@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace MediaVizSdk;
 
+require_once __DIR__ . '/Exceptions.php';
+
 class Authentication {
     private \OAuthSdk\OAuthClient $client;
 
@@ -27,9 +29,14 @@ class Authentication {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        $response = curl_exec($ch);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        $raw = curl_exec($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         curl_close($ch);
-        return json_decode($response, true);
+        $headers = self::parseHeaders(substr($raw, 0, $headerSize));
+        $body = substr($raw, $headerSize);
+        return handleResponse($body, $statusCode, $headers);
     }
 
     public function createRequestPasswordReset(
@@ -62,9 +69,14 @@ class Authentication {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        $response = curl_exec($ch);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        $raw = curl_exec($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         curl_close($ch);
-        return json_decode($response, true);
+        $headers = self::parseHeaders(substr($raw, 0, $headerSize));
+        $body = substr($raw, $headerSize);
+        return handleResponse($body, $statusCode, $headers);
     }
 
     public function createLogout(string $accessToken, string $refreshToken): \OAuthSdk\AuthenticatedResponse {
@@ -77,8 +89,24 @@ class Authentication {
         $ch = curl_init($baseUrl . $path);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-        $response = curl_exec($ch);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        $raw = curl_exec($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         curl_close($ch);
-        return json_decode($response, true);
+        $headers = self::parseHeaders(substr($raw, 0, $headerSize));
+        $body = substr($raw, $headerSize);
+        return handleResponse($body, $statusCode, $headers);
+    }
+
+    private static function parseHeaders(string $raw): array {
+        $headers = [];
+        foreach (explode("\r\n", $raw) as $line) {
+            $parts = explode(':', $line, 2);
+            if (count($parts) === 2) {
+                $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+        }
+        return $headers;
     }
 }

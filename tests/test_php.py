@@ -121,7 +121,7 @@ def test_unauth_method_structured_body(gen):
     assert "'company'" in src
     assert "curl_init" in src
     assert "json_encode($body)" in src
-    assert "json_decode($response, true)" in src
+    assert "handleResponse($body, $statusCode, $headers)" in src
 
 
 def test_unauth_method_no_body_get(gen):
@@ -131,7 +131,7 @@ def test_unauth_method_no_body_get(gen):
     assert "public function getPublicStatus(string $baseUrl)" in src
     assert "curl_init($baseUrl . $path)" in src
     assert "CURLOPT_CUSTOMREQUEST, 'GET'" in src
-    assert "json_decode($response, true)" in src
+    assert "handleResponse($body, $statusCode, $headers)" in src
 
 
 def test_unauth_method_dynamic_body(gen):

@@ -7,6 +7,7 @@ class JavaScriptNodeGenerator(JavaScriptBrowserGenerator):
 
     def generate(self, endpoints: list[dict], output_dir: str) -> None:
         os.makedirs(output_dir, exist_ok=True)
+        self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
         controller_files = []
         for controller, eps in groups.items():

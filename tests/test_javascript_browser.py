@@ -126,7 +126,7 @@ def test_unauth_fn_structured_body(gen):
     assert "fetch(baseUrl +" in src
     assert "'POST'" in src
     assert "JSON.stringify" in src
-    assert "resp.json()" in src
+    assert "handleResponse(resp)" in src
 
 
 def test_unauth_fn_dynamic_body(gen):

@@ -1,4 +1,5 @@
 import { OAuthClient } from './oauth/index.js';
+import { handleResponse } from './errors.js';
 
 export async function createToken(baseUrl, { type, required, passwordType, passwordRequired }) {
   const resp = await fetch(baseUrl + `/api/v1/token/`, {
@@ -9,7 +10,7 @@ export async function createToken(baseUrl, { type, required, passwordType, passw
       password: { type: passwordType, required: passwordRequired }
     }),
   });
-  return resp.json();
+  return handleResponse(resp);
 }
 
 export function createRequestPasswordReset(client, accessToken, refreshToken, { email } = {}) {
@@ -30,7 +31,7 @@ export async function createResetPassword(baseUrl, { type, required, newPassword
       new_password: { type: newPasswordType, required: newPasswordRequired }
     }),
   });
-  return resp.json();
+  return handleResponse(resp);
 }
 
 export function createLogout(client, accessToken, refreshToken) {
@@ -40,5 +41,5 @@ export function createLogout(client, accessToken, refreshToken) {
 
 export async function getShareauthPhp(baseUrl) {
   const resp = await fetch(baseUrl + `/shareAuth.php`, { method: 'GET' });
-  return resp.json();
+  return handleResponse(resp);
 }

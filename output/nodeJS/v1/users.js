@@ -1,4 +1,5 @@
 import { OAuthClient } from './oauth/index.js';
+import { handleResponse } from './errors.js';
 
 export function getUsers(client, accessToken, refreshToken, userId) {
   const path = `/api/v1/users/${encodeURIComponent(userId)}`;
@@ -14,7 +15,7 @@ export async function createUsersNewCompany(baseUrl, { name, email, password, ac
       company: { name: companyName }
     }),
   });
-  return resp.json();
+  return handleResponse(resp);
 }
 
 export function updateUsers(client, accessToken, refreshToken, userId) {

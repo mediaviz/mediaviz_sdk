@@ -271,5 +271,90 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 15,
+    "description": "Add emit_errors_file to JavaScript browser generator — emits errors.js with ApiError hierarchy and handleResponse function",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "emit_errors_file",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "emit_barrel_index",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 16,
+    "description": "Wire handleResponse into JS unauth functions — replace return resp.json() with return handleResponse(resp)",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_emit_unauth_fn",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "emit_controller_file",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 17,
+    "description": "Add emit_errors_file to PHP generator — emits Exceptions.php with ApiException hierarchy and handleResponse function",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "emit_errors_file",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "generate",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 18,
+    "description": "Wire handleResponse into PHP unauth methods — replace json_decode return with handleResponse call",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_emit_unauth_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_curl_post",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 19,
+    "description": "Ensure Node.js generator inherits error handling — verify emit_errors_file is called in generate() override",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/javascript_node.py",
+        "location": "generate",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
   }
 ]

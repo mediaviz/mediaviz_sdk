@@ -256,6 +256,48 @@ Copied into `output/{framework}/v{N}/oauth/` directly from the source OAuth SDK 
 
 Snake_case endpoint `id` → framework convention is handled by each generator.
 
+## Error Handling
+
+Each generated SDK includes a standalone error-handling module emitted alongside the controller files. Auth endpoints delegate to the OAuth client (which handles its own errors); error handling applies to unauthenticated endpoints only.
+
+### Error Module Files
+
+| Framework | File | Contents |
+|-----------|------|----------|
+| javascript (browser) | `errors.js` | ES module with error classes + `handleResponse()` |
+| nodeJS | `errors.js` | Same as browser |
+| php | `Exceptions.php` | Namespaced exception classes + `handleResponse()` function |
+
+### FastAPI Error Envelope
+
+The API returns errors using FastAPI's default structure:
+
+- **Non-422 errors:** `{"detail": "Human-readable message"}`
+- **422 validation errors:** `{"detail": [{"type": "...", "loc": ["body", "field"], "msg": "...", "input": {...}, "url": "..."}]}`
+
+All responses include an `x-request-id` header for tracing.
+
+### Error Hierarchy
+
+| Class (JS) / Exception (PHP) | Thrown on | Key fields |
+|-------------------------------|-----------|------------|
+| `ApiError` / `ApiException` | Any non-2xx not matched below | `message`, `status`, `requestId`, `body` |
+| `ValidationError` / `ValidationException` | 422 | `fieldErrors` (parsed from `detail` array) |
+| `NotFoundError` / `NotFoundException` | 404 | — |
+| `RateLimitError` / `RateLimitException` | 429 | `retryAfter` (from `retry-after` header) |
+| `ServerError` / `ServerException` | 5xx | — |
+
+### Generator Responsibilities
+
+- `generate()` calls `emit_errors_file(output_dir)` to write the error module
+- Barrel/index file re-exports the error classes (JS only)
+- Unauthenticated functions call `handleResponse(resp)` instead of directly returning `resp.json()` / `json_decode()`
+- Auth functions are unchanged — the OAuth client handles errors internally
+
+### Reference
+
+Full error class implementations and consumer usage examples are in `errors.md`.
+
 ## Constraints
 
 - All generated code is read-only by convention. Manual edits go into a separate layer (not covered by this spec).

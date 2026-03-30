@@ -1,3 +1,4 @@
+export * from './errors.js';
 export * from './admin.js';
 export * from './authentication.js';
 export * from './curated albums.js';

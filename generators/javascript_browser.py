@@ -7,6 +7,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
     def generate(self, endpoints: list[dict], output_dir: str) -> None:
         os.makedirs(output_dir, exist_ok=True)
+        self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
         controller_files = []
         for controller, eps in groups.items():
@@ -19,11 +20,104 @@ class JavaScriptBrowserGenerator(BaseGenerator):
     def copy_auth_wrapper(self, oauth_sdk_root: str, output_dir: str) -> None:
         self._copy_oauth(oauth_sdk_root, "javascript", output_dir)
 
+    def emit_errors_file(self, output_dir: str) -> None:
+        lines = [
+            "// Auto-generated — do not edit",
+            "",
+            "export class ApiError extends Error {",
+            "  constructor(message, status, requestId, body) {",
+            "    super(message);",
+            "    this.name = 'ApiError';",
+            "    this.status = status;",
+            "    this.requestId = requestId;",
+            "    this.body = body;",
+            "  }",
+            "}",
+            "",
+            "export class ValidationError extends ApiError {",
+            "  constructor(body, status, requestId) {",
+            "    const detail = body.detail ?? [];",
+            "    const message = Array.isArray(detail)",
+            "      ? detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join('; ')",
+            "      : String(detail);",
+            "    super(message, status, requestId, body);",
+            "    this.name = 'ValidationError';",
+            "    this.fieldErrors = Array.isArray(detail)",
+            "      ? detail.map(d => ({ loc: d.loc, msg: d.msg, type: d.type }))",
+            "      : [];",
+            "  }",
+            "}",
+            "",
+            "export class NotFoundError extends ApiError {",
+            "  constructor(body, status, requestId) {",
+            "    super(body.detail ?? 'Resource not found', status, requestId, body);",
+            "    this.name = 'NotFoundError';",
+            "  }",
+            "}",
+            "",
+            "export class RateLimitError extends ApiError {",
+            "  constructor(body, status, requestId, headers) {",
+            "    super(body.detail ?? 'Rate limited', status, requestId, body);",
+            "    this.name = 'RateLimitError';",
+            "    this.retryAfter = parseInt(headers.get('retry-after') ?? '', 10) || null;",
+            "  }",
+            "}",
+            "",
+            "export class ServerError extends ApiError {",
+            "  constructor(body, status, requestId) {",
+            "    super(body.detail ?? 'Internal server error', status, requestId, body);",
+            "    this.name = 'ServerError';",
+            "  }",
+            "}",
+            "",
+            "export async function handleResponse(response) {",
+            "  const requestId = response.headers.get('x-request-id');",
+            "",
+            "  if (response.ok) {",
+            "    return response.json();",
+            "  }",
+            "",
+            "  let body;",
+            "  try {",
+            "    body = await response.json();",
+            "  } catch {",
+            "    body = { detail: response.statusText };",
+            "  }",
+            "",
+            "  switch (response.status) {",
+            "    case 422:",
+            "      throw new ValidationError(body, response.status, requestId);",
+            "    case 404:",
+            "      throw new NotFoundError(body, response.status, requestId);",
+            "    case 429:",
+            "      throw new RateLimitError(body, response.status, requestId, response.headers);",
+            "    default:",
+            "      if (response.status >= 500) {",
+            "        throw new ServerError(body, response.status, requestId);",
+            "      }",
+            "      throw new ApiError(",
+            "        body.detail ?? 'Unknown error',",
+            "        response.status,",
+            "        requestId,",
+            "        body",
+            "      );",
+            "  }",
+            "}",
+            "",
+        ]
+        with open(os.path.join(output_dir, "errors.js"), "w") as f:
+            f.write("\n".join(lines))
+
     def emit_controller_file(self, controller: str, endpoints: list[dict], filepath: str) -> None:
         needs_oauth = any(ep.get("auth") == "required" for ep in endpoints)
+        needs_errors = any(ep.get("auth") != "required" for ep in endpoints)
         lines = []
         if needs_oauth:
-            lines += ["import { OAuthClient } from './oauth/index.js';", ""]
+            lines += ["import { OAuthClient } from './oauth/index.js';"]
+        if needs_errors:
+            lines += ["import { handleResponse } from './errors.js';"]
+        if needs_oauth or needs_errors:
+            lines.append("")
         for ep in endpoints:
             lines.extend(self._emit_function(ep))
             lines.append("")
@@ -31,7 +125,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             f.write("\n".join(lines))
 
     def emit_barrel_index(self, controller_files: list[str], output_dir: str) -> None:
-        lines = [f"export * from './{f}';" for f in sorted(controller_files)]
+        lines = ["export * from './errors.js';"]
+        lines += [f"export * from './{f}';" for f in sorted(controller_files)]
         with open(os.path.join(output_dir, "index.js"), "w") as f:
             f.write("\n".join(lines) + "\n")
 
@@ -115,7 +210,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 lines.append(f"      {group_key}: {{ {', '.join(field_strs)} }}{comma}")
             lines.append("    }),")
             lines.append("  });")
-            lines.append("  return resp.json();")
+            lines.append("  return handleResponse(resp);")
         elif request_body:
             # Dynamic/unstructured body string
             sig_parts = ["baseUrl"] + path_args + ["body = {}"]
@@ -126,7 +221,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines.append("    headers: { 'Content-Type': 'application/json' },")
             lines.append("    body: JSON.stringify(body),")
             lines.append("  });")
-            lines.append("  return resp.json();")
+            lines.append("  return handleResponse(resp);")
         else:
             # No body — GET or DELETE
             sig_parts = ["baseUrl"] + path_args
@@ -146,7 +241,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 lines.append(f"  const resp = await fetch(baseUrl + path, {{ method: '{method}' }});")
             else:
                 lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{ method: '{method}' }});")
-            lines.append("  return resp.json();")
+            lines.append("  return handleResponse(resp);")
 
         lines.append("}")
         return lines
