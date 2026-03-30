@@ -1,0 +1,8 @@
+{
+  "name": "mediaviz/sdk",
+  "autoload": {
+    "psr-4": {
+      "MediaVizSdk\\": "./"
+    }
+  }
+}

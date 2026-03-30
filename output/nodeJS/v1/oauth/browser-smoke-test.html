@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OAuth SDK Browser Smoke Test</title>
+</head>
+<body>
+  <pre id="output"></pre>
+  <script src="dist/oauth-sdk.umd.js"></script>
+  <script>
+    (async () => {
+      const log = (msg) => {
+        document.getElementById('output').textContent += msg + '\n';
+        console.log(msg);
+      };
+
+      try {
+        const { OAuthClient } = OAuthSDK;
+        const client = new OAuthClient({
+          baseUrl: 'https://example.com',
+          clientId: 'test-client-id',
+          clientSecret: 'test-client-secret',
+          redirectUri: 'https://example.com/callback',
+        });
+
+        const result = await client.generateAuthorizationUrl();
+
+        if (!result.url.includes('response_type=code')) {
+          throw new Error(`url missing response_type=code: ${result.url}`);
+        }
+        if (result.code_verifier.length !== 64) {
+          throw new Error(`code_verifier length ${result.code_verifier.length} !== 64`);
+        }
+        if (result.state.length !== 32) {
+          throw new Error(`state length ${result.state.length} !== 32`);
+        }
+
+        log('PASS');
+      } catch (err) {
+        log('FAIL: ' + err.message);
+      }
+    })();
+  </script>
+</body>
+</html>

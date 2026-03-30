@@ -1,0 +1,275 @@
+[
+  {
+    "id": 1,
+    "description": "Create versioning module that scans output directory for existing versions and returns next version number",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/versioning.py",
+        "location": "get_next_version",
+        "status": "new file"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 2,
+    "description": "Create resolver module that reads a ref-list YAML, follows refs into controller YAMLs, extracts endpoints by id, and writes a flattened YAML snapshot",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "resolve_refs",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "parse_ref",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "write_flattened_yaml",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 3,
+    "description": "Create abstract base generator class with shared utilities (group_by_controller, snake_to_camel, copy_auth_wrapper interface)",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/base.py",
+        "location": "BaseGenerator",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 4,
+    "description": "Create framework registry with auto-discovery of generator classes from generators/ directory",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/__init__.py",
+        "location": "discover_generators",
+        "status": "new file"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 5,
+    "description": "Create JavaScript browser generator — emits ES module files per controller, barrel index, copies JS OAuth SDK, adds Rollup config for UMD build",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "JavaScriptBrowserGenerator",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "copy_auth_wrapper",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "emit_controller_file",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "emit_barrel_index",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "emit_rollup_config",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 6,
+    "description": "Create Node.js generator — emits ESM files per controller, barrel index, copies JS OAuth SDK (no Rollup)",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/javascript_node.py",
+        "location": "JavaScriptNodeGenerator",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_node.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_node.py",
+        "location": "copy_auth_wrapper",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_node.py",
+        "location": "emit_controller_file",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_node.py",
+        "location": "emit_barrel_index",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 7,
+    "description": "Create PHP generator — emits one class per controller, autoload config, copies PHP OAuth SDK",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "PhpGenerator",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "copy_auth_wrapper",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "emit_controller_file",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "emit_autoload_config",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 8,
+    "description": "Create CLI entrypoint (generate.py) that wires together versioning, resolver, registry, and generators with argparse flags",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generate.py",
+        "location": "main",
+        "status": "new file"
+      },
+      {
+        "file": "mediaviz_sdk/generate.py",
+        "location": "parse_args",
+        "status": "new file"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 9,
+    "description": "Test resolver against top_endpoints.yaml — verify all 76 refs resolve, flattened YAML is valid, endpoint fields are preserved",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_resolver.py",
+        "location": "test_resolve_top_endpoints",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_resolver.py",
+        "location": "test_parse_ref",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 10,
+    "description": "Test versioning — verify v1 default, auto-increment, correct scanning of output directory",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_versioning.py",
+        "location": "test_first_version",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_versioning.py",
+        "location": "test_increment",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 11,
+    "description": "Test JavaScript browser generator — verify output file structure, function naming (camelCase), path interpolation, query param handling, auth routing, Rollup config presence",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_javascript_browser.py",
+        "location": "test_generate_photos_controller",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_javascript_browser.py",
+        "location": "test_unauth_endpoint",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 12,
+    "description": "Test PHP generator — verify output file structure, function naming (camelCase), class structure (PascalCase), path interpolation, query param handling, auth routing",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_php.py",
+        "location": "test_generate_photos_controller",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_php.py",
+        "location": "test_unauth_endpoint",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 13,
+    "description": "Test framework registry auto-discovery — verify all generators found, unknown framework raises error",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_registry.py",
+        "location": "test_discover_all",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_registry.py",
+        "location": "test_unknown_framework",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 14,
+    "description": "End-to-end test — run full generate.py against top_endpoints.yaml, verify output directory structure, version numbering, file contents for one endpoint per framework",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_e2e.py",
+        "location": "test_full_generation",
+        "status": "new file"
+      }
+    ],
+    "completion_status": true
+  }
+]
