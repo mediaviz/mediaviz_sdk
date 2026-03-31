@@ -19,6 +19,8 @@ class BaseGenerator(ABC):
     def group_by_controller(self, endpoints: list[dict]) -> dict[str, list[dict]]:
         groups: dict[str, list[dict]] = {}
         for ep in endpoints:
+            if ep.get("hidden"):
+                continue
             controller = ep["controller"]
             groups.setdefault(controller, []).append(ep)
         return groups

@@ -42,7 +42,8 @@ def test_resolve_top_endpoints_count():
 def test_resolve_preserves_required_fields():
     endpoints = resolve_refs(TOP_ENDPOINTS)
     required_keys = {"id", "controller", "base_path", "method", "path", "summary",
-                     "auth", "params", "request_body", "response", "content_type", "tags"}
+                     "auth", "params", "request_body", "response", "content_type", "tags",
+                     "hidden"}
     for ep in endpoints:
         assert required_keys == set(ep.keys()), f"Missing keys in endpoint: {ep['id']}"
 

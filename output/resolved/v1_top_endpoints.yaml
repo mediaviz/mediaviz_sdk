@@ -1,6 +1,6 @@
 version: 1
 source: top_endpoints.yaml
-resolved_at: '2026-03-30T15:52:29Z'
+resolved_at: '2026-03-30T18:15:39Z'
 endpoints:
 - id: get_admin_category_labels
   controller: Admin
