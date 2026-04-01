@@ -44,7 +44,7 @@ def main() -> None:
     file_counts: dict[str, int] = {}
     for framework in requested:
         gen = registry[framework]()
-        fw_dir = os.path.join(output_dir, framework, f"v{version}")
+        fw_dir = os.path.join(output_dir, f"v{version}", framework)
         os.makedirs(fw_dir, exist_ok=True)
         gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)
         gen.generate(endpoints, fw_dir)
@@ -52,7 +52,7 @@ def main() -> None:
 
     print(f"\nSDK v{version} generated:")
     for fw, count in file_counts.items():
-        print(f"  {fw}: {count} file(s) → {os.path.join(output_dir, fw, f'v{version}')}")
+        print(f"  {fw}: {count} file(s) → {os.path.join(output_dir, f'v{version}', fw)}")
 
 
 if __name__ == "__main__":

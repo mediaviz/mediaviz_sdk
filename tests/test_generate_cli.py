@@ -92,14 +92,14 @@ def test_cli_creates_resolved_yaml(sdk_env):
 def test_cli_creates_framework_output_dir(sdk_env):
     result = run_cli(sdk_env, ["--frameworks", "javascript"])
     assert result.returncode == 0, result.stderr
-    fw_dir = os.path.join(sdk_env["output"], "javascript", "v1")
+    fw_dir = os.path.join(sdk_env["output"], "v1", "javascript")
     assert os.path.isdir(fw_dir)
 
 
 def test_cli_generates_controller_file(sdk_env):
     result = run_cli(sdk_env, ["--frameworks", "javascript"])
     assert result.returncode == 0, result.stderr
-    photos_js = os.path.join(sdk_env["output"], "javascript", "v1", "photos.js")
+    photos_js = os.path.join(sdk_env["output"], "v1", "javascript", "photos.js")
     assert os.path.isfile(photos_js)
     content = open(photos_js).read()
     assert "getPhotos" in content
@@ -108,14 +108,14 @@ def test_cli_generates_controller_file(sdk_env):
 def test_cli_copies_oauth_wrapper(sdk_env):
     result = run_cli(sdk_env, ["--frameworks", "javascript"])
     assert result.returncode == 0, result.stderr
-    oauth_index = os.path.join(sdk_env["output"], "javascript", "v1", "oauth", "index.js")
+    oauth_index = os.path.join(sdk_env["output"], "v1", "javascript", "oauth", "index.js")
     assert os.path.isfile(oauth_index)
 
 
 def test_cli_version_increments_on_second_run(sdk_env):
     run_cli(sdk_env, ["--frameworks", "javascript"])
     run_cli(sdk_env, ["--frameworks", "javascript"])
-    v2_dir = os.path.join(sdk_env["output"], "javascript", "v2")
+    v2_dir = os.path.join(sdk_env["output"], "v2", "javascript")
     assert os.path.isdir(v2_dir)
     resolved_dir = os.path.join(sdk_env["output"], "resolved")
     yaml_files = sorted(os.listdir(resolved_dir))

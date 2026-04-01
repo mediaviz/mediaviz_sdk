@@ -1,5 +1,7 @@
+from __future__ import annotations
 import json
 import os
+import re
 from .base import BaseGenerator
 
 _TYPE_MAP = {"string": "string", "integer": "int", "boolean": "bool", "number": "float"}
@@ -20,10 +22,57 @@ class PhpGenerator(BaseGenerator):
             class_name = self.snake_to_pascal(controller) if "_" in controller else controller
             filename = class_name + ".php"
             self.emit_controller_file(class_name, eps, os.path.join(output_dir, filename))
-        self.emit_autoload_config(output_dir)
+        reexport_files = self.reexport_all_modules(output_dir)
+        self.emit_autoload_config(output_dir, reexport_files=reexport_files)
 
-    def copy_auth_wrapper(self, oauth_sdk_root: str, output_dir: str) -> None:
-        self._copy_oauth(oauth_sdk_root, "php", output_dir)
+    def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
+        self._copy_module_files(module_root, "php", module_name, output_dir)
+
+    def discover_module_exports(self, module_name: str, module_path: str) -> list[dict]:
+        composer = os.path.join(module_path, "composer.json")
+        if not os.path.isfile(composer):
+            return []
+        config = json.load(open(composer))
+        psr4 = config.get("autoload", {}).get("psr-4", {})
+        if not psr4:
+            return []
+        exports = []
+        for namespace, src_dir in psr4.items():
+            src_path = os.path.join(module_path, src_dir)
+            if not os.path.isdir(src_path):
+                continue
+            for fname in sorted(os.listdir(src_path)):
+                if not fname.endswith(".php"):
+                    continue
+                content = open(os.path.join(src_path, fname)).read()
+                for m in re.finditer(
+                    r'(?:(?:readonly|final|abstract)\s+)*(class|enum|interface)\s+(\w+)',
+                    content,
+                ):
+                    exports.append({
+                        "name": m.group(2),
+                        "kind": m.group(1),
+                        "fqcn": namespace.rstrip("\\") + "\\" + m.group(2),
+                    })
+        return exports
+
+    def emit_reexports(self, module_name: str, exports: list[dict], output_dir: str) -> str | None:
+        if not exports:
+            return None
+        filename = f"_{module_name}.php"
+        lines = ["<?php", "// Auto-generated — do not edit", "namespace MediaVizSdk;", ""]
+        for exp in exports:
+            fqcn = "\\" + exp["fqcn"]
+            if exp["kind"] == "class":
+                lines.append(f"class {exp['name']} extends {fqcn} {{}}")
+            elif exp["kind"] == "interface":
+                lines.append(f"interface {exp['name']} extends {fqcn} {{}}")
+            elif exp["kind"] == "enum":
+                lines.append(f"\\class_alias({fqcn}::class, 'MediaVizSdk\\\\{exp['name']}');")
+        lines.append("")
+        with open(os.path.join(output_dir, filename), "w") as f:
+            f.write("\n".join(lines))
+        return filename
 
     def emit_errors_file(self, output_dir: str) -> None:
         lines = [
@@ -150,13 +199,28 @@ class PhpGenerator(BaseGenerator):
         with open(filepath, "w") as f:
             f.write("\n".join(lines))
 
-    def emit_autoload_config(self, output_dir: str) -> None:
+    def emit_autoload_config(self, output_dir: str, reexport_files: list[str] | None = None) -> None:
         config = {
             "name": "mediaviz/sdk",
+            "require": {},
             "autoload": {
                 "psr-4": {"MediaVizSdk\\": "./"}
-            }
+            },
         }
+        for mod in self._copied_modules:
+            composer_path = os.path.join(mod["path"], "composer.json")
+            if not os.path.isfile(composer_path):
+                continue
+            mod_config = json.load(open(composer_path))
+            for ns, src in mod_config.get("autoload", {}).get("psr-4", {}).items():
+                config["autoload"]["psr-4"][ns] = f"./{mod['name']}/{src}"
+            for pkg, constraint in mod_config.get("require", {}).items():
+                if pkg not in config["require"]:
+                    config["require"][pkg] = constraint
+        if not config["require"]:
+            del config["require"]
+        if reexport_files:
+            config["autoload"]["files"] = [f"./{f}" for f in reexport_files]
         with open(os.path.join(output_dir, "composer.json"), "w") as f:
             json.dump(config, f, indent=2)
             f.write("\n")
@@ -202,9 +266,9 @@ class PhpGenerator(BaseGenerator):
             sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
 
         if isinstance(request_body, dict):
-            flat_params, body_groups = self._flatten_body(request_body)
-            for param in flat_params:
-                sig_parts.append(f"mixed ${param}")
+            fields = self._flatten_body(request_body)
+            for _, camel_param in fields:
+                sig_parts.append(f"mixed ${camel_param}")
             if len(sig_parts) > 1:
                 indent = "        "
                 sig = f"    public function {func_name}(\n"
@@ -215,11 +279,8 @@ class PhpGenerator(BaseGenerator):
             lines = [sig]
             lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
             lines.append("        $body = [")
-            for group_key, fields in body_groups:
-                field_entries = []
-                for snake_key, camel_param in fields:
-                    field_entries.append(f"'{snake_key}' => ${camel_param}")
-                lines.append(f"            '{group_key}' => [{', '.join(field_entries)}],")
+            for snake_key, camel_param in fields:
+                lines.append(f"            '{snake_key}' => ${camel_param},")
             lines.append("        ];")
             lines.extend(self._curl_post(method))
         elif request_body:
@@ -287,21 +348,10 @@ class PhpGenerator(BaseGenerator):
             "        return handleResponse($body, $statusCode, $headers);",
         ]
 
-    def _flatten_body(self, body: dict) -> tuple[list[str], list[tuple[str, list[tuple[str, str]]]]]:
-        used: set[str] = set()
-        flat_params: list[str] = []
-        body_groups: list[tuple[str, list[tuple[str, str]]]] = []
-        for group_key, fields in body.items():
-            if not isinstance(fields, dict):
-                continue
-            group_fields: list[tuple[str, str]] = []
-            for field_name in fields:
-                camel = self.snake_to_camel(field_name)
-                if camel in used:
-                    group_camel = self.snake_to_camel(group_key)
-                    camel = group_camel + camel[0].upper() + camel[1:]
-                used.add(camel)
-                flat_params.append(camel)
-                group_fields.append((field_name, camel))
-            body_groups.append((group_key, group_fields))
-        return flat_params, body_groups
+    def _flatten_body(self, body: dict) -> list[tuple[str, str]]:
+        """Extract field names from request_body schema, returning [(snake_key, camelKey), ...]."""
+        fields: list[tuple[str, str]] = []
+        for field_name in body:
+            camel = self.snake_to_camel(field_name)
+            fields.append((field_name, camel))
+        return fields

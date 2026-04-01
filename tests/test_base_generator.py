@@ -11,8 +11,14 @@ class ConcreteGenerator(BaseGenerator):
     def generate(self, endpoints, output_dir):
         pass
 
-    def copy_auth_wrapper(self, oauth_sdk_root, output_dir):
-        self._copy_oauth(oauth_sdk_root, "javascript", output_dir)
+    def copy_module(self, module_name, module_root, output_dir):
+        self._copy_module_files(module_root, "javascript", module_name, output_dir)
+
+    def discover_module_exports(self, module_name, module_path):
+        return []
+
+    def emit_reexports(self, module_name, exports, output_dir):
+        return None
 
 
 @pytest.fixture
@@ -50,17 +56,16 @@ def test_group_by_controller_empty(gen):
     assert gen.group_by_controller([]) == {}
 
 
-def test_copy_oauth_missing_src(gen):
+def test_copy_module_missing_src(gen):
     with tempfile.TemporaryDirectory() as tmp:
         oauth_root = os.path.join(tmp, "oauth_sdk")
         os.makedirs(oauth_root)
         out_dir = os.path.join(tmp, "output")
-        # should not raise even if subdir missing
-        gen.copy_auth_wrapper(oauth_root, out_dir)
+        gen.copy_module("oauth", oauth_root, out_dir)
         assert os.path.isdir(os.path.join(out_dir, "oauth"))
 
 
-def test_copy_oauth_copies_files(gen):
+def test_copy_module_copies_files(gen):
     with tempfile.TemporaryDirectory() as tmp:
         oauth_root = os.path.join(tmp, "oauth_sdk")
         js_src = os.path.join(oauth_root, "javascript")
@@ -68,5 +73,35 @@ def test_copy_oauth_copies_files(gen):
         with open(os.path.join(js_src, "index.js"), "w") as f:
             f.write("export class OAuthClient {}")
         out_dir = os.path.join(tmp, "output")
+        gen.copy_module("oauth", oauth_root, out_dir)
+        assert os.path.isfile(os.path.join(out_dir, "oauth", "index.js"))
+
+
+def test_copy_module_registers_in_copied_modules(gen):
+    with tempfile.TemporaryDirectory() as tmp:
+        oauth_root = os.path.join(tmp, "oauth_sdk")
+        js_src = os.path.join(oauth_root, "javascript")
+        os.makedirs(js_src)
+        out_dir = os.path.join(tmp, "output")
+        gen.copy_module("oauth", oauth_root, out_dir)
+        assert len(gen._copied_modules) == 1
+        assert gen._copied_modules[0]["name"] == "oauth"
+
+
+def test_copy_auth_wrapper_delegates_to_copy_module(gen):
+    with tempfile.TemporaryDirectory() as tmp:
+        oauth_root = os.path.join(tmp, "oauth_sdk")
+        js_src = os.path.join(oauth_root, "javascript")
+        os.makedirs(js_src)
+        with open(os.path.join(js_src, "index.js"), "w") as f:
+            f.write("// stub")
+        out_dir = os.path.join(tmp, "output")
         gen.copy_auth_wrapper(oauth_root, out_dir)
         assert os.path.isfile(os.path.join(out_dir, "oauth", "index.js"))
+        assert gen._copied_modules[0]["name"] == "oauth"
+
+
+def test_reexport_all_modules_empty(gen):
+    with tempfile.TemporaryDirectory() as tmp:
+        result = gen.reexport_all_modules(tmp)
+        assert result == []

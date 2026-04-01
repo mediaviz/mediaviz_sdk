@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import pytest
@@ -103,22 +104,21 @@ def test_auth_method_query_params(gen):
 
 def test_unauth_method_structured_body(gen):
     ep = _unauth_ep(
-        "create_users_new_company",
-        "/api/v1/users/new_company",
+        "create_token",
+        "/api/v1/token/",
         method="POST",
         request_body={
-            "user": {"name": "string", "email": "string", "account_type": "integer"},
-            "company": {"name": "string"},
+            "username": {"type": "string (email)", "required": True},
+            "password": {"type": "string", "required": True},
         },
     )
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "public function createUsersNewCompany" in src
-    assert "$name" in src
-    assert "$companyName" in src
-    assert "$accountType" in src
-    assert "'account_type' => $accountType" in src
-    assert "'company'" in src
+    assert "public function createToken" in src
+    assert "$username" in src
+    assert "$password" in src
+    assert "'username' => $username" in src
+    assert "'password' => $password" in src
     assert "curl_init" in src
     assert "json_encode($body)" in src
     assert "handleResponse($body, $statusCode, $headers)" in src
@@ -197,3 +197,100 @@ def test_file_naming_pascal_case(gen, tmp_path):
     ep = _auth_ep("get_items", "/api/v1/items/", controller="MyController")
     gen.generate([ep], str(tmp_path))
     assert (tmp_path / "MyController.php").exists()
+
+
+# ── module re-export ─────────────────────────────────────────────────────────
+
+
+def _make_php_oauth_module(base_path):
+    """Create a minimal PHP oauth module for testing."""
+    mod_dir = base_path / "oauth"
+    src_dir = mod_dir / "src"
+    src_dir.mkdir(parents=True)
+    (mod_dir / "composer.json").write_text(json.dumps({
+        "autoload": {"psr-4": {"OAuthSdk\\": "src/"}}
+    }))
+    (src_dir / "OAuthClient.php").write_text(
+        "<?php\nnamespace OAuthSdk;\nclass OAuthClient {}\n"
+    )
+    (src_dir / "OAuthErrorCode.php").write_text(
+        "<?php\nnamespace OAuthSdk;\nenum OAuthErrorCode: string {}\n"
+    )
+    (src_dir / "Types.php").write_text(
+        "<?php\nnamespace OAuthSdk;\n"
+        "readonly class TokenResponse {}\n"
+        "readonly class AuthenticatedResponse {}\n"
+    )
+    return str(mod_dir)
+
+
+def test_discover_php_module_exports(gen, tmp_path):
+    mod_path = _make_php_oauth_module(tmp_path)
+    exports = gen.discover_module_exports("oauth", mod_path)
+    names = {e["name"] for e in exports}
+    assert "OAuthClient" in names
+    assert "OAuthErrorCode" in names
+    assert "TokenResponse" in names
+    assert "AuthenticatedResponse" in names
+
+
+def test_discover_php_module_exports_kinds(gen, tmp_path):
+    mod_path = _make_php_oauth_module(tmp_path)
+    exports = gen.discover_module_exports("oauth", mod_path)
+    by_name = {e["name"]: e for e in exports}
+    assert by_name["OAuthClient"]["kind"] == "class"
+    assert by_name["OAuthErrorCode"]["kind"] == "enum"
+
+
+def test_discover_php_module_no_composer(gen, tmp_path):
+    mod_dir = tmp_path / "empty"
+    mod_dir.mkdir()
+    assert gen.discover_module_exports("empty", str(mod_dir)) == []
+
+
+def test_emit_php_reexports_facades(gen, tmp_path):
+    exports = [
+        {"name": "OAuthClient", "kind": "class", "fqcn": "OAuthSdk\\OAuthClient"},
+        {"name": "OAuthErrorCode", "kind": "enum", "fqcn": "OAuthSdk\\OAuthErrorCode"},
+    ]
+    filename = gen.emit_reexports("oauth", exports, str(tmp_path))
+    assert filename == "_oauth.php"
+    content = (tmp_path / "_oauth.php").read_text()
+    assert "namespace MediaVizSdk;" in content
+    assert "class OAuthClient extends \\OAuthSdk\\OAuthClient {}" in content
+    assert "class_alias" in content
+    assert "OAuthErrorCode" in content
+
+
+def test_emit_php_reexports_empty(gen, tmp_path):
+    assert gen.emit_reexports("oauth", [], str(tmp_path)) is None
+
+
+def test_autoload_config_includes_reexports(gen, tmp_path):
+    mod_path = _make_php_oauth_module(tmp_path)
+    gen._copied_modules.append({"name": "oauth", "path": mod_path})
+    gen.generate([_auth_ep("get_photos", "/api/v1/photos/")], str(tmp_path))
+    config = json.loads((tmp_path / "composer.json").read_text())
+    assert "OAuthSdk\\" in config["autoload"]["psr-4"]
+    assert "./_oauth.php" in config["autoload"]["files"]
+
+
+def test_autoload_config_merges_nested_require(gen, tmp_path):
+    mod_dir = tmp_path / "oauth"
+    src_dir = mod_dir / "src"
+    src_dir.mkdir(parents=True)
+    (mod_dir / "composer.json").write_text(json.dumps({
+        "require": {"php": ">=8.1", "ext-curl": "*"},
+        "autoload": {"psr-4": {"OAuthSdk\\": "src/"}},
+    }))
+    gen._copied_modules.append({"name": "oauth", "path": str(mod_dir)})
+    gen.generate([_auth_ep("get_photos", "/api/v1/photos/")], str(tmp_path))
+    config = json.loads((tmp_path / "composer.json").read_text())
+    assert config["require"]["php"] == ">=8.1"
+    assert config["require"]["ext-curl"] == "*"
+
+
+def test_autoload_config_no_require_when_no_modules(gen, tmp_path):
+    gen.generate([_auth_ep("get_photos", "/api/v1/photos/")], str(tmp_path))
+    config = json.loads((tmp_path / "composer.json").read_text())
+    assert "require" not in config

@@ -1,6 +1,6 @@
 version: 1
 source: top_endpoints.yaml
-resolved_at: '2026-03-30T18:15:39Z'
+resolved_at: '2026-03-31T21:56:32Z'
 endpoints:
 - id: get_admin_category_labels
   controller: Admin
@@ -19,6 +19,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: true
 - id: get_admin_keyword_group
   controller: Admin
   base_path: /api/v1
@@ -40,6 +41,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: true
 - id: get_admin_keyword_group_1
   controller: Admin
   base_path: /api/v1
@@ -53,6 +55,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: true
 - id: create_admin_get_google_sheets_credentials
   controller: Admin
   base_path: /api/v1
@@ -66,6 +69,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: true
 - id: create_token
   controller: Authentication
   base_path: /api/v1
@@ -91,6 +95,7 @@ endpoints:
   content_type: application/x-www-form-urlencoded
   tags:
   - top
+  hidden: false
 - id: create_request_password_reset
   controller: Authentication
   base_path: /api/v1
@@ -108,6 +113,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_reset_password
   controller: Authentication
   base_path: /api/v1
@@ -127,6 +133,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: create_logout
   controller: Authentication
   base_path: /api/v1
@@ -140,6 +147,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_shareauth_php
   controller: Authentication
   base_path: /api/v1
@@ -153,15 +161,16 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_album
+  hidden: false
+- id: get_all_project_curated_albums
   controller: Curated Albums
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos_album/{projectTable}/
-  summary: Called by getCuratedAlbumTopics(projectTable)
+  path: /api/v1/curated_album/project/{project_table_name}
+  summary: Get all curated albums for a project
   auth: required
   params:
-  - name: projectTable
+  - name: project_table_name
     in: path
     type: string
     required: true
@@ -170,66 +179,84 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_album_type_sort
+  hidden: false
+- id: get_curated_album_photos
   controller: Curated Albums
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos_album/{projectTable}/type/{formattedAlbum}/sort/{sortOrder}
-  summary: Called by getPhotoIdsByCuratedAlbum(projectTable, formattedAlbum, sortOrder,
-    batchSize)
+  path: /api/v1/curated_album/photos/{album_id}/
+  summary: Get paginated photos for a curated album
   auth: required
   params:
-  - name: projectTable
+  - name: album_id
     in: path
-    type: string
-    required: true
-  - name: formattedAlbum
-    in: path
-    type: string
-    required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
-  - name: limit
-    in: query
     type: integer
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: string (ASC|DESC)
     required: false
+    default: ASC
   - name: last_id
     in: query
     type: integer
     required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
+  - name: confidence_value
+    in: query
+    type: float (0.0–1.0)
+    required: false
   request_body: null
   response: null
   content_type: null
   tags:
   - top
-- id: get_photos_album_type_ranked_sort
+  hidden: false
+- id: get_curated_album_photos_ranked
   controller: Curated Albums
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos_album/{projectTable}/type/{formattedAlbum}/ranked/sort/{sortOrder}
-  summary: Called by getCuratedAlbumBestMidWorstPhotoIds(projectTable, formattedAlbum,
-    sortOrder)
+  path: /api/v1/curated_album/photos/ranked/{album_id}/
+  summary: Get paginated ranked (best/middle/worst) photos for a curated album
   auth: required
   params:
-  - name: projectTable
+  - name: album_id
     in: path
-    type: string
+    type: integer
     required: true
-  - name: formattedAlbum
-    in: path
-    type: string
-    required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
+  - name: asc_or_desc
+    in: query
+    type: string (ASC|DESC)
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: integer
+    required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
+  - name: confidence_value
+    in: query
+    type: float (0.0–1.0)
+    required: false
   request_body: null
-  response: null
+  response:
+    status: 200
+    body:
+      best: array
+      middle: array
+      worst: array
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_custom_album_project
   controller: Custom Albums
   base_path: /api/v1
@@ -256,6 +283,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_custom_album_project
   controller: Custom Albums
   base_path: /api/v1
@@ -273,6 +301,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_custom_album
   controller: Custom Albums
   base_path: /api/v1
@@ -290,6 +319,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: delete_custom_album
   controller: Custom Albums
   base_path: /api/v1
@@ -307,6 +337,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: update_custom_album
   controller: Custom Albums
   base_path: /api/v1
@@ -325,11 +356,12 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_custom_album_photos_sort
   controller: Custom Albums
   base_path: /api/v1
   method: GET
-  path: /api/v1/custom_album/photos/{customAlbumId}/sort/{sortOrder}/
+  path: /api/v1/custom_album/photos/{customAlbumId}/
   summary: Called by getCustomAlbumPhotoIds(customAlbumId, sortOrder, batchSize)
   auth: required
   params:
@@ -337,28 +369,31 @@ endpoints:
     in: path
     type: integer
     required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
-  - name: limit
+  - name: asc_or_desc
     in: query
-    type: integer
+    type: string (ASC|DESC)
     required: false
+    default: ASC
   - name: last_id
     in: query
     type: integer
     required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
   request_body: null
   response: null
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_custom_album_photos_ranked_sort
   controller: Custom Albums
   base_path: /api/v1
   method: GET
-  path: /api/v1/custom_album/photos/ranked/{customAlbumId}/sort/{sortOrder}/
+  path: /api/v1/custom_album/photos/ranked/{customAlbumId}/
   summary: Called by getCustomBestMidWorstPhotoIds(customAlbumId, sortOrder)
   auth: required
   params:
@@ -366,10 +401,11 @@ endpoints:
     in: path
     type: integer
     required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
+  - name: asc_or_desc
+    in: query
+    type: string (ASC|DESC)
+    required: false
+    default: ASC
   request_body: null
   response:
     status: 200
@@ -380,6 +416,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_evidence
   controller: Evidence
   base_path: /api/v1
@@ -397,6 +434,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_upload_status_data_export_service
   controller: Export
   base_path: /api/v1
@@ -414,6 +452,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_export
   controller: Export
   base_path: /api/v1
@@ -431,6 +470,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_person_photo
   controller: Faces
   base_path: /api/v1
@@ -452,6 +492,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: update_person
   controller: Faces
   base_path: /api/v1
@@ -477,6 +518,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_person
   controller: Faces
   base_path: /api/v1
@@ -494,6 +536,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_keyword_user
   controller: Keywords
   base_path: /api/v1
@@ -507,6 +550,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_keyword
   controller: Keywords
   base_path: /api/v1
@@ -526,6 +570,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_keyword_list
   controller: Keywords
   base_path: /api/v1
@@ -543,6 +588,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_keyword_project_default
   controller: Keywords
   base_path: /api/v1
@@ -560,6 +606,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_keyword_project
   controller: Keywords
   base_path: /api/v1
@@ -577,6 +624,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_keyword_all_keywords_id_label
   controller: Keywords
   base_path: /api/v1
@@ -590,6 +638,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: update_keyword
   controller: Keywords
   base_path: /api/v1
@@ -613,6 +662,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: update_keyword_details
   controller: Keywords
   base_path: /api/v1
@@ -633,6 +683,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: create_keyword_projects
   controller: Keywords
   base_path: /api/v1
@@ -650,6 +701,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_keyword
   controller: Keywords
   base_path: /api/v1
@@ -667,6 +719,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: delete_keyword_projects
   controller: Keywords
   base_path: /api/v1
@@ -684,6 +737,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: delete_keyword
   controller: Keywords
   base_path: /api/v1
@@ -701,6 +755,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_keyword_export
   controller: Keywords
   base_path: /api/v1
@@ -718,6 +773,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_keyword_export_status
   controller: Keywords
   base_path: /api/v1
@@ -735,53 +791,40 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_sort
-  controller: Photos
-  base_path: /api/v1
-  method: GET
-  path: /api/v1/photos/{table_name}/sort/{sortOrder}/
-  summary: Called by getAllPhotoIds(table_name, sortOrder, batchSize)
-  auth: required
-  params:
-  - name: table_name
-    in: path
-    type: string
-    required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
-  - name: limit
-    in: query
-    type: integer (batch size)
-    required: false
-  - name: last_id
-    in: query
-    type: integer (pagination cursor)
-    required: false
-  request_body: null
-  response: null
-  content_type: null
-  tags:
-  - top
-- id: get_photos
+  hidden: false
+- id: get_photo_ids
   controller: Photos
   base_path: /api/v1
   method: GET
   path: /api/v1/photos/{table_name}/
-  summary: Called by fetchPhotoIds()
+  summary: Called by getAllPhotoIds(table_name, sortOrder, batchSize) / fetchPhotoIds()
   auth: required
   params:
   - name: table_name
     in: path
     type: string
     required: true
+  - name: asc_or_desc
+    in: query
+    type: string (ASC|DESC)
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: integer (pagination cursor)
+    required: false
+  - name: limit
+    in: query
+    type: integer (batch size)
+    required: false
+    default: 5000
   request_body: null
   response: null
   content_type: null
   tags:
   - top
-- id: get_photos_1
+  hidden: false
+- id: get_photo_by_id
   controller: Photos
   base_path: /api/v1
   method: GET
@@ -802,7 +845,8 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: delete_photos_delete
+  hidden: false
+- id: delete_photos
   controller: Photos
   base_path: /api/v1
   method: DELETE
@@ -823,7 +867,8 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_project
+  hidden: false
+- id: get_project_thumbnail
   controller: Photos
   base_path: /api/v1
   method: GET
@@ -840,7 +885,8 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photo_month_years
+  hidden: false
+- id: get_project_month_years
   controller: Photos
   base_path: /api/v1
   method: GET
@@ -857,11 +903,12 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_month_year_sort
+  hidden: false
+- id: get_photos_by_month_year_sort
   controller: Photos
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos/{projectTable}/month/{month}/year/{year}/sort/{sortOrder}/
+  path: /api/v1/photos/{projectTable}/month/{month}/year/{year}/
   summary: Called by getPhotoIdsByMonthYear(projectTable, month, year, sortOrder)
   auth: required
   params:
@@ -877,23 +924,26 @@ endpoints:
     in: path
     type: string
     required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
-  - name: limit
+  - name: asc_or_desc
     in: query
-    type: integer
+    type: string (ASC|DESC)
     required: false
+    default: ASC
   - name: last_id
     in: query
     type: integer
     required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
   request_body: null
   response: null
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_photos_date_taken_none
   controller: Photos
   base_path: /api/v1
@@ -911,7 +961,8 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: update_photos_update_id_rank
+  hidden: false
+- id: update_photos_update_rank_by_id
   controller: Photos
   base_path: /api/v1
   method: PUT
@@ -936,11 +987,12 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_ranked_sort
+  hidden: false
+- id: get_photos_ranked
   controller: Photos
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos_ranked/{tableName}/sort/{sortOrder}/
+  path: /api/v1/photos_ranked/{tableName}/
   summary: Called by getAllPhotosBestMidWorstPhotoIds(tableName, sortOrder, batchSize)
   auth: required
   params:
@@ -948,18 +1000,20 @@ endpoints:
     in: path
     type: string
     required: true
-  - name: sortOrder
-    in: path
-    type: string (asc|desc)
-    required: true
-  - name: limit
+  - name: asc_or_desc
     in: query
-    type: integer
+    type: string (ASC|DESC)
     required: false
+    default: ASC
   - name: last_id
     in: query
     type: integer
     required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
   request_body: null
   response:
     status: 200
@@ -970,11 +1024,12 @@ endpoints:
   content_type: null
   tags:
   - top
-- id: get_photos_month_year_ranked_sort
+  hidden: false
+- id: get_photos_month_year_ranked
   controller: Photos
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos/{projectTable}/month/{month}/year/{year}/ranked/sort/{sortOrder}
+  path: /api/v1/photos/{projectTable}/month/{month}/year/{year}/ranked
   summary: Called by getMonthYearBestMidWorstPhotoIds(projectTable, month, year, sortOrder)
   auth: required
   params:
@@ -990,10 +1045,11 @@ endpoints:
     in: path
     type: string
     required: true
-  - name: sortOrder
-    in: path
-    type: string
-    required: true
+  - name: asc_or_desc
+    in: query
+    type: string (ASC|DESC)
+    required: false
+    default: ASC
   request_body: null
   response:
     status: 200
@@ -1004,11 +1060,12 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_photos_date_taken_none_ranked_sort_desc
   controller: Photos
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos/{projectTable}/date_taken/none/ranked/sort/desc
+  path: /api/v1/photos/{projectTable}/date_taken/none/ranked
   summary: Called by getUnknownDateBestMidWorstPhotoIds(projectTable)
   auth: required
   params:
@@ -1016,11 +1073,17 @@ endpoints:
     in: path
     type: string
     required: true
+  - name: asc_or_desc
+    in: query
+    type: string (ASC|DESC)
+    required: false
+    default: ASC
   request_body: null
   response: null
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_user
   controller: Projects
   base_path: /api/v1
@@ -1038,6 +1101,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_directory
   controller: Projects
   base_path: /api/v1
@@ -1055,6 +1119,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects
   controller: Projects
   base_path: /api/v1
@@ -1072,6 +1137,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_project_outcome
   controller: Projects
   base_path: /api/v1
@@ -1105,6 +1171,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: update_projects
   controller: Projects
   base_path: /api/v1
@@ -1123,6 +1190,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: update_projects_photos
   controller: Projects
   base_path: /api/v1
@@ -1140,6 +1208,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: delete_projects
   controller: Projects
   base_path: /api/v1
@@ -1157,6 +1226,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_projects_event
   controller: Projects
   base_path: /api/v1
@@ -1180,6 +1250,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: update_project_upload_report
   controller: Reporting
   base_path: /api/v1
@@ -1201,6 +1272,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_search
   controller: Search
   base_path: /api/v1
@@ -1254,6 +1326,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_similarity_level_medium
   controller: Similarity
   base_path: /api/v1
@@ -1271,6 +1344,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_similarity_queue_level
   controller: Similarity
   base_path: /api/v1
@@ -1292,6 +1366,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_projects_personhood_queue
   controller: Similarity
   base_path: /api/v1
@@ -1309,6 +1384,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: get_photos_project_upload_status
   controller: Status
   base_path: /api/v1
@@ -1331,6 +1407,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_upload
   controller: Upload
   base_path: /
@@ -1353,6 +1430,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_users
   controller: Users
   base_path: /api/v1
@@ -1370,6 +1448,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_users_new_company
   controller: Users
   base_path: /api/v1
@@ -1392,6 +1471,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: update_users
   controller: Users
   base_path: /api/v1
@@ -1409,6 +1489,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: delete_users_delete
   controller: Users
   base_path: /api/v1
@@ -1426,6 +1507,7 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false
 - id: create_user_change_password
   controller: Users
   base_path: /api/v1
@@ -1445,6 +1527,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: create_users
   controller: Users
   base_path: /api/v1
@@ -1458,6 +1541,7 @@ endpoints:
   content_type: application/json
   tags:
   - top
+  hidden: false
 - id: get_users_company
   controller: Users
   base_path: /api/v1
@@ -1475,3 +1559,4 @@ endpoints:
   content_type: null
   tags:
   - top
+  hidden: false

@@ -41,7 +41,7 @@ def e2e_output(tmp_path_factory):
         "--endpoints", ENDPOINTS_YAML,
         "--controllers", CONTROLLERS_DIR,
         "--oauth-sdk", oauth_root,
-        "--frameworks", "javascript,nodeJS,php",
+        "--frameworks", "javascript,php",
         "--output", output_dir,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
@@ -93,77 +93,52 @@ def test_resolved_yaml_preserves_endpoint_fields(e2e_output):
 # ── output directory structure ─────────────────────────────────────────────────
 
 def test_javascript_v1_dir_exists(e2e_output):
-    assert os.path.isdir(os.path.join(e2e_output, "javascript", "v1"))
-
-
-def test_nodejs_v1_dir_exists(e2e_output):
-    assert os.path.isdir(os.path.join(e2e_output, "nodeJS", "v1"))
+    assert os.path.isdir(os.path.join(e2e_output, "v1", "javascript"))
 
 
 def test_php_v1_dir_exists(e2e_output):
-    assert os.path.isdir(os.path.join(e2e_output, "php", "v1"))
+    assert os.path.isdir(os.path.join(e2e_output, "v1", "php"))
 
 
 # ── JavaScript browser: file contents ─────────────────────────────────────────
 
 def test_js_photos_controller_file_exists(e2e_output):
-    assert os.path.isfile(os.path.join(e2e_output, "javascript", "v1", "photos.js"))
+    assert os.path.isfile(os.path.join(e2e_output, "v1", "javascript", "photos.js"))
 
 
 def test_js_photos_contains_get_photos_sort(e2e_output):
-    content = open(os.path.join(e2e_output, "javascript", "v1", "photos.js")).read()
+    content = open(os.path.join(e2e_output, "v1", "javascript", "photos.js")).read()
     assert "getPhotosSort" in content
 
 
 def test_js_photos_sort_path_interpolation(e2e_output):
-    content = open(os.path.join(e2e_output, "javascript", "v1", "photos.js")).read()
+    content = open(os.path.join(e2e_output, "v1", "javascript", "photos.js")).read()
     assert "encodeURIComponent(tableName)" in content
     assert "encodeURIComponent(sortOrder)" in content
 
 
 def test_js_photos_sort_query_params(e2e_output):
-    content = open(os.path.join(e2e_output, "javascript", "v1", "photos.js")).read()
+    content = open(os.path.join(e2e_output, "v1", "javascript", "photos.js")).read()
     # limit and last_id are optional query params
     assert "limit" in content
     assert "lastId" in content
 
 
 def test_js_barrel_index_exists(e2e_output):
-    assert os.path.isfile(os.path.join(e2e_output, "javascript", "v1", "index.js"))
+    assert os.path.isfile(os.path.join(e2e_output, "v1", "javascript", "index.js"))
 
 
 def test_js_barrel_index_exports_photos(e2e_output):
-    content = open(os.path.join(e2e_output, "javascript", "v1", "index.js")).read()
+    content = open(os.path.join(e2e_output, "v1", "javascript", "index.js")).read()
     assert "photos.js" in content
 
 
 def test_js_rollup_config_exists(e2e_output):
-    assert os.path.isfile(os.path.join(e2e_output, "javascript", "v1", "rollup.config.js"))
+    assert os.path.isfile(os.path.join(e2e_output, "v1", "javascript", "rollup.config.js"))
 
 
 def test_js_oauth_wrapper_copied(e2e_output):
-    oauth_dir = os.path.join(e2e_output, "javascript", "v1", "oauth")
-    assert os.path.isdir(oauth_dir)
-    assert any(os.listdir(oauth_dir))
-
-
-# ── Node.js: file contents ─────────────────────────────────────────────────────
-
-def test_node_photos_contains_get_photos_sort(e2e_output):
-    content = open(os.path.join(e2e_output, "nodeJS", "v1", "photos.js")).read()
-    assert "getPhotosSort" in content
-
-
-def test_node_no_rollup_config(e2e_output):
-    assert not os.path.isfile(os.path.join(e2e_output, "nodeJS", "v1", "rollup.config.js"))
-
-
-def test_node_barrel_index_exists(e2e_output):
-    assert os.path.isfile(os.path.join(e2e_output, "nodeJS", "v1", "index.js"))
-
-
-def test_node_oauth_wrapper_copied(e2e_output):
-    oauth_dir = os.path.join(e2e_output, "nodeJS", "v1", "oauth")
+    oauth_dir = os.path.join(e2e_output, "v1", "javascript", "oauth")
     assert os.path.isdir(oauth_dir)
     assert any(os.listdir(oauth_dir))
 
@@ -171,35 +146,35 @@ def test_node_oauth_wrapper_copied(e2e_output):
 # ── PHP: file contents ─────────────────────────────────────────────────────────
 
 def test_php_photos_class_file_exists(e2e_output):
-    assert os.path.isfile(os.path.join(e2e_output, "php", "v1", "Photos.php"))
+    assert os.path.isfile(os.path.join(e2e_output, "v1", "php", "Photos.php"))
 
 
 def test_php_photos_contains_get_photos_sort(e2e_output):
-    content = open(os.path.join(e2e_output, "php", "v1", "Photos.php")).read()
+    content = open(os.path.join(e2e_output, "v1", "php", "Photos.php")).read()
     assert "getPhotosSort" in content
 
 
 def test_php_photos_sort_path_interpolation(e2e_output):
-    content = open(os.path.join(e2e_output, "php", "v1", "Photos.php")).read()
+    content = open(os.path.join(e2e_output, "v1", "php", "Photos.php")).read()
     assert "urlencode($tableName)" in content
     assert "urlencode($sortOrder)" in content
 
 
 def test_php_photos_class_structure(e2e_output):
-    content = open(os.path.join(e2e_output, "php", "v1", "Photos.php")).read()
+    content = open(os.path.join(e2e_output, "v1", "php", "Photos.php")).read()
     assert "declare(strict_types=1);" in content
     assert "namespace MediaVizSdk;" in content
     assert "class Photos" in content
 
 
 def test_php_oauth_wrapper_copied(e2e_output):
-    oauth_dir = os.path.join(e2e_output, "php", "v1", "oauth")
+    oauth_dir = os.path.join(e2e_output, "v1", "php", "oauth")
     assert os.path.isdir(oauth_dir)
     assert any(os.listdir(oauth_dir))
 
 
 def test_php_composer_config_exists(e2e_output):
-    assert os.path.isfile(os.path.join(e2e_output, "php", "v1", "composer.json"))
+    assert os.path.isfile(os.path.join(e2e_output, "v1", "php", "composer.json"))
 
 
 # ── version consistency ────────────────────────────────────────────────────────
@@ -210,6 +185,6 @@ def test_all_frameworks_use_same_version(e2e_output):
     yaml_file = next(f for f in os.listdir(resolved_dir) if f.endswith(".yaml"))
     version = int(yaml_file.split("_")[0][1:])  # v1_foo.yaml → 1
 
-    for framework in ("javascript", "nodeJS", "php"):
-        fw_dir = os.path.join(e2e_output, framework, f"v{version}")
-        assert os.path.isdir(fw_dir), f"{framework}/v{version} missing"
+    for framework in ("javascript", "php"):
+        fw_dir = os.path.join(e2e_output, f"v{version}", framework)
+        assert os.path.isdir(fw_dir), f"v{version}/{framework} missing"
