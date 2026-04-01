@@ -134,7 +134,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "  const requestId = response.headers.get('x-request-id');",
             "",
             "  if (response.ok) {",
-            "    return response.json();",
+            "    return response.status === 204 ? null : response.json();",
             "  }",
             "",
             "  let body;",
@@ -257,7 +257,15 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
     def _emit_auth_fn(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
         path_args = [self.snake_to_camel(p["name"]) for p in path_params]
+        request_body = ep.get("request_body")
+
         sig_parts = ["client", "accessToken", "refreshToken"] + path_args
+        if isinstance(request_body, dict):
+            fields = self._flatten_body(request_body)
+            param_names = [camel for _, camel in fields]
+            sig_parts.append("{ " + ", ".join(param_names) + " }")
+        elif request_body:
+            sig_parts.append("body = {}")
         if query_params:
             q_names = [self.snake_to_camel(p["name"]) for p in query_params]
             sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
@@ -276,7 +284,20 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         else:
             lines.append(f"  const path = {tmpl};")
 
-        lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken);")
+        if isinstance(request_body, dict):
+            fields = self._flatten_body(request_body)
+            field_strs = []
+            for snake_key, camel_param in fields:
+                if snake_key == camel_param:
+                    field_strs.append(camel_param)
+                else:
+                    field_strs.append(f"{snake_key}: {camel_param}")
+            body_arg = "JSON.stringify({ " + ", ".join(field_strs) + " })"
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, {body_arg});")
+        elif request_body:
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+        else:
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken);")
         lines.append("}")
         return lines
 

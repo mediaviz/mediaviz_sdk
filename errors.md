@@ -92,7 +92,7 @@ export async function handleResponse(response) {
   const requestId = response.headers.get('x-request-id');
 
   if (response.ok) {
-    return response.json();
+    return response.status === 204 ? null : response.json();
   }
 
   let body;

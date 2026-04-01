@@ -13,7 +13,7 @@ def gen():
     return JavaScriptBrowserGenerator()
 
 
-def _auth_ep(ep_id, path, method="GET", params=None):
+def _auth_ep(ep_id, path, method="GET", params=None, request_body=None):
     return {
         "id": ep_id,
         "controller": "Photos",
@@ -21,8 +21,8 @@ def _auth_ep(ep_id, path, method="GET", params=None):
         "path": path,
         "auth": "required",
         "params": params or [],
-        "request_body": None,
-        "content_type": None,
+        "request_body": request_body,
+        "content_type": "application/json" if request_body else None,
         "tags": [],
     }
 
@@ -93,6 +93,39 @@ def test_auth_fn_query_params(gen):
     assert "query.set('last_id', lastId)" in src
     assert "URLSearchParams" in src
     assert "if (qs) path +=" in src
+
+
+def test_auth_fn_dynamic_body(gen):
+    ep = _auth_ep(
+        "update_projects",
+        "/api/v1/projects/{project_id}",
+        method="PUT",
+        params=[{"name": "project_id", "in": "path", "type": "integer", "required": True}],
+        request_body="varies by caller: name, directory, or thumbnail",
+    )
+    lines = gen._emit_function(ep)
+    src = "\n".join(lines)
+    assert "body = {}" in src
+    assert "JSON.stringify(body)" in src
+    assert "client.request(path, 'PUT', accessToken, refreshToken, JSON.stringify(body))" in src
+
+
+def test_auth_fn_structured_body(gen):
+    ep = _auth_ep(
+        "create_projects_event",
+        "/api/v1/projects/{project_table_name}/event",
+        method="POST",
+        params=[{"name": "project_table_name", "in": "path", "type": "string", "required": True}],
+        request_body={
+            "event": {"type": "string", "required": True},
+            "detail": {"type": "string", "required": True},
+        },
+    )
+    lines = gen._emit_function(ep)
+    src = "\n".join(lines)
+    assert "{ event, detail }" in src
+    assert "JSON.stringify({ event, detail })" in src
+    assert "client.request(path, 'POST', accessToken, refreshToken, JSON.stringify({ event, detail }))" in src
 
 
 # ── unauthenticated function emission ─────────────────────────────────────────
