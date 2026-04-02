@@ -356,5 +356,59 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 20,
+    "description": "Normalize controller names in group_by_controller to replace spaces with underscores, preventing spaces in generated filenames",
+    "touch_points": [
+      {
+        "file": "generators/base.py",
+        "location": "group_by_controller",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "generate",
+        "status": "removed redundant .replace(' ', '_') — base handles it"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 21,
+    "description": "Static output dir (./sdk_files), archive previous versions to ./sdk_files/archive/v{N}, package resolved YAML inside version dir",
+    "touch_points": [
+      {
+        "file": "generate.py",
+        "location": "SDK_OUTPUT_DIR, archive_existing_versions, main",
+        "status": "removed --output flag, hardcoded sdk_files, added archive step"
+      },
+      {
+        "file": "versioning.py",
+        "location": "get_next_version",
+        "status": "scans v{N} dirs instead of resolved/ yaml files"
+      },
+      {
+        "file": "resolver.py",
+        "location": "write_flattened_yaml",
+        "status": "writes into version_dir as resolved_{name}.yaml, removed version param"
+      },
+      {
+        "file": "tests/test_versioning.py",
+        "location": "all tests",
+        "status": "updated to use v{N} dirs instead of resolved/ files"
+      },
+      {
+        "file": "tests/test_resolver.py",
+        "location": "test_write_flattened_yaml_*",
+        "status": "updated signature and assertions for new output structure"
+      },
+      {
+        "file": "spec.md",
+        "location": "architecture, versioning, resolver, CLI, constraints",
+        "status": "updated to reflect sdk_files/ layout and archive behavior"
+      }
+    ],
+    "completion_status": true
   }
 ]

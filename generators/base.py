@@ -4,6 +4,8 @@ import re
 import shutil
 import os
 
+from naming import snake_to_camel as _snake_to_camel, snake_to_pascal as _snake_to_pascal
+
 
 class BaseGenerator(ABC):
     framework_name: str
@@ -48,24 +50,24 @@ class BaseGenerator(ABC):
         for ep in endpoints:
             if ep.get("hidden"):
                 continue
-            controller = ep["controller"]
+            controller = ep["controller"].replace(" ", "_")
             groups.setdefault(controller, []).append(ep)
         return groups
 
     @staticmethod
     def snake_to_camel(name: str) -> str:
-        parts = name.split("_")
-        return parts[0] + "".join(p.capitalize() for p in parts[1:])
+        return _snake_to_camel(name)
 
     @staticmethod
     def snake_to_pascal(name: str) -> str:
-        return "".join(p.capitalize() for p in name.split("_"))
+        return _snake_to_pascal(name)
 
     def _copy_module_files(self, module_root: str, framework_subdir: str, module_name: str, output_dir: str) -> str:
         src = os.path.join(module_root, framework_subdir)
         dst = os.path.join(output_dir, module_name)
         if os.path.isdir(src):
-            shutil.copytree(src, dst, dirs_exist_ok=True)
+            shutil.copytree(src, dst, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns("vendor", "node_modules"))
         else:
             os.makedirs(dst, exist_ok=True)
         self._copied_modules.append({"name": module_name, "path": dst})

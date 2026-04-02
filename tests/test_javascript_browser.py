@@ -206,6 +206,16 @@ def test_barrel_index_exports(gen, tmp_path):
     assert "export * from './photos.js';" in index_src
 
 
+def test_controller_with_spaces_produces_underscored_filename(gen, tmp_path):
+    ep = _auth_ep("get_curated", "/api/v1/curated/")
+    ep["controller"] = "Curated Albums"
+    gen.generate([ep], str(tmp_path))
+    assert (tmp_path / "curated_albums.js").exists()
+    assert not (tmp_path / "curated albums.js").exists()
+    index_src = (tmp_path / "index.js").read_text()
+    assert "export * from './curated_albums.js';" in index_src
+
+
 def test_oauth_import_only_for_auth(gen, tmp_path):
     auth_endpoints = [_auth_ep("get_photos", "/api/v1/photos/")]
     gen.generate(auth_endpoints, str(tmp_path))

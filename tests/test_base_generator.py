@@ -52,6 +52,17 @@ def test_group_by_controller(gen):
     assert groups["Photos"][0]["id"] == "get_photos"
 
 
+def test_group_by_controller_replaces_spaces_with_underscores(gen):
+    endpoints = [
+        {"id": "get_curated", "controller": "Curated Albums"},
+        {"id": "get_custom", "controller": "Custom Albums"},
+    ]
+    groups = gen.group_by_controller(endpoints)
+    assert set(groups.keys()) == {"Curated_Albums", "Custom_Albums"}
+    assert len(groups["Curated_Albums"]) == 1
+    assert len(groups["Custom_Albums"]) == 1
+
+
 def test_group_by_controller_empty(gen):
     assert gen.group_by_controller([]) == {}
 

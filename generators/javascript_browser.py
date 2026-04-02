@@ -292,10 +292,10 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                     field_strs.append(camel_param)
                 else:
                     field_strs.append(f"{snake_key}: {camel_param}")
-            body_arg = "JSON.stringify({ " + ", ".join(field_strs) + " })"
+            body_arg = "{ " + ", ".join(field_strs) + " }"
             lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, {body_arg});")
         elif request_body:
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, body);")
         else:
             lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken);")
         lines.append("}")

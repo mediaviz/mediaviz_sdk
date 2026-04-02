@@ -62,17 +62,14 @@ def _flatten(ep: dict, controller: str, base_path: str) -> dict:
 def write_flattened_yaml(
     endpoints: list[dict],
     ref_list_path: str,
-    output_dir: str,
-    version: int,
+    version_dir: str,
 ) -> str:
-    """Write flattened YAML snapshot; return the output file path."""
+    """Write flattened YAML snapshot into the version directory."""
     source_name = os.path.basename(ref_list_path)
-    resolved_dir = os.path.join(output_dir, "resolved")
-    os.makedirs(resolved_dir, exist_ok=True)
+    os.makedirs(version_dir, exist_ok=True)
 
-    out_path = os.path.join(resolved_dir, f"v{version}_{source_name}")
+    out_path = os.path.join(version_dir, f"resolved_{source_name}")
     data = {
-        "version": version,
         "source": source_name,
         "resolved_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "endpoints": endpoints,

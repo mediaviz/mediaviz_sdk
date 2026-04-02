@@ -1,0 +1,409 @@
+[
+  {
+    "id": 1,
+    "description": "Create BaseTestGenerator ABC and TestResult dataclass in test_generators/base.py",
+    "touch_points": [
+      {
+        "file": "test_generators/__init__.py",
+        "location": "discover_test_generators",
+        "status": "new file — mirrors generators/__init__.py auto-discovery pattern"
+      },
+      {
+        "file": "test_generators/base.py",
+        "location": "BaseTestGenerator",
+        "status": "new file — ABC with generate(), run(), group_by_controller()"
+      },
+      {
+        "file": "test_generators/base.py",
+        "location": "TestResult",
+        "status": "new dataclass — success, total, passed, failed, output"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 2,
+    "description": "Extract shared utility functions (snake_to_camel, snake_to_pascal, group_by_controller) into a common module so both generators and test_generators can import them without circular deps",
+    "touch_points": [
+      {
+        "file": "naming.py",
+        "location": "snake_to_camel, snake_to_pascal",
+        "status": "new file — move static methods here"
+      },
+      {
+        "file": "generators/base.py",
+        "location": "snake_to_camel, snake_to_pascal, group_by_controller",
+        "status": "modify — import from naming.py, keep as thin delegates for backward compat"
+      },
+      {
+        "file": "test_generators/base.py",
+        "location": "imports",
+        "status": "import from naming.py"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 3,
+    "description": "Create test value generator — deterministic mapping from YAML type strings to test fixture values",
+    "touch_points": [
+      {
+        "file": "test_generators/base.py",
+        "location": "test_value_for_type",
+        "status": "new method — returns deterministic test value per type string"
+      },
+      {
+        "file": "test_generators/base.py",
+        "location": "ENCODING_TEST_VALUES",
+        "status": "new constant — type->value map for URL encoding edge cases"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 4,
+    "description": "Build expected URL string from endpoint path and test fixture values — shared logic in BaseTestGenerator",
+    "touch_points": [
+      {
+        "file": "test_generators/base.py",
+        "location": "build_expected_path",
+        "status": "new method — substitutes path params with test values, URL-encodes"
+      },
+      {
+        "file": "test_generators/base.py",
+        "location": "build_expected_query_string",
+        "status": "new method — builds expected ?key=val&key2=val2 from query params"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 5,
+    "description": "Create JavaScriptTestGenerator — emit helpers.js with SpyOAuthClient and spy fetch",
+    "touch_points": [
+      {
+        "file": "test_generators/javascript.py",
+        "location": "JavaScriptTestGenerator",
+        "status": "new file"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "emit_helpers",
+        "status": "new method — writes helpers.js with SpyOAuthClient class + globalThis.fetch spy + stub Response"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 6,
+    "description": "JavaScriptTestGenerator — emit test file per controller with all contract assertions",
+    "touch_points": [
+      {
+        "file": "test_generators/javascript.py",
+        "location": "emit_controller_test",
+        "status": "new method — writes {controller}.test.js"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_existence_test",
+        "status": "new — assert typeof fn === 'function'"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_method_test",
+        "status": "new — assert HTTP method string via spy"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_path_test",
+        "status": "new — assert constructed URL path matches expected"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_query_test",
+        "status": "new — assert query params appear correctly"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_body_test",
+        "status": "new — assert request body structure for POST/PUT"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_auth_routing_test",
+        "status": "new — assert auth endpoints use client.request, unauth use fetch"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 7,
+    "description": "JavaScriptTestGenerator — emit error class existence tests",
+    "touch_points": [
+      {
+        "file": "test_generators/javascript.py",
+        "location": "emit_errors_test",
+        "status": "new method — writes errors.test.js asserting all 5 error classes exist and extend Error"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 8,
+    "description": "JavaScriptTestGenerator — emit package.json and jest.config.js for test runner",
+    "touch_points": [
+      {
+        "file": "test_generators/javascript.py",
+        "location": "emit_package_json",
+        "status": "new method — jest + babel devDeps, test script"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "emit_jest_config",
+        "status": "new method — transform config for ESM"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 9,
+    "description": "JavaScriptTestGenerator — implement run() to npm install + npx jest via subprocess",
+    "touch_points": [
+      {
+        "file": "test_generators/javascript.py",
+        "location": "run",
+        "status": "new method — subprocess.run npm install then npx jest, parse exit code + output into TestResult"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 10,
+    "description": "Create PhpTestGenerator — emit helpers.php with SpyOAuthClient",
+    "touch_points": [
+      {
+        "file": "test_generators/php.py",
+        "location": "PhpTestGenerator",
+        "status": "new file"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "emit_helpers",
+        "status": "new method — writes helpers.php with SpyOAuthClient implementing same interface, records calls"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 11,
+    "description": "PhpTestGenerator — emit test file per controller with all contract assertions",
+    "touch_points": [
+      {
+        "file": "test_generators/php.py",
+        "location": "emit_controller_test",
+        "status": "new method — writes {Controller}Test.php"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "_emit_existence_test",
+        "status": "new — assertMethodExists"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "_emit_method_test",
+        "status": "new — assert HTTP method via spy"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "_emit_path_test",
+        "status": "new — assert URL path"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "_emit_query_test",
+        "status": "new — assert query params"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "_emit_body_test",
+        "status": "new — assert request body keys"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "_emit_auth_routing_test",
+        "status": "new — assert auth vs unauth transport"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 12,
+    "description": "PhpTestGenerator — emit error class existence tests",
+    "touch_points": [
+      {
+        "file": "test_generators/php.py",
+        "location": "emit_errors_test",
+        "status": "new method — writes ExceptionsTest.php asserting all 5 exception classes exist"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 13,
+    "description": "PhpTestGenerator — emit composer.json and phpunit.xml for test runner",
+    "touch_points": [
+      {
+        "file": "test_generators/php.py",
+        "location": "emit_composer_json",
+        "status": "new method — phpunit require-dev, PSR-4 autoload"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "emit_phpunit_xml",
+        "status": "new method — test suite config pointing at test dir"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 14,
+    "description": "PhpTestGenerator — implement run() to composer install + phpunit via subprocess",
+    "touch_points": [
+      {
+        "file": "test_generators/php.py",
+        "location": "run",
+        "status": "new method — subprocess.run composer install then vendor/bin/phpunit, parse into TestResult"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 15,
+    "description": "Integrate test generation and execution into generate.py main() — runs automatically after SDK generation",
+    "touch_points": [
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "modify — after SDK gen loop, add test gen + run loop for each framework"
+      },
+      {
+        "file": "generate.py",
+        "location": "imports",
+        "status": "modify — add import for discover_test_generators"
+      },
+      {
+        "file": "generate.py",
+        "location": "print_test_summary",
+        "status": "new function — prints failures first with framework, test name, and assertion detail, then passing counts"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 16,
+    "description": "Write pytest tests for BaseTestGenerator — test_value_for_type, build_expected_path, build_expected_query_string",
+    "touch_points": [
+      {
+        "file": "tests/test_base_test_generator.py",
+        "location": "test_test_value_for_type",
+        "status": "new file"
+      },
+      {
+        "file": "tests/test_base_test_generator.py",
+        "location": "test_build_expected_path",
+        "status": "new test"
+      },
+      {
+        "file": "tests/test_base_test_generator.py",
+        "location": "test_build_expected_query_string",
+        "status": "new test"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 17,
+    "description": "Write pytest tests for JavaScriptTestGenerator — verify emitted test file content against known endpoints",
+    "touch_points": [
+      {
+        "file": "tests/test_js_test_generator.py",
+        "location": "test_emit_controller_test",
+        "status": "new file — assert generated .test.js contains expected describe/it blocks"
+      },
+      {
+        "file": "tests/test_js_test_generator.py",
+        "location": "test_emit_helpers",
+        "status": "new test — assert SpyOAuthClient class present in helpers.js"
+      },
+      {
+        "file": "tests/test_js_test_generator.py",
+        "location": "test_emit_errors_test",
+        "status": "new test — assert errors.test.js checks all 5 classes"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 18,
+    "description": "Write pytest tests for PhpTestGenerator — verify emitted test file content against known endpoints",
+    "touch_points": [
+      {
+        "file": "tests/test_php_test_generator.py",
+        "location": "test_emit_controller_test",
+        "status": "new file — assert generated Test.php contains expected test methods"
+      },
+      {
+        "file": "tests/test_php_test_generator.py",
+        "location": "test_emit_helpers",
+        "status": "new test — assert SpyOAuthClient class present in helpers.php"
+      },
+      {
+        "file": "tests/test_php_test_generator.py",
+        "location": "test_emit_errors_test",
+        "status": "new test — assert ExceptionsTest.php checks all 5 classes"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 19,
+    "description": "Write pytest test for generate.py integration — verify test generation runs after SDK generation and exit code reflects test results",
+    "touch_points": [
+      {
+        "file": "tests/test_generate_cli.py",
+        "location": "test_generates_and_runs_tests",
+        "status": "modify — add test case verifying tests/ dir created and test runner invoked"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 20,
+    "description": "Write pytest test for test_generators auto-discovery registry",
+    "touch_points": [
+      {
+        "file": "tests/test_test_generator_registry.py",
+        "location": "test_discover_test_generators",
+        "status": "new file — assert javascript and php test generators are discovered"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 21,
+    "description": "Controller name normalization — OOP languages must normalize controller names (replace spaces with underscores, then snake_to_pascal) before using as class names/filenames. Applies to both SDK generators and test generators. See spec § Naming Conventions.",
+    "touch_points": [
+      {
+        "file": "generators/php.py",
+        "location": "emit_controller",
+        "status": "fixed — controller.replace(' ', '_') before snake_to_pascal"
+      },
+      {
+        "file": "test_generators/php.py",
+        "location": "emit_controller_test",
+        "status": "fixed — controller.replace(' ', '_') before snake_to_pascal"
+      }
+    ],
+    "completion_status": true
+  }
+]

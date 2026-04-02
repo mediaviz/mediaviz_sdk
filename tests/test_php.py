@@ -199,6 +199,13 @@ def test_file_naming_pascal_case(gen, tmp_path):
     assert (tmp_path / "MyController.php").exists()
 
 
+def test_controller_with_spaces_produces_no_space_filename(gen, tmp_path):
+    ep = _auth_ep("get_curated", "/api/v1/curated/", controller="Curated Albums")
+    gen.generate([ep], str(tmp_path))
+    assert (tmp_path / "CuratedAlbums.php").exists()
+    assert not (tmp_path / "Curated Albums.php").exists()
+
+
 # ── module re-export ─────────────────────────────────────────────────────────
 
 

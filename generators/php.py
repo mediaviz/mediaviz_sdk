@@ -10,6 +10,10 @@ _TYPE_MAP = {"string": "string", "integer": "int", "boolean": "bool", "number": 
 def _php_type(t) -> str:
     return _TYPE_MAP.get(str(t).lower() if t else "", "mixed")
 
+def _php_nullable(t: str) -> str:
+    """Wrap type as nullable. `mixed` already includes null in PHP 8+."""
+    return t if t == "mixed" else f"?{t}"
+
 
 class PhpGenerator(BaseGenerator):
     framework_name = "php"
@@ -19,7 +23,7 @@ class PhpGenerator(BaseGenerator):
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
         for controller, eps in groups.items():
-            class_name = self.snake_to_pascal(controller) if "_" in controller else controller
+            class_name = self.snake_to_pascal(controller)
             filename = class_name + ".php"
             self.emit_controller_file(class_name, eps, os.path.join(output_dir, filename))
         reexport_files = self.reexport_all_modules(output_dir)
@@ -46,13 +50,18 @@ class PhpGenerator(BaseGenerator):
                     continue
                 content = open(os.path.join(src_path, fname)).read()
                 for m in re.finditer(
-                    r'(?:(?:readonly|final|abstract)\s+)*(class|enum|interface)\s+(\w+)',
+                    r'((?:(?:readonly|final|abstract)\s+)*)(class|enum|interface)\s+(\w+)',
                     content,
                 ):
+                    modifiers = m.group(1).strip()
+                    psr4_match = fname == m.group(3) + ".php"
                     exports.append({
-                        "name": m.group(2),
-                        "kind": m.group(1),
-                        "fqcn": namespace.rstrip("\\") + "\\" + m.group(2),
+                        "name": m.group(3),
+                        "kind": m.group(2),
+                        "fqcn": namespace.rstrip("\\") + "\\" + m.group(3),
+                        "modifiers": modifiers,
+                        "file": os.path.join(src_path, fname),
+                        "psr4": psr4_match,
                     })
         return exports
 
@@ -63,8 +72,12 @@ class PhpGenerator(BaseGenerator):
         lines = ["<?php", "// Auto-generated — do not edit", "namespace MediaVizSdk;", ""]
         for exp in exports:
             fqcn = "\\" + exp["fqcn"]
+            needs_alias = "final" in exp.get("modifiers", "") or "readonly" in exp.get("modifiers", "")
             if exp["kind"] == "class":
-                lines.append(f"class {exp['name']} extends {fqcn} {{}}")
+                if needs_alias:
+                    lines.append(f"\\class_alias({fqcn}::class, 'MediaVizSdk\\\\{exp['name']}');")
+                else:
+                    lines.append(f"class {exp['name']} extends {fqcn} {{}}")
             elif exp["kind"] == "interface":
                 lines.append(f"interface {exp['name']} extends {fqcn} {{}}")
             elif exp["kind"] == "enum":
@@ -214,13 +227,16 @@ class PhpGenerator(BaseGenerator):
             mod_config = json.load(open(composer_path))
             for ns, src in mod_config.get("autoload", {}).get("psr-4", {}).items():
                 config["autoload"]["psr-4"][ns] = f"./{mod['name']}/{src}"
+            for f in mod_config.get("autoload", {}).get("files", []):
+                config["autoload"].setdefault("files", []).append(f"./{mod['name']}/{f}")
             for pkg, constraint in mod_config.get("require", {}).items():
                 if pkg not in config["require"]:
                     config["require"][pkg] = constraint
         if not config["require"]:
             del config["require"]
         if reexport_files:
-            config["autoload"]["files"] = [f"./{f}" for f in reexport_files]
+            for f in reexport_files:
+                config["autoload"].setdefault("files", []).append(f"./{f}")
         with open(os.path.join(output_dir, "composer.json"), "w") as f:
             json.dump(config, f, indent=2)
             f.write("\n")
@@ -236,13 +252,25 @@ class PhpGenerator(BaseGenerator):
         return self._emit_unauth_method(func_name, ep, path_params, query_params)
 
     def _emit_auth_method(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
+        request_body = ep.get("request_body")
         sig_parts = ["string $accessToken", "string $refreshToken"]
         for p in path_params:
             sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
+
+        body_fields = []
+        has_generic_body = False
+        if isinstance(request_body, dict):
+            body_fields = self._flatten_body(request_body)
+            for _, camel_param in body_fields:
+                sig_parts.append(f"mixed ${camel_param}")
+        elif request_body:
+            has_generic_body = True
+            sig_parts.append("array $body = []")
+
         for p in query_params:
             t = _php_type(p.get("type"))
             camel = self.snake_to_camel(p["name"])
-            sig_parts.append(f"?{t} ${camel} = null")
+            sig_parts.append(f"{_php_nullable(t)} ${camel} = null")
 
         if len(sig_parts) > 2:
             indent = "        "
@@ -254,7 +282,17 @@ class PhpGenerator(BaseGenerator):
             lines = [f"    public function {func_name}({', '.join(sig_parts)}): \\OAuthSdk\\AuthenticatedResponse {{"]
 
         lines.extend(self._build_path(ep["path"], path_params, query_params, "auth"))
-        lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken);")
+
+        if body_fields:
+            lines.append("        $body = [")
+            for snake_key, camel_param in body_fields:
+                lines.append(f"            '{snake_key}' => ${camel_param},")
+            lines.append("        ];")
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body);")
+        elif has_generic_body:
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body);")
+        else:
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken);")
         lines.append("    }")
         return lines
 
@@ -293,7 +331,7 @@ class PhpGenerator(BaseGenerator):
             for p in query_params:
                 t = _php_type(p.get("type"))
                 camel = self.snake_to_camel(p["name"])
-                sig_parts.append(f"?{t} ${camel} = null")
+                sig_parts.append(f"{_php_nullable(t)} ${camel} = null")
             lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
             lines.extend(self._build_path(ep["path"], path_params, query_params, "unauth"))
             lines.append(f"        $ch = curl_init($baseUrl . $path);")
@@ -315,10 +353,10 @@ class PhpGenerator(BaseGenerator):
         result = path
         for p in path_params:
             camel = self.snake_to_camel(p["name"])
-            result = result.replace("{" + p["name"] + "}", f'" . urlencode(${camel}) . "')
+            result = result.replace("{" + p["name"] + "}", f'" . rawurlencode((string)${camel}) . "')
         # Clean up leading/trailing concatenation artifacts
         php_path = f'"{result}"'
-        php_path = php_path.replace('""', "")
+        php_path = php_path.replace(' . ""', "").replace('"" . ', "")
         if query_params:
             lines = [f"        $path = {php_path};"]
             lines.append("        $query = [];")

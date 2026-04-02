@@ -50,20 +50,20 @@ def test_resolve_preserves_required_fields():
 
 def test_resolve_photos_sort_fields():
     endpoints = resolve_refs(TOP_ENDPOINTS)
-    ep = next(e for e in endpoints if e["id"] == "get_photos_sort")
+    ep = next(e for e in endpoints if e["id"] == "get_photos_by_month_year_sort")
 
     assert ep["controller"] == "Photos"
     assert ep["base_path"] == "/api/v1"
     assert ep["method"] == "GET"
-    assert ep["path"] == "/api/v1/photos/{table_name}/sort/{sortOrder}/"
+    assert ep["path"] == "/api/v1/photos/{projectTable}/month/{month}/year/{year}/"
     assert ep["auth"] == "required"
     assert isinstance(ep["params"], list)
-    assert len(ep["params"]) == 4
+    assert len(ep["params"]) == 6
 
     path_params = [p for p in ep["params"] if p["in"] == "path"]
     query_params = [p for p in ep["params"] if p["in"] == "query"]
-    assert {p["name"] for p in path_params} == {"table_name", "sortOrder"}
-    assert {p["name"] for p in query_params} == {"limit", "last_id"}
+    assert {p["name"] for p in path_params} == {"projectTable", "month", "year"}
+    assert {p["name"] for p in query_params} == {"asc_or_desc", "last_id", "limit"}
 
 
 def test_resolve_unauth_endpoint():
@@ -95,22 +95,23 @@ def test_resolve_unknown_endpoint_raises(tmp_path):
 
 def test_write_flattened_yaml_structure(tmp_path):
     endpoints = resolve_refs(TOP_ENDPOINTS)
-    out_path = write_flattened_yaml(endpoints, TOP_ENDPOINTS, str(tmp_path), version=3)
+    version_dir = str(tmp_path / "v3")
+    out_path = write_flattened_yaml(endpoints, TOP_ENDPOINTS, version_dir)
 
     assert os.path.isfile(out_path)
-    assert os.path.basename(out_path) == "v3_top_endpoints.yaml"
+    assert os.path.basename(out_path) == "resolved_top_endpoints.yaml"
 
     with open(out_path) as f:
         data = yaml.safe_load(f)
 
-    assert data["version"] == 3
     assert data["source"] == "top_endpoints.yaml"
     assert "resolved_at" in data
     assert isinstance(data["endpoints"], list)
     assert len(data["endpoints"]) == len(endpoints)
 
 
-def test_write_flattened_yaml_creates_resolved_dir(tmp_path):
+def test_write_flattened_yaml_creates_version_dir(tmp_path):
     endpoints = resolve_refs(TOP_ENDPOINTS)
-    write_flattened_yaml(endpoints, TOP_ENDPOINTS, str(tmp_path), version=1)
-    assert os.path.isdir(tmp_path / "resolved")
+    version_dir = str(tmp_path / "v1")
+    write_flattened_yaml(endpoints, TOP_ENDPOINTS, version_dir)
+    assert os.path.isdir(tmp_path / "v1")

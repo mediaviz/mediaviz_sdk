@@ -17,16 +17,15 @@ mediaviz_sdk/
     php.py                  # PHP generator
   resolver.py              # Reads ref-list YAML, resolves refs, outputs flattened YAML
   versioning.py            # Version auto-increment logic
-  output/
-    javascript/
+  sdk_files/               # Static output directory
+    v{N}/                  # Current version (only one active at a time)
+      resolved_*.yaml      # Flattened endpoint snapshot
+      javascript/
+      php/
+      tests/
+    archive/               # Previous versions moved here on new generation
       v1/
       v2/
-      ...
-    nodeJS/
-      v1/
-      ...
-    php/
-      v1/
       ...
 ```
 
@@ -38,7 +37,7 @@ Reads a ref-list YAML file (e.g., `top_endpoints.yaml`), follows each `$ref` int
 
 **Input:** Path to a ref-list YAML, path to the controllers directory.
 
-**Output:** A flattened YAML file written to `output/resolved/v{N}_{ref_list_name}.yaml` using the same auto-incremented version as the SDK output.
+**Output:** A flattened YAML file written to `sdk_files/v{N}/resolved_{ref_list_name}.yaml`, packaged alongside the generated SDK files.
 
 **Flattened YAML structure:**
 ```yaml
@@ -79,13 +78,13 @@ endpoints:
 
 ### 2. Versioning (`versioning.py`)
 
-Scans the `output/` directory for existing version directories per framework and globally.
+Scans `sdk_files/` for existing `v{N}` directories to determine the next version.
 
 **Logic:**
-- Look at `output/resolved/` for existing `v{N}_*.yaml` files to determine the current global version.
-- If no versions exist, start at `v1`.
+- Look at `sdk_files/` for existing `v{N}` directories (ignores `archive/`).
+- If no version directories exist, start at `v1`.
 - Otherwise, increment the highest existing version number by 1.
-- The same version number is used for both the resolved YAML and all framework outputs in a single run.
+- The same version number is used for the resolved YAML and all framework outputs in a single run.
 
 ### 3. Base Generator (`generators/base.py`)
 
@@ -131,8 +130,7 @@ python generate.py \
   --endpoints ../mediaviz_docs/api-docs/top_endpoints.yaml \
   --controllers ../mediaviz_docs/api-docs/controllers/ \
   --oauth-sdk ../oauth_library/sdk/ \
-  --frameworks javascript,nodeJS,php \
-  --output ./output/
+  --frameworks javascript,nodeJS,php
 ```
 
 **Flags:**
@@ -142,17 +140,19 @@ python generate.py \
 | `--controllers` | yes | Path to controllers directory |
 | `--oauth-sdk` | yes | Path to OAuth SDK root (contains `javascript/`, `php/`, `python/` subdirectories) |
 | `--frameworks` | no | Comma-separated list of frameworks to generate. Default: all registered. |
-| `--output` | no | Output root directory. Default: `./output/` |
+
+Output is always written to `./sdk_files/` (static, not configurable).
 
 **Run sequence:**
-1. Determine next version number via `versioning.py`
-2. Resolve endpoints via `resolver.py`, write flattened YAML to `output/resolved/v{N}_{name}.yaml`
-3. For each requested framework:
+1. Determine next version number by scanning `sdk_files/` for `v{N}` directories
+2. Archive all existing `sdk_files/v{N}` directories to `sdk_files/archive/v{N}`
+3. Resolve endpoints via `resolver.py`, write flattened YAML to `sdk_files/v{N}/resolved_{name}.yaml`
+4. For each requested framework:
    a. Instantiate generator
-   b. Create `output/{framework}/v{N}/`
+   b. Create `sdk_files/v{N}/{framework}/`
    c. Call `copy_auth_wrapper()` to bundle OAuth SDK source
    d. Call `generate()` to emit SDK files
-4. Print summary: version number, frameworks generated, file counts
+5. Print summary: version number, frameworks generated, file counts
 
 ## Generated SDK Shape
 
@@ -244,7 +244,7 @@ export * from './users.js';
 
 ### Bundled Auth Wrapper
 
-Copied into `output/{framework}/v{N}/oauth/` directly from the source OAuth SDK for that framework.
+Copied into `sdk_files/v{N}/{framework}/oauth/` directly from the source OAuth SDK for that framework.
 
 ## Naming Conventions per Framework
 
@@ -255,6 +255,10 @@ Copied into `output/{framework}/v{N}/oauth/` directly from the source OAuth SDK 
 | php | camelCase | PascalCase controller name `.php` | PascalCase controller name |
 
 Snake_case endpoint `id` → framework convention is handled by each generator.
+
+### Filename Normalization
+
+Spaces in controller names are replaced with underscores in `group_by_controller()` (base class) before any framework-specific naming is applied. This ensures generated filenames never contain spaces. For example, a controller named "Curated Albums" produces `curated_albums.js` (JS) or `CuratedAlbums.php` (PHP).
 
 ## Error Handling
 
@@ -301,6 +305,6 @@ Full error class implementations and consumer usage examples are in `errors.md`.
 ## Constraints
 
 - All generated code is read-only by convention. Manual edits go into a separate layer (not covered by this spec).
-- The generator never modifies or deletes previous version directories.
-- The resolved YAML is the source of truth for what was generated in a given version — it is an immutable snapshot.
+- Previous version directories are archived to `sdk_files/archive/` when a new version is generated. Archived versions are never modified or deleted.
+- The resolved YAML is the source of truth for what was generated in a given version — it is an immutable snapshot, packaged inside the version directory.
 - No runtime dependencies beyond the bundled OAuth SDK and the language's standard HTTP primitives (`fetch` for JS, `curl` for PHP).

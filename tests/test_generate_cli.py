@@ -144,3 +144,20 @@ def test_cli_missing_required_arg_exits_nonzero(sdk_env):
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
     assert result.returncode != 0
+
+
+def test_cli_generates_test_dir(sdk_env):
+    """After SDK generation, test files are generated into output/v1/tests/{framework}/."""
+    result = run_cli(sdk_env, ["--frameworks", "javascript"])
+    assert result.returncode == 0, result.stderr
+    test_dir = os.path.join(sdk_env["output"], "v1", "tests", "javascript")
+    assert os.path.isdir(test_dir), f"test dir not created: {test_dir}"
+    assert os.path.isfile(os.path.join(test_dir, "helpers.js"))
+    assert os.path.isfile(os.path.join(test_dir, "package.json"))
+
+
+def test_cli_test_summary_printed(sdk_env):
+    """print_test_summary is called and 'Test Results' appears in stdout."""
+    result = run_cli(sdk_env, ["--frameworks", "javascript"])
+    assert result.returncode == 0, result.stderr
+    assert "Test Results" in result.stdout
