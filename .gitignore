@@ -1,0 +1,4 @@
+sdk_files/archive/
+__pycache__/
+*.pyc
+.pytest_cache/
