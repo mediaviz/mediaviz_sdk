@@ -410,5 +410,64 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 22,
+    "description": "Normalize path converter syntax ({param:type}) in resolver — strip type suffix and promote misclassified params to in:path",
+    "touch_points": [
+      {
+        "file": "resolver.py",
+        "location": "_normalize_path",
+        "status": "new function — strips :converter from path placeholders, promotes params to path"
+      },
+      {
+        "file": "resolver.py",
+        "location": "_flatten",
+        "status": "calls _normalize_path before returning endpoint dict"
+      },
+      {
+        "file": "spec.md",
+        "location": "Resolver section",
+        "status": "updated description to document normalization behavior"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 23,
+    "description": "Respect endpoint content_type in generators — use URLSearchParams/http_build_query for application/x-www-form-urlencoded instead of hardcoded JSON",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_unauth_fn",
+        "status": "reads ep content_type, emits URLSearchParams for form-urlencoded, JSON.stringify for default"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_curl_post",
+        "status": "accepts content_type param, uses http_build_query for form-urlencoded"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_unauth_method",
+        "status": "passes content_type to _curl_post"
+      },
+      {
+        "file": "tests/test_javascript_browser.py",
+        "location": "test_unauth_fn_form_urlencoded, _auth_ep, _unauth_ep",
+        "status": "added form-urlencoded test, fixed missing function_name in helpers"
+      },
+      {
+        "file": "tests/test_php.py",
+        "location": "test_unauth_method_form_urlencoded, _auth_ep, _unauth_ep",
+        "status": "added form-urlencoded test, fixed missing function_name in helpers"
+      },
+      {
+        "file": "spec.md",
+        "location": "Unauthenticated endpoint examples",
+        "status": "added form-urlencoded output example"
+      }
+    ],
+    "completion_status": true
   }
 ]

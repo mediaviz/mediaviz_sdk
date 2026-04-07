@@ -244,7 +244,7 @@ class PhpGenerator(BaseGenerator):
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _emit_method(self, ep: dict) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         path_params = [p for p in ep["params"] if p["in"] == "path"]
         query_params = [p for p in ep["params"] if p["in"] == "query"]
         if ep.get("auth") == "required":
@@ -259,7 +259,10 @@ class PhpGenerator(BaseGenerator):
 
         body_fields = []
         has_generic_body = False
-        if isinstance(request_body, dict):
+        is_model = isinstance(request_body, dict) and self._is_model_body(request_body)
+        if is_model:
+            sig_parts.append("array $body")
+        elif isinstance(request_body, dict):
             body_fields = self._flatten_body(request_body)
             for _, camel_param in body_fields:
                 sig_parts.append(f"mixed ${camel_param}")
@@ -283,7 +286,9 @@ class PhpGenerator(BaseGenerator):
 
         lines.extend(self._build_path(ep["path"], path_params, query_params, "auth"))
 
-        if body_fields:
+        if is_model:
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body);")
+        elif body_fields:
             lines.append("        $body = [")
             for snake_key, camel_param in body_fields:
                 lines.append(f"            '{snake_key}' => ${camel_param},")
@@ -299,11 +304,24 @@ class PhpGenerator(BaseGenerator):
     def _emit_unauth_method(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
         method = ep["method"]
         request_body = ep.get("request_body")
+        content_type = ep.get("content_type") or "application/json"
         sig_parts = ["string $baseUrl"]
         for p in path_params:
             sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
 
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            sig_parts.append("array $body")
+            if len(sig_parts) > 1:
+                indent = "        "
+                sig = f"    public function {func_name}(\n"
+                sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
+                sig += "\n    ): mixed {"
+            else:
+                sig = f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"
+            lines = [sig]
+            lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
+            lines.extend(self._curl_post(method, content_type))
+        elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             for _, camel_param in fields:
                 sig_parts.append(f"mixed ${camel_param}")
@@ -320,13 +338,13 @@ class PhpGenerator(BaseGenerator):
             for snake_key, camel_param in fields:
                 lines.append(f"            '{snake_key}' => ${camel_param},")
             lines.append("        ];")
-            lines.extend(self._curl_post(method))
+            lines.extend(self._curl_post(method, content_type))
         elif request_body:
             sig_parts.append("array $body = []")
             lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
             lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
             lines.append("        $body = $body;")
-            lines.extend(self._curl_post(method))
+            lines.extend(self._curl_post(method, content_type))
         else:
             for p in query_params:
                 t = _php_type(p.get("type"))
@@ -368,14 +386,18 @@ class PhpGenerator(BaseGenerator):
             lines = [f"        $path = {php_path};"]
         return lines
 
-    def _curl_post(self, method: str) -> list[str]:
+    def _curl_post(self, method: str, content_type: str = "application/json") -> list[str]:
+        if content_type == "application/x-www-form-urlencoded":
+            encode_line = "        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($body));"
+        else:
+            encode_line = "        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));"
         return [
             "        $ch = curl_init();",
             "        curl_setopt($ch, CURLOPT_URL, $baseUrl . $path);",
             "        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);",
             f"        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '{method}');",
-            "        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));",
-            "        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);",
+            encode_line,
+            f"        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: {content_type}']);",
             "        curl_setopt($ch, CURLOPT_HEADER, true);",
             "        $raw = curl_exec($ch);",
             "        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);",
@@ -385,6 +407,10 @@ class PhpGenerator(BaseGenerator):
             "        $body = substr($raw, $headerSize);",
             "        return handleResponse($body, $statusCode, $headers);",
         ]
+
+    def _is_model_body(self, body: dict) -> bool:
+        """Check if request_body uses the _model convention (body IS the model, not wrapped)."""
+        return list(body.keys()) == ["_model"]
 
     def _flatten_body(self, body: dict) -> list[tuple[str, str]]:
         """Extract field names from request_body schema, returning [(snake_key, camelKey), ...]."""

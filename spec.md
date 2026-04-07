@@ -33,7 +33,7 @@ mediaviz_sdk/
 
 ### 1. Resolver (`resolver.py`)
 
-Reads a ref-list YAML file (e.g., `top_endpoints.yaml`), follows each `$ref` into controller YAML files, extracts the matching endpoint by `id`, and writes a single flattened YAML file.
+Reads a ref-list YAML file (e.g., `top_endpoints.yaml`), follows each `$ref` into controller YAML files, extracts the matching endpoint by `id`, and writes a single flattened YAML file. During flattening, path placeholders with type converters (e.g. `{directory:path}`) are normalized to `{directory}`, and any corresponding params are promoted to `in: path`.
 
 **Input:** Path to a ref-list YAML, path to the controllers directory.
 
@@ -215,7 +215,7 @@ class Photos {
 }
 ```
 
-**Unauthenticated endpoint example (JS):**
+**Unauthenticated endpoint example (JS, JSON body):**
 ```javascript
 export async function createUsersNewCompany(baseUrl, { name, email, password, accountType, companyId, profilePicture, companyName }) {
   const resp = await fetch(baseUrl + '/api/v1/users/new_company', {
@@ -227,6 +227,20 @@ export async function createUsersNewCompany(baseUrl, { name, email, password, ac
     })
   });
   return resp.json();
+}
+```
+
+**Unauthenticated endpoint example (JS, form-urlencoded body):**
+
+When an endpoint's `content_type` is `application/x-www-form-urlencoded`, the generator uses `URLSearchParams` (JS) or `http_build_query` (PHP) instead of JSON serialization:
+```javascript
+export async function getAccessTokenLogin(baseUrl, { username, password }) {
+  const resp = await fetch(baseUrl + `/api/v1/token/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username, password }).toString(),
+  });
+  return handleResponse(resp);
 }
 ```
 

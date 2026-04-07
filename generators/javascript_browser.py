@@ -199,7 +199,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "export default {\n"
             "  input: 'index.js',\n"
             "  output: [\n"
-            "    { file: 'dist/sdk.cjs.js', format: 'cjs', exports: 'named' },\n"
+            "    { file: 'dist/sdk.cjs', format: 'cjs', exports: 'named' },\n"
             "    { file: 'dist/sdk.esm.js', format: 'es' },\n"
             "    { file: 'dist/sdk.umd.js', format: 'umd', name: 'MediaVizSdk', exports: 'named' },\n"
             "  ],\n"
@@ -214,15 +214,15 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "name": "@mediaviz/sdk",
             "version": "0.1.0",
             "type": "module",
-            "main": "./dist/sdk.cjs.js",
+            "main": "./dist/sdk.cjs",
             "module": "./dist/sdk.esm.js",
             "browser": "./dist/sdk.umd.js",
             "exports": {
                 ".": {
                     "browser": "./dist/sdk.umd.js",
                     "import": "./dist/sdk.esm.js",
-                    "require": "./dist/sdk.cjs.js",
-                    "default": "./dist/sdk.cjs.js",
+                    "require": "./dist/sdk.cjs",
+                    "default": "./dist/sdk.cjs",
                 },
             },
             "scripts": {
@@ -241,7 +241,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _emit_function(self, ep: dict) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         path_params = [p for p in ep["params"] if p["in"] == "path"]
         query_params = [p for p in ep["params"] if p["in"] == "query"]
         if ep.get("auth") == "required":
@@ -260,7 +260,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         request_body = ep.get("request_body")
 
         sig_parts = ["client", "accessToken", "refreshToken"] + path_args
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            sig_parts.append("body")
+        elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             param_names = [camel for _, camel in fields]
             sig_parts.append("{ " + ", ".join(param_names) + " }")
@@ -284,7 +286,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         else:
             lines.append(f"  const path = {tmpl};")
 
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+        elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             field_strs = []
             for snake_key, camel_param in fields:
@@ -293,9 +297,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 else:
                     field_strs.append(f"{snake_key}: {camel_param}")
             body_arg = "{ " + ", ".join(field_strs) + " }"
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, {body_arg});")
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify({body_arg}));")
         elif request_body:
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, body);")
+            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
         else:
             lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken);")
         lines.append("}")
@@ -305,8 +309,23 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         method = ep["method"]
         path_args = [self.snake_to_camel(p["name"]) for p in path_params]
         request_body = ep.get("request_body")
+        content_type = ep.get("content_type") or "application/json"
+        is_form = content_type == "application/x-www-form-urlencoded"
 
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            sig_parts = ["baseUrl"] + path_args + ["body"]
+            lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+            tmpl = self._path_template(ep["path"], path_params)
+            lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{")
+            lines.append(f"    method: '{method}',")
+            lines.append(f"    headers: {{ 'Content-Type': '{content_type}' }},")
+            if is_form:
+                lines.append("    body: new URLSearchParams(body).toString(),")
+            else:
+                lines.append("    body: JSON.stringify(body),")
+            lines.append("  });")
+            lines.append("  return handleResponse(resp);")
+        elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             param_names = [camel for _, camel in fields]
             sig_parts = ["baseUrl"] + path_args + ["{ " + ", ".join(param_names) + " }"]
@@ -314,16 +333,19 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             tmpl = self._path_template(ep["path"], path_params)
             lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{")
             lines.append(f"    method: '{method}',")
-            lines.append("    headers: { 'Content-Type': 'application/json' },")
+            lines.append(f"    headers: {{ 'Content-Type': '{content_type}' }},")
             field_strs = []
             for snake_key, camel_param in fields:
                 if snake_key == camel_param:
                     field_strs.append(f"      {camel_param}")
                 else:
                     field_strs.append(f"      {snake_key}: {camel_param}")
-            lines.append("    body: JSON.stringify({")
+            if is_form:
+                lines.append("    body: new URLSearchParams({")
+            else:
+                lines.append("    body: JSON.stringify({")
             lines.append(",\n".join(field_strs))
-            lines.append("    }),")
+            lines.append("    }).toString(),") if is_form else lines.append("    }),")
             lines.append("  });")
             lines.append("  return handleResponse(resp);")
         elif request_body:
@@ -333,8 +355,11 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             tmpl = self._path_template(ep["path"], path_params)
             lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{")
             lines.append(f"    method: '{method}',")
-            lines.append("    headers: { 'Content-Type': 'application/json' },")
-            lines.append("    body: JSON.stringify(body),")
+            lines.append(f"    headers: {{ 'Content-Type': '{content_type}' }},")
+            if is_form:
+                lines.append("    body: new URLSearchParams(body).toString(),")
+            else:
+                lines.append("    body: JSON.stringify(body),")
             lines.append("  });")
             lines.append("  return handleResponse(resp);")
         else:
@@ -360,6 +385,10 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
         lines.append("}")
         return lines
+
+    def _is_model_body(self, body: dict) -> bool:
+        """Check if request_body uses the _model convention (body IS the model, not wrapped)."""
+        return list(body.keys()) == ["_model"]
 
     def _flatten_body(self, body: dict) -> list[tuple[str, str]]:
         """Extract field names from request_body schema, returning [(snake_key, camelKey), ...]."""

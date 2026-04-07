@@ -1,7 +1,11 @@
 import os
+import re
 from datetime import datetime, timezone
 
 import yaml
+
+# Matches {param_name:converter} in URL paths (e.g. FastAPI's {directory:path})
+_PATH_CONVERTER_RE = re.compile(r"\{(\w+):\w+\}")
 
 
 def parse_ref(ref: str) -> tuple[str, str]:
@@ -41,16 +45,40 @@ def resolve_refs(ref_list_path: str) -> list[dict]:
     return endpoints
 
 
+def _normalize_path(path: str, params: list[dict]) -> tuple[str, list[dict]]:
+    """Strip type converters from path placeholders and promote misclassified params to path."""
+    path_param_names = {m.group(1) for m in _PATH_CONVERTER_RE.finditer(path)}
+    if not path_param_names:
+        return path, params
+    normalized = _PATH_CONVERTER_RE.sub(r"{\1}", path)
+    for p in params:
+        if p["name"] in path_param_names and p.get("in") != "path":
+            p = {**p, "in": "path", "required": True}
+    # rebuild list with promotions applied
+    params = [
+        {**p, "in": "path", "required": True} if p["name"] in path_param_names and p.get("in") != "path" else p
+        for p in params
+    ]
+    # add missing path params not declared in params list
+    declared = {p["name"] for p in params}
+    for name in sorted(path_param_names - declared):
+        params.append({"name": name, "in": "path", "type": "str", "required": True})
+    return normalized, params
+
+
 def _flatten(ep: dict, controller: str, base_path: str) -> dict:
+    params = list(ep.get("params") or [])
+    path, params = _normalize_path(ep["path"], params)
     return {
         "id": ep["id"],
+        "function_name": ep.get("function_name", ep["id"]),
         "controller": controller,
         "base_path": base_path,
         "method": ep["method"],
-        "path": ep["path"],
+        "path": path,
         "summary": ep.get("summary"),
         "auth": ep.get("auth"),
-        "params": ep.get("params") or [],
+        "params": params,
         "request_body": ep.get("request_body"),
         "response": ep.get("response"),
         "content_type": ep.get("content_type"),
