@@ -13,30 +13,32 @@ def gen():
     return JavaScriptBrowserGenerator()
 
 
-def _auth_ep(ep_id, path, method="GET", params=None, request_body=None):
+def _auth_ep(ep_id, path, method="GET", params=None, request_body=None, content_type=None):
     return {
         "id": ep_id,
+        "function_name": ep_id,
         "controller": "Photos",
         "method": method,
         "path": path,
         "auth": "required",
         "params": params or [],
         "request_body": request_body,
-        "content_type": "application/json" if request_body else None,
+        "content_type": content_type or ("application/json" if request_body else None),
         "tags": [],
     }
 
 
-def _unauth_ep(ep_id, path, method="GET", params=None, request_body=None):
+def _unauth_ep(ep_id, path, method="GET", params=None, request_body=None, content_type=None):
     return {
         "id": ep_id,
+        "function_name": ep_id,
         "controller": "Users",
         "method": method,
         "path": path,
         "auth": "none",
         "params": params or [],
         "request_body": request_body,
-        "content_type": "application/json" if request_body else None,
+        "content_type": content_type or ("application/json" if request_body else None),
         "tags": [],
     }
 
@@ -57,8 +59,9 @@ def test_auth_fn_no_params(gen):
     ep = _auth_ep("get_status", "/api/v1/status")
     lines = gen._emit_function(ep)
     src = "\n".join(lines)
-    assert "export function getStatus(client, accessToken, refreshToken)" in src
-    assert "client.request" in src
+    assert "export async function getStatus(client, accessToken, refreshToken)" in src
+    assert "const { data } = await client.request" in src
+    assert "return data;" in src
     assert "'GET'" in src
 
 
@@ -72,7 +75,7 @@ def test_auth_fn_path_params(gen):
     src = "\n".join(lines)
     assert "tableName" in src
     assert "encodeURIComponent(tableName)" in src
-    assert "client.request(path, 'GET', accessToken, refreshToken)" in src
+    assert "await client.request(path, 'GET', accessToken, refreshToken)" in src
 
 
 def test_auth_fn_query_params(gen):
@@ -88,7 +91,7 @@ def test_auth_fn_query_params(gen):
     )
     lines = gen._emit_function(ep)
     src = "\n".join(lines)
-    assert "export function getPhotosSort(client, accessToken, refreshToken, tableName, sortOrder, { limit, lastId } = {})" in src
+    assert "export async function getPhotosSort(client, accessToken, refreshToken, tableName, sortOrder, { limit, lastId } = {})" in src
     assert "query.set('limit', limit)" in src
     assert "query.set('last_id', lastId)" in src
     assert "URLSearchParams" in src
@@ -107,7 +110,7 @@ def test_auth_fn_dynamic_body(gen):
     src = "\n".join(lines)
     assert "body = {}" in src
     assert "JSON.stringify(body)" in src
-    assert "client.request(path, 'PUT', accessToken, refreshToken, JSON.stringify(body))" in src
+    assert "await client.request(path, 'PUT', accessToken, refreshToken, JSON.stringify(body))" in src
 
 
 def test_auth_fn_structured_body(gen):
@@ -125,7 +128,7 @@ def test_auth_fn_structured_body(gen):
     src = "\n".join(lines)
     assert "{ event, detail }" in src
     assert "JSON.stringify({ event, detail })" in src
-    assert "client.request(path, 'POST', accessToken, refreshToken, JSON.stringify({ event, detail }))" in src
+    assert "await client.request(path, 'POST', accessToken, refreshToken, JSON.stringify({ event, detail }))" in src
 
 
 # ── unauthenticated function emission ─────────────────────────────────────────
@@ -174,6 +177,24 @@ def test_unauth_fn_no_body(gen):
     assert "export async function getPublicStatus(baseUrl)" in src
     assert "fetch(baseUrl +" in src
     assert "'GET'" in src
+
+
+def test_unauth_fn_form_urlencoded(gen):
+    ep = _unauth_ep(
+        "create_token",
+        "/api/v1/token/",
+        method="POST",
+        request_body={
+            "username": {"type": "string (email)", "required": True},
+            "password": {"type": "string", "required": True},
+        },
+        content_type="application/x-www-form-urlencoded",
+    )
+    lines = gen._emit_function(ep)
+    src = "\n".join(lines)
+    assert "application/x-www-form-urlencoded" in src
+    assert "new URLSearchParams" in src
+    assert "JSON.stringify" not in src
 
 
 # ── controller file + index ────────────────────────────────────────────────────
@@ -256,14 +277,14 @@ def test_package_json(gen, tmp_path):
     pkg = json.loads((tmp_path / "package.json").read_text())
     assert pkg["name"] == "@mediaviz/sdk"
     assert pkg["type"] == "module"
-    assert pkg["main"] == "./dist/sdk.cjs.js"
+    assert pkg["main"] == "./dist/sdk.cjs"
     assert pkg["module"] == "./dist/sdk.esm.js"
     assert pkg["browser"] == "./dist/sdk.umd.js"
     exports = pkg["exports"]["."]
     assert exports["browser"] == "./dist/sdk.umd.js"
     assert exports["import"] == "./dist/sdk.esm.js"
-    assert exports["require"] == "./dist/sdk.cjs.js"
-    assert exports["default"] == "./dist/sdk.cjs.js"
+    assert exports["require"] == "./dist/sdk.cjs"
+    assert exports["default"] == "./dist/sdk.cjs"
     assert "build" in pkg["scripts"]
     assert "rollup" in pkg["devDependencies"]
 

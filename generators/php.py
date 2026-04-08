@@ -279,25 +279,25 @@ class PhpGenerator(BaseGenerator):
             indent = "        "
             sig = f"    public function {func_name}(\n"
             sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
-            sig += f"\n    ): \\OAuthSdk\\AuthenticatedResponse {{"
+            sig += f"\n    ): mixed {{"
             lines = [sig]
         else:
-            lines = [f"    public function {func_name}({', '.join(sig_parts)}): \\OAuthSdk\\AuthenticatedResponse {{"]
+            lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
 
         lines.extend(self._build_path(ep["path"], path_params, query_params, "auth"))
 
         if is_model:
-            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body);")
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body)->data;")
         elif body_fields:
             lines.append("        $body = [")
             for snake_key, camel_param in body_fields:
                 lines.append(f"            '{snake_key}' => ${camel_param},")
             lines.append("        ];")
-            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body);")
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body)->data;")
         elif has_generic_body:
-            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body);")
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken, $body)->data;")
         else:
-            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken);")
+            lines.append(f"        return $this->client->request($path, '{ep['method']}', $accessToken, $refreshToken)->data;")
         lines.append("    }")
         return lines
 

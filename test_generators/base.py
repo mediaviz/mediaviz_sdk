@@ -92,3 +92,8 @@ class BaseTestGenerator(ABC):
             for p in query_params
         }
         return "?" + urlencode(pairs)
+
+    @staticmethod
+    def _is_model_body(body: dict) -> bool:
+        """Check if request_body uses the _model convention (body IS the model, not wrapped)."""
+        return list(body.keys()) == ["_model"]

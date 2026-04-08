@@ -162,7 +162,7 @@ class JavaScriptTestGenerator(BaseTestGenerator):
     def emit_controller_test(
         self, controller: str, endpoints: list[dict], sdk_dir: str, test_dir: str
     ) -> None:
-        func_names = [self.snake_to_camel(ep["id"]) for ep in endpoints]
+        func_names = [self.snake_to_camel(ep["function_name"]) for ep in endpoints]
         imports_str = ", ".join(func_names)
         rel_sdk = os.path.relpath(os.path.join(sdk_dir, controller.lower() + ".js"), test_dir)
         rel_helpers = "./helpers.js"
@@ -177,7 +177,7 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         lines.append(f"describe('{controller}', () => {{")
 
         for ep in endpoints:
-            func_name = self.snake_to_camel(ep["id"])
+            func_name = self.snake_to_camel(ep["function_name"])
             params = ep.get("params", [])
             lines.extend(self._emit_existence_test(func_name))
             lines.extend(self._emit_method_test(ep, func_name, params))
@@ -279,6 +279,8 @@ class JavaScriptTestGenerator(BaseTestGenerator):
     def _emit_body_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
         request_body = ep.get("request_body")
         is_auth = ep.get("auth") == "required"
+        content_type = ep.get("content_type") or "application/json"
+        is_form = content_type == "application/x-www-form-urlencoded"
         call_args = self._build_call_args(ep, params, spy_name="spy")
         lines = [f"  it('{func_name} — request body', async () => {{"]
         if is_auth:
@@ -287,6 +289,13 @@ class JavaScriptTestGenerator(BaseTestGenerator):
                 f"    await {func_name}({call_args});",
                 "    const body = spy.last_call().body;",
             ]
+        elif is_form:
+            lines += [
+                "    const spy = makeSpyFetch();",
+                "    globalThis.fetch = spy;",
+                f"    await {func_name}({call_args});",
+                "    const body = Object.fromEntries(new URLSearchParams(spy.last_call().body));",
+            ]
         else:
             lines += [
                 "    const spy = makeSpyFetch();",
@@ -294,7 +303,9 @@ class JavaScriptTestGenerator(BaseTestGenerator):
                 f"    await {func_name}({call_args});",
                 "    const body = JSON.parse(spy.last_call().body);",
             ]
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            lines.append("    expect(body).toBeDefined();")
+        elif isinstance(request_body, dict):
             for field in request_body:
                 lines.append(f"    expect(body).toHaveProperty('{field}');")
         else:
@@ -343,7 +354,9 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             val = self.test_value_for_type(p.get("type", "string"), encoding=encoding)
             parts.append(_js_literal(val))
 
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            parts.append("{ Model: 'test_value' }")
+        elif isinstance(request_body, dict):
             field_parts = []
             for field in request_body:
                 camel = self.snake_to_camel(field)

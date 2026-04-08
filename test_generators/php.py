@@ -124,6 +124,7 @@ class PhpTestGenerator(BaseTestGenerator):
             "    <testsuites>\n"
             '        <testsuite name="Contract Tests">\n'
             '            <directory>.</directory>\n'
+            "            <exclude>./vendor</exclude>\n"
             "        </testsuite>\n"
             "    </testsuites>\n"
             "</phpunit>\n"
@@ -201,7 +202,7 @@ class PhpTestGenerator(BaseTestGenerator):
     # ── per-assertion emitters ────────────────────────────────────────────────
 
     def _emit_existence_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         return [
             f"    public function test_{ep['id']}_exists(): void {{",
             f"        $this->assertTrue(method_exists({class_name}::class, '{func_name}'));",
@@ -210,7 +211,7 @@ class PhpTestGenerator(BaseTestGenerator):
         ]
 
     def _emit_method_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         method = ep["method"]
         is_auth = ep.get("auth") == "required"
         call_args = self._build_call_args(ep, ep.get("params", []))
@@ -231,7 +232,7 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_path_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         params = ep.get("params", [])
         path_params = [p for p in params if p.get("in") == "path"]
         expected_path = self.build_expected_path(ep["path"], params) if path_params else ep["path"]
@@ -253,7 +254,7 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_query_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         params = ep.get("params", [])
         query_params = [p for p in params if p.get("in") == "query"]
         is_auth = ep.get("auth") == "required"
@@ -276,7 +277,7 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_body_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         request_body = ep.get("request_body")
         is_auth = ep.get("auth") == "required"
         call_args = self._build_call_args(ep, ep.get("params", []))
@@ -288,7 +289,9 @@ class PhpTestGenerator(BaseTestGenerator):
                 f"        $obj->{func_name}({call_args});",
                 "        $body = $spy->lastCall()['body'];",
             ]
-            if isinstance(request_body, dict):
+            if isinstance(request_body, dict) and self._is_model_body(request_body):
+                lines.append("        $this->assertIsArray($body);")
+            elif isinstance(request_body, dict):
                 for field in request_body:
                     lines.append(f"        $this->assertArrayHasKey('{field}', $body);")
             else:
@@ -301,7 +304,7 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_auth_routing_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["id"])
+        func_name = self.snake_to_camel(ep["function_name"])
         is_auth = ep.get("auth") == "required"
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_auth_routing(): void {{"]
@@ -339,7 +342,9 @@ class PhpTestGenerator(BaseTestGenerator):
             val = self.test_value_for_type(p.get("type", "string"), encoding=encoding)
             parts.append(_php_literal(val))
 
-        if isinstance(request_body, dict):
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            parts.append("['Model' => 'test_value']")
+        elif isinstance(request_body, dict):
             for field in request_body:
                 val_type = (
                     request_body[field].get("type", "string")
@@ -372,21 +377,24 @@ def _php_literal(value: object) -> str:
 
 def _parse_phpunit_counts(output: str) -> tuple[int, int, int]:
     passed = failed = 0
-    m_pass = re.search(r"(\d+) test(?:s?) (?:complete|passed|OK)", output)
-    m_fail = re.search(r"(\d+) failure", output)
-    # PHPUnit summary line: "Tests: 5, Assertions: 10, Failures: 1."
+
+    # PHPUnit success: "OK (305 tests, 332 assertions)"
+    m_ok = re.search(r"OK \((\d+) tests?", output)
+
+    # PHPUnit failure summary: "Tests: 5, Assertions: 10, Failures: 1."
     m_tests = re.search(r"Tests:\s*(\d+)", output)
     m_failures = re.search(r"Failures:\s*(\d+)", output)
-    if m_tests:
+    m_errors = re.search(r"Errors:\s*(\d+)", output)
+
+    if m_ok:
+        total = int(m_ok.group(1))
+        passed = total
+        failed = 0
+    elif m_tests:
         total = int(m_tests.group(1))
+        failed = (int(m_failures.group(1)) if m_failures else 0) + (int(m_errors.group(1)) if m_errors else 0)
+        passed = total - failed
     else:
         total = 0
-    if m_failures:
-        failed = int(m_failures.group(1))
-    elif m_fail:
-        failed = int(m_fail.group(1))
-    if m_pass:
-        passed = int(m_pass.group(1))
-    else:
-        passed = total - failed
+
     return passed, failed, total

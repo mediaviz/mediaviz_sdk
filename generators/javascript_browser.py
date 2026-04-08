@@ -272,7 +272,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             q_names = [self.snake_to_camel(p["name"]) for p in query_params]
             sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
 
-        lines = [f"export function {func_name}({', '.join(sig_parts)}) {{"]
+        lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
         tmpl = self._path_template(ep["path"], path_params)
 
         if query_params:
@@ -287,7 +287,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines.append(f"  const path = {tmpl};")
 
         if isinstance(request_body, dict) and self._is_model_body(request_body):
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
         elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             field_strs = []
@@ -297,11 +297,12 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 else:
                     field_strs.append(f"{snake_key}: {camel_param}")
             body_arg = "{ " + ", ".join(field_strs) + " }"
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify({body_arg}));")
+            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify({body_arg}));")
         elif request_body:
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
         else:
-            lines.append(f"  return client.request(path, '{ep['method']}', accessToken, refreshToken);")
+            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken);")
+        lines.append("  return data;")
         lines.append("}")
         return lines
 

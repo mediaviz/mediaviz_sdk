@@ -16,6 +16,7 @@ def gen():
 def _auth_ep(ep_id, path, method="GET", params=None, controller="Photos"):
     return {
         "id": ep_id,
+        "function_name": ep_id,
         "controller": controller,
         "method": method,
         "path": path,
@@ -27,16 +28,17 @@ def _auth_ep(ep_id, path, method="GET", params=None, controller="Photos"):
     }
 
 
-def _unauth_ep(ep_id, path, method="GET", params=None, request_body=None, controller="Users"):
+def _unauth_ep(ep_id, path, method="GET", params=None, request_body=None, controller="Users", content_type=None):
     return {
         "id": ep_id,
+        "function_name": ep_id,
         "controller": controller,
         "method": method,
         "path": path,
         "auth": "none",
         "params": params or [],
         "request_body": request_body,
-        "content_type": "application/json" if request_body else None,
+        "content_type": content_type or ("application/json" if request_body else None),
         "tags": [],
     }
 
@@ -60,8 +62,8 @@ def test_auth_method_no_params(gen):
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
     assert "public function getStatus(string $accessToken, string $refreshToken)" in src
-    assert r"\OAuthSdk\AuthenticatedResponse" in src
-    assert "$this->client->request($path, 'GET', $accessToken, $refreshToken)" in src
+    assert "): mixed {" in src
+    assert "$this->client->request($path, 'GET', $accessToken, $refreshToken)->data" in src
 
 
 def test_auth_method_path_params(gen):
@@ -73,7 +75,7 @@ def test_auth_method_path_params(gen):
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
     assert "string $tableName" in src
-    assert "urlencode($tableName)" in src
+    assert "rawurlencode((string)$tableName)" in src
     assert "$this->client->request" in src
 
 
@@ -95,8 +97,8 @@ def test_auth_method_query_params(gen):
     assert "$query['limit'] = $limit" in src
     assert "$query['last_id'] = $lastId" in src
     assert "http_build_query($query)" in src
-    assert "urlencode($tableName)" in src
-    assert "urlencode($sortOrder)" in src
+    assert "rawurlencode((string)$tableName)" in src
+    assert "rawurlencode((string)$sortOrder)" in src
 
 
 # ── unauthenticated method emission ───────────────────────────────────────────
@@ -146,6 +148,24 @@ def test_unauth_method_dynamic_body(gen):
     src = "\n".join(lines)
     assert "public function updateUsers(string $baseUrl, int $userId, array $body = [])" in src
     assert "CURLOPT_CUSTOMREQUEST, 'PUT'" in src
+
+
+def test_unauth_method_form_urlencoded(gen):
+    ep = _unauth_ep(
+        "create_token",
+        "/api/v1/token/",
+        method="POST",
+        request_body={
+            "username": {"type": "string (email)", "required": True},
+            "password": {"type": "string", "required": True},
+        },
+        content_type="application/x-www-form-urlencoded",
+    )
+    lines = gen._emit_method(ep)
+    src = "\n".join(lines)
+    assert "http_build_query($body)" in src
+    assert "Content-Type: application/x-www-form-urlencoded" in src
+    assert "json_encode" not in src
 
 
 # ── controller file structure ─────────────────────────────────────────────────
