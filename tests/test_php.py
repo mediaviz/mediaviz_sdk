@@ -321,3 +321,112 @@ def test_autoload_config_no_require_when_no_modules(gen, tmp_path):
     gen.generate([_auth_ep("get_photos", "/api/v1/photos/")], str(tmp_path))
     config = json.loads((tmp_path / "composer.json").read_text())
     assert "require" not in config
+
+
+# ── split types file ─────────────────────────────────────────────────────────
+
+
+def _make_types_module(base_path):
+    """Create a module with a monolithic Types.php containing multiple classes."""
+    mod_dir = base_path / "oauth"
+    src_dir = mod_dir / "src"
+    src_dir.mkdir(parents=True)
+    (mod_dir / "composer.json").write_text(json.dumps({
+        "autoload": {
+            "psr-4": {"OAuthSdk\\": "src/"},
+            "files": ["src/Types.php"],
+        }
+    }))
+    (src_dir / "OAuthClient.php").write_text(
+        "<?php\nnamespace OAuthSdk;\nclass OAuthClient {}\n"
+    )
+    (src_dir / "Types.php").write_text(
+        "<?php\n\ndeclare(strict_types=1);\n\nnamespace OAuthSdk;\n\n"
+        "readonly class OAuthClientConfig\n{\n"
+        "    public function __construct(\n"
+        "        public string $baseUrl,\n"
+        "        public string $clientId,\n"
+        "    ) {}\n}\n\n"
+        "readonly class TokenResponse\n{\n"
+        "    public function __construct(\n"
+        "        public string $accessToken,\n"
+        "    ) {}\n}\n\n"
+        "readonly class ClientRegistrationRequest\n{\n"
+        "    /**\n"
+        "     * @param list<string> $redirectUris\n"
+        "     */\n"
+        "    public function __construct(\n"
+        "        public string $clientName,\n"
+        "        public array $redirectUris,\n"
+        "    ) {}\n}\n"
+    )
+    return str(mod_dir)
+
+
+def test_split_types_creates_individual_files(gen, tmp_path):
+    mod_path = _make_types_module(tmp_path)
+    gen._split_types_file(mod_path)
+    src = tmp_path / "oauth" / "src"
+    assert (src / "OAuthClientConfig.php").exists()
+    assert (src / "TokenResponse.php").exists()
+    assert (src / "ClientRegistrationRequest.php").exists()
+    assert not (src / "Types.php").exists()
+
+
+def test_split_types_file_content(gen, tmp_path):
+    mod_path = _make_types_module(tmp_path)
+    gen._split_types_file(mod_path)
+    src = tmp_path / "oauth" / "src"
+    content = (src / "OAuthClientConfig.php").read_text()
+    assert "<?php" in content
+    assert "declare(strict_types=1);" in content
+    assert "namespace OAuthSdk;" in content
+    assert "readonly class OAuthClientConfig" in content
+    assert "public string $baseUrl" in content
+
+
+def test_split_types_preserves_docblocks(gen, tmp_path):
+    mod_path = _make_types_module(tmp_path)
+    gen._split_types_file(mod_path)
+    src = tmp_path / "oauth" / "src"
+    content = (src / "ClientRegistrationRequest.php").read_text()
+    assert "@param list<string> $redirectUris" in content
+    assert "readonly class ClientRegistrationRequest" in content
+
+
+def test_split_types_removes_files_autoload(gen, tmp_path):
+    mod_path = _make_types_module(tmp_path)
+    gen._split_types_file(mod_path)
+    config = json.loads((tmp_path / "oauth" / "composer.json").read_text())
+    assert "files" not in config["autoload"]
+
+
+def test_split_types_preserves_other_files(gen, tmp_path):
+    mod_path = _make_types_module(tmp_path)
+    gen._split_types_file(mod_path)
+    src = tmp_path / "oauth" / "src"
+    assert (src / "OAuthClient.php").exists()
+
+
+def test_split_types_noop_without_types_file(gen, tmp_path):
+    mod_dir = tmp_path / "mod"
+    src_dir = mod_dir / "src"
+    src_dir.mkdir(parents=True)
+    (mod_dir / "composer.json").write_text(json.dumps({
+        "autoload": {"psr-4": {"Foo\\": "src/"}}
+    }))
+    gen._split_types_file(str(mod_dir))  # should not raise
+
+
+def test_split_types_discover_finds_split_classes(gen, tmp_path):
+    mod_path = _make_types_module(tmp_path)
+    gen._split_types_file(mod_path)
+    exports = gen.discover_module_exports("oauth", mod_path)
+    names = {e["name"] for e in exports}
+    assert "OAuthClientConfig" in names
+    assert "TokenResponse" in names
+    assert "ClientRegistrationRequest" in names
+    # All split files should be PSR-4 compliant
+    for e in exports:
+        if e["name"] in ("OAuthClientConfig", "TokenResponse", "ClientRegistrationRequest"):
+            assert e["psr4"] is True

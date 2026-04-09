@@ -9,7 +9,7 @@
         "status": "new file"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 2,
@@ -31,7 +31,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 3,
@@ -43,7 +43,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 4,
@@ -55,7 +55,7 @@
         "status": "new file"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 5,
@@ -92,7 +92,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 6,
@@ -124,7 +124,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 7,
@@ -156,7 +156,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 8,
@@ -173,7 +173,7 @@
         "status": "new file"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 9,
@@ -190,7 +190,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 10,
@@ -207,7 +207,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 11,
@@ -224,7 +224,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 12,
@@ -241,7 +241,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 13,
@@ -258,7 +258,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 14,
@@ -270,7 +270,7 @@
         "status": "new file"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 15,
@@ -292,7 +292,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 16,
@@ -309,7 +309,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 17,
@@ -326,7 +326,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 18,
@@ -343,7 +343,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 19,
@@ -355,7 +355,7 @@
         "status": "complete"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 20,
@@ -372,7 +372,7 @@
         "status": "removed redundant .replace(' ', '_') — base handles it"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 21,
@@ -409,7 +409,7 @@
         "status": "updated to reflect sdk_files/ layout and archive behavior"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 22,
@@ -431,7 +431,7 @@
         "status": "updated description to document normalization behavior"
       }
     ],
-    "completion_status": true
+    "completion_status": false
   },
   {
     "id": 23,
@@ -466,6 +466,28 @@
         "file": "spec.md",
         "location": "Unauthenticated endpoint examples",
         "status": "added form-urlencoded output example"
+      }
+    ],
+    "completion_status": false
+  },
+  {
+    "id": 24,
+    "description": "Split copied Types.php into individual PSR-4 class files during PHP module copy — one file per class, remove files autoload entry from composer.json",
+    "touch_points": [
+      {
+        "file": "generators/php.py",
+        "location": "copy_module",
+        "status": "calls _split_types_file after copying module"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_split_types_file",
+        "status": "new method — parses Types.php, writes individual class files, updates composer.json"
+      },
+      {
+        "file": "tests/test_php.py",
+        "location": "test_split_types_*",
+        "status": "7 new tests covering file creation, content, docblocks, autoload cleanup, noop, and discover integration"
       }
     ],
     "completion_status": true

@@ -260,6 +260,8 @@ export * from './users.js';
 
 Copied into `sdk_files/v{N}/{framework}/oauth/` directly from the source OAuth SDK for that framework.
 
+**PHP PSR-4 normalization:** After copying, the PHP generator splits any multi-class `Types.php` into individual files (one class per file, e.g. `OAuthClientConfig.php`, `TokenResponse.php`) to match PSR-4 autoloading conventions. The `files` autoload entry for `Types.php` is removed from `composer.json` since PSR-4 handles discovery.
+
 ## Naming Conventions per Framework
 
 | Framework | Function names | File names | Class names |

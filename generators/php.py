@@ -30,7 +30,8 @@ class PhpGenerator(BaseGenerator):
         self.emit_autoload_config(output_dir, reexport_files=reexport_files)
 
     def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
-        self._copy_module_files(module_root, "php", module_name, output_dir)
+        dst = self._copy_module_files(module_root, "php", module_name, output_dir)
+        self._split_types_file(dst)
 
     def discover_module_exports(self, module_name: str, module_path: str) -> list[dict]:
         composer = os.path.join(module_path, "composer.json")
@@ -177,8 +178,8 @@ class PhpGenerator(BaseGenerator):
             f.write("\n".join(lines))
 
     def emit_controller_file(self, class_name: str, endpoints: list[dict], filepath: str) -> None:
-        needs_auth = any(ep.get("auth") == "required" for ep in endpoints)
-        needs_errors = any(ep.get("auth") != "required" for ep in endpoints)
+        needs_auth = any(ep.get("auth") == "required" and not ep.get("api_host") for ep in endpoints)
+        needs_errors = any(ep.get("auth") != "required" or ep.get("api_host") for ep in endpoints)
         lines = ["<?php", "declare(strict_types=1);", "namespace MediaVizSdk;", ""]
         if needs_errors:
             lines.append("require_once __DIR__ . '/Exceptions.php';")
@@ -247,6 +248,9 @@ class PhpGenerator(BaseGenerator):
         func_name = self.snake_to_camel(ep["function_name"])
         path_params = [p for p in ep["params"] if p["in"] == "path"]
         query_params = [p for p in ep["params"] if p["in"] == "query"]
+        header_params = [p for p in ep["params"] if p["in"] == "header"]
+        if ep.get("api_host"):
+            return self._emit_alt_host_method(func_name, ep, path_params, query_params, header_params)
         if ep.get("auth") == "required":
             return self._emit_auth_method(func_name, ep, path_params, query_params)
         return self._emit_unauth_method(func_name, ep, path_params, query_params)
@@ -367,6 +371,89 @@ class PhpGenerator(BaseGenerator):
         lines.append("    }")
         return lines
 
+    def _emit_alt_host_method(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict], header_params: list[dict]) -> list[str]:
+        """Emit method for endpoints on a non-default API host (e.g. photo_upload)."""
+        method = ep["method"]
+        request_body = ep.get("request_body")
+        content_type = ep.get("content_type") or "application/json"
+
+        required_headers = [p for p in header_params if p.get("required")]
+        optional_headers = [p for p in header_params if not p.get("required")]
+
+        sig_parts = ["string $baseUrl", "string $accessToken"]
+        for p in path_params:
+            sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
+        for p in required_headers:
+            sig_parts.append(f"string ${self.header_to_param(p['name'])}")
+
+        body_fields = []
+        is_model = isinstance(request_body, dict) and self._is_model_body(request_body)
+        if is_model:
+            sig_parts.append("array $body")
+        elif isinstance(request_body, dict):
+            body_fields = self._flatten_body(request_body)
+            for _, camel_param in body_fields:
+                sig_parts.append(f"mixed ${camel_param}")
+        elif request_body:
+            sig_parts.append("array $body = []")
+
+        for p in optional_headers:
+            sig_parts.append(f"?string ${self.header_to_param(p['name'])} = null")
+        for p in query_params:
+            t = _php_type(p.get("type"))
+            sig_parts.append(f"{_php_nullable(t)} ${self.snake_to_camel(p['name'])} = null")
+
+        indent = "        "
+        sig = f"    public function {func_name}(\n"
+        sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
+        sig += "\n    ): mixed {"
+        lines = [sig]
+
+        lines.extend(self._build_path(ep["path"], path_params, query_params, "unauth"))
+
+        # Build headers array
+        lines.append("        $headers = [")
+        lines.append(f"            'Content-Type: {content_type}',")
+        lines.append("            'Authorization: ' . $accessToken,")
+        for p in required_headers:
+            param = self.header_to_param(p["name"])
+            lines.append(f"            '{p['name']}: ' . ${param},")
+        lines.append("        ];")
+        for p in optional_headers:
+            param = self.header_to_param(p["name"])
+            lines.append(f"        if (${param} !== null) $headers[] = '{p['name']}: ' . ${param};")
+
+        # Build body
+        if is_model:
+            pass  # $body already set from param
+        elif body_fields:
+            lines.append("        $body = [")
+            for snake_key, camel_param in body_fields:
+                lines.append(f"            '{snake_key}' => ${camel_param},")
+            lines.append("        ];")
+
+        # cURL call
+        lines.append("        $ch = curl_init();")
+        lines.append("        curl_setopt($ch, CURLOPT_URL, $baseUrl . $path);")
+        lines.append("        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);")
+        lines.append(f"        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '{method}');")
+        if request_body:
+            if content_type == "application/x-www-form-urlencoded":
+                lines.append("        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($body));")
+            else:
+                lines.append("        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));")
+        lines.append("        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);")
+        lines.append("        curl_setopt($ch, CURLOPT_HEADER, true);")
+        lines.append("        $raw = curl_exec($ch);")
+        lines.append("        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);")
+        lines.append("        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);")
+        lines.append("        curl_close($ch);")
+        lines.append("        $headers = self::parseHeaders(substr($raw, 0, $headerSize));")
+        lines.append("        $body = substr($raw, $headerSize);")
+        lines.append("        return handleResponse($body, $statusCode, $headers);")
+        lines.append("    }")
+        return lines
+
     def _build_path(self, path: str, path_params: list[dict], query_params: list[dict], mode: str) -> list[str]:
         result = path
         for p in path_params:
@@ -419,3 +506,61 @@ class PhpGenerator(BaseGenerator):
             camel = self.snake_to_camel(field_name)
             fields.append((field_name, camel))
         return fields
+
+    def _split_types_file(self, module_path: str) -> None:
+        """Split a monolithic Types.php into one file per class (PSR-4)."""
+        composer_path = os.path.join(module_path, "composer.json")
+        if not os.path.isfile(composer_path):
+            return
+        config = json.load(open(composer_path))
+        psr4 = config.get("autoload", {}).get("psr-4", {})
+        if not psr4:
+            return
+
+        for namespace, src_dir in psr4.items():
+            types_path = os.path.join(module_path, src_dir, "Types.php")
+            if not os.path.isfile(types_path):
+                continue
+            content = open(types_path).read()
+
+            # Parse individual class blocks
+            pattern = re.compile(
+                r'((?:/\*\*[\s\S]*?\*/\s*)?'          # optional docblock
+                r'(?:(?:readonly|final|abstract)\s+)*'  # modifiers
+                r'(?:class|enum|interface)\s+\w+'       # declaration
+                r'[\s\S]*?\n\})',                        # body through closing brace
+            )
+            classes = pattern.findall(content)
+            if not classes:
+                continue
+
+            src_path = os.path.join(module_path, src_dir)
+            ns = namespace.rstrip("\\")
+
+            for class_block in classes:
+                name_match = re.search(r'(?:class|enum|interface)\s+(\w+)', class_block)
+                if not name_match:
+                    continue
+                class_name = name_match.group(1)
+                file_content = (
+                    "<?php\n\n"
+                    "declare(strict_types=1);\n\n"
+                    f"namespace {ns};\n\n"
+                    f"{class_block}\n"
+                )
+                with open(os.path.join(src_path, f"{class_name}.php"), "w") as f:
+                    f.write(file_content)
+
+            os.remove(types_path)
+
+            # Remove Types.php from composer.json files array
+            files = config.get("autoload", {}).get("files", [])
+            types_ref = f"{src_dir}Types.php"
+            files = [f for f in files if f != types_ref]
+            if files:
+                config["autoload"]["files"] = files
+            else:
+                config["autoload"].pop("files", None)
+            with open(composer_path, "w") as f:
+                json.dump(config, f, indent=4)
+                f.write("\n")

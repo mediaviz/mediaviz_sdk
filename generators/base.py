@@ -4,7 +4,7 @@ import re
 import shutil
 import os
 
-from naming import snake_to_camel as _snake_to_camel, snake_to_pascal as _snake_to_pascal
+from naming import snake_to_camel as _snake_to_camel, snake_to_pascal as _snake_to_pascal, header_to_param as _header_to_param
 
 
 class BaseGenerator(ABC):
@@ -61,6 +61,10 @@ class BaseGenerator(ABC):
     @staticmethod
     def snake_to_pascal(name: str) -> str:
         return _snake_to_pascal(name)
+
+    @staticmethod
+    def header_to_param(name: str) -> str:
+        return _header_to_param(name)
 
     def _copy_module_files(self, module_root: str, framework_subdir: str, module_name: str, output_dir: str) -> str:
         src = os.path.join(module_root, framework_subdir)

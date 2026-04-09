@@ -169,8 +169,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             f.write("\n".join(lines))
 
     def emit_controller_file(self, controller: str, endpoints: list[dict], filepath: str) -> None:
-        needs_oauth = any(ep.get("auth") == "required" for ep in endpoints)
-        needs_errors = any(ep.get("auth") != "required" for ep in endpoints)
+        needs_oauth = any(ep.get("auth") == "required" and not ep.get("api_host") for ep in endpoints)
+        needs_errors = any(ep.get("auth") != "required" or ep.get("api_host") for ep in endpoints)
         lines = []
         if needs_oauth:
             lines += [f"import {{ OAuthClient }} from './{self._oauth_import_path()}';"]
@@ -244,6 +244,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         func_name = self.snake_to_camel(ep["function_name"])
         path_params = [p for p in ep["params"] if p["in"] == "path"]
         query_params = [p for p in ep["params"] if p["in"] == "query"]
+        header_params = [p for p in ep["params"] if p["in"] == "header"]
+        if ep.get("api_host"):
+            return self._emit_alt_host_fn(func_name, ep, path_params, query_params, header_params)
         if ep.get("auth") == "required":
             return self._emit_auth_fn(func_name, ep, path_params, query_params)
         return self._emit_unauth_fn(func_name, ep, path_params, query_params)
@@ -384,6 +387,89 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{ method: '{method}' }});")
             lines.append("  return handleResponse(resp);")
 
+        lines.append("}")
+        return lines
+
+    def _emit_alt_host_fn(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict], header_params: list[dict]) -> list[str]:
+        """Emit function for endpoints on a non-default API host (e.g. photo_upload)."""
+        method = ep["method"]
+        path_args = [self.snake_to_camel(p["name"]) for p in path_params]
+        request_body = ep.get("request_body")
+        content_type = ep.get("content_type") or "application/json"
+
+        required_headers = [p for p in header_params if p.get("required")]
+        optional_headers = [p for p in header_params if not p.get("required")]
+
+        sig_parts = ["baseUrl", "accessToken"] + path_args
+        for p in required_headers:
+            sig_parts.append(self.header_to_param(p["name"]))
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            sig_parts.append("body")
+        elif isinstance(request_body, dict):
+            fields = self._flatten_body(request_body)
+            sig_parts.append("{ " + ", ".join(camel for _, camel in fields) + " }")
+        elif request_body:
+            sig_parts.append("body = {}")
+        if optional_headers:
+            opt_names = [self.header_to_param(p["name"]) for p in optional_headers]
+            sig_parts.append("{ " + ", ".join(opt_names) + " } = {}")
+        if query_params:
+            q_names = [self.snake_to_camel(p["name"]) for p in query_params]
+            sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
+
+        lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+        tmpl = self._path_template(ep["path"], path_params)
+
+        # Build headers object
+        lines.append("  const headers = {")
+        lines.append(f"    'Content-Type': '{content_type}',")
+        lines.append("    'Authorization': accessToken,")
+        for p in required_headers:
+            param = self.header_to_param(p["name"])
+            lines.append(f"    '{p['name']}': {param},")
+        lines.append("  };")
+        if optional_headers:
+            for p in optional_headers:
+                param = self.header_to_param(p["name"])
+                lines.append(f"  if ({param} !== undefined) headers['{p['name']}'] = {param};")
+
+        # Build path with query params
+        if query_params:
+            lines.append(f"  let path = {tmpl};")
+            lines.append("  const query = new URLSearchParams();")
+            for p in query_params:
+                camel = self.snake_to_camel(p["name"])
+                lines.append(f"  if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+            lines.append("  const qs = query.toString();")
+            lines.append("  if (qs) path += '?' + qs;")
+            fetch_url = "baseUrl + path"
+        else:
+            fetch_url = f"baseUrl + {tmpl}"
+
+        # Build fetch call
+        if isinstance(request_body, dict) and self._is_model_body(request_body):
+            body_str = "JSON.stringify(body)"
+        elif isinstance(request_body, dict):
+            fields = self._flatten_body(request_body)
+            field_strs = []
+            for snake_key, camel_param in fields:
+                if snake_key == camel_param:
+                    field_strs.append(camel_param)
+                else:
+                    field_strs.append(f"{snake_key}: {camel_param}")
+            body_str = "JSON.stringify({ " + ", ".join(field_strs) + " })"
+        elif request_body:
+            body_str = "JSON.stringify(body)"
+        else:
+            body_str = None
+
+        lines.append(f"  const resp = await fetch({fetch_url}, {{")
+        lines.append(f"    method: '{method}',")
+        lines.append("    headers,")
+        if body_str:
+            lines.append(f"    body: {body_str},")
+        lines.append("  });")
+        lines.append("  return handleResponse(resp);")
         lines.append("}")
         return lines
 

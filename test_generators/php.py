@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 
-from naming import snake_to_camel, snake_to_pascal
+from naming import snake_to_camel, snake_to_pascal, header_to_param
 from .base import BaseTestGenerator, TestResult
 
 
@@ -13,6 +13,7 @@ class PhpTestGenerator(BaseTestGenerator):
 
     snake_to_camel = staticmethod(snake_to_camel)
     snake_to_pascal = staticmethod(snake_to_pascal)
+    header_to_param = staticmethod(header_to_param)
 
     def generate(self, endpoints: list[dict], sdk_dir: str, test_dir: str) -> None:
         os.makedirs(test_dir, exist_ok=True)
@@ -213,10 +214,10 @@ class PhpTestGenerator(BaseTestGenerator):
     def _emit_method_test(self, ep: dict, class_name: str) -> list[str]:
         func_name = self.snake_to_camel(ep["function_name"])
         method = ep["method"]
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_http_method(): void {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
                 f"        $obj = new {class_name}($spy);",
@@ -236,10 +237,10 @@ class PhpTestGenerator(BaseTestGenerator):
         params = ep.get("params", [])
         path_params = [p for p in params if p.get("in") == "path"]
         expected_path = self.build_expected_path(ep["path"], params) if path_params else ep["path"]
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params, encoding=True)
         lines = [f"    public function test_{ep['id']}_path(): void {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
                 f"        $obj = new {class_name}($spy);",
@@ -257,10 +258,10 @@ class PhpTestGenerator(BaseTestGenerator):
         func_name = self.snake_to_camel(ep["function_name"])
         params = ep.get("params", [])
         query_params = [p for p in params if p.get("in") == "query"]
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params)
         lines = [f"    public function test_{ep['id']}_query_params(): void {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
                 f"        $obj = new {class_name}($spy);",
@@ -279,10 +280,10 @@ class PhpTestGenerator(BaseTestGenerator):
     def _emit_body_test(self, ep: dict, class_name: str) -> list[str]:
         func_name = self.snake_to_camel(ep["function_name"])
         request_body = ep.get("request_body")
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_request_body(): void {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
                 f"        $obj = new {class_name}($spy);",
@@ -305,10 +306,10 @@ class PhpTestGenerator(BaseTestGenerator):
 
     def _emit_auth_routing_test(self, ep: dict, class_name: str) -> list[str]:
         func_name = self.snake_to_camel(ep["function_name"])
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_auth_routing(): void {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
                 f"        $obj = new {class_name}($spy);",
@@ -324,16 +325,23 @@ class PhpTestGenerator(BaseTestGenerator):
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
+    def _uses_oauth_client(self, ep: dict) -> bool:
+        return ep.get("auth") == "required" and not ep.get("api_host")
+
     def _build_call_args(
         self, ep: dict, params: list[dict], encoding: bool = False
     ) -> str:
+        is_alt_host = bool(ep.get("api_host"))
         is_auth = ep.get("auth") == "required"
         path_params = [p for p in params if p.get("in") == "path"]
         query_params = [p for p in params if p.get("in") == "query"]
+        header_params = [p for p in params if p.get("in") == "header"]
         request_body = ep.get("request_body")
 
         parts: list[str] = []
-        if is_auth:
+        if is_alt_host:
+            parts += ["'https://upload.example.com'", "'access_token'"]
+        elif is_auth:
             parts += ["'access_token'", "'refresh_token'"]
         else:
             parts.append("'https://api.example.com'")
@@ -341,6 +349,11 @@ class PhpTestGenerator(BaseTestGenerator):
         for p in path_params:
             val = self.test_value_for_type(p.get("type", "string"), encoding=encoding)
             parts.append(_php_literal(val))
+
+        if is_alt_host:
+            required_headers = [p for p in header_params if p.get("required")]
+            for p in required_headers:
+                parts.append(_php_literal(self.test_value_for_type("string")))
 
         if isinstance(request_body, dict) and self._is_model_body(request_body):
             parts.append("['Model' => 'test_value']")
@@ -354,6 +367,11 @@ class PhpTestGenerator(BaseTestGenerator):
                 parts.append(_php_literal(self.test_value_for_type(val_type)))
         elif request_body:
             parts.append("[]")
+
+        if is_alt_host:
+            optional_headers = [p for p in header_params if not p.get("required")]
+            for p in optional_headers:
+                parts.append(_php_literal(self.test_value_for_type("string")))
 
         for p in query_params:
             parts.append(_php_literal(self.test_value_for_type(p.get("type", "string"))))

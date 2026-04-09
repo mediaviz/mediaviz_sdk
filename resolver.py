@@ -84,6 +84,7 @@ def _flatten(ep: dict, controller: str, base_path: str) -> dict:
         "content_type": ep.get("content_type"),
         "tags": ep.get("tags", []),
         "hidden": ep.get("hidden", False),
+        "api_host": ep.get("api_host"),
     }
 
 

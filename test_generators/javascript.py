@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 
-from naming import snake_to_camel, snake_to_pascal  # noqa: F401
+from naming import snake_to_camel, snake_to_pascal, header_to_param  # noqa: F401
 from .base import BaseTestGenerator, TestResult
 
 
@@ -12,6 +12,7 @@ class JavaScriptTestGenerator(BaseTestGenerator):
 
     snake_to_camel = staticmethod(snake_to_camel)
     snake_to_pascal = staticmethod(snake_to_pascal)
+    header_to_param = staticmethod(header_to_param)
 
     def generate(self, endpoints: list[dict], sdk_dir: str, test_dir: str) -> None:
         os.makedirs(test_dir, exist_ok=True)
@@ -205,12 +206,15 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             "",
         ]
 
+    def _uses_oauth_client(self, ep: dict) -> bool:
+        return ep.get("auth") == "required" and not ep.get("api_host")
+
     def _emit_method_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
         method = ep["method"]
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params, spy_name="spy")
         lines = [f"  it('{func_name} — HTTP method is {method}', async () => {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "    const spy = new SpyOAuthClient();",
                 f"    await {func_name}({call_args});",
@@ -232,10 +236,10 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             expected_path = ep["path"]
         else:
             expected_path = self.build_expected_path(ep["path"], params)
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params, spy_name="spy", encoding=True)
         lines = [f"  it('{func_name} — path construction', async () => {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "    const spy = new SpyOAuthClient();",
                 f"    await {func_name}({call_args});",
@@ -253,10 +257,10 @@ class JavaScriptTestGenerator(BaseTestGenerator):
 
     def _emit_query_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
         query_params = [p for p in params if p.get("in") == "query"]
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params, spy_name="spy")
         lines = [f"  it('{func_name} — query params', async () => {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "    const spy = new SpyOAuthClient();",
                 f"    await {func_name}({call_args});",
@@ -278,12 +282,12 @@ class JavaScriptTestGenerator(BaseTestGenerator):
 
     def _emit_body_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
         request_body = ep.get("request_body")
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         content_type = ep.get("content_type") or "application/json"
         is_form = content_type == "application/x-www-form-urlencoded"
         call_args = self._build_call_args(ep, params, spy_name="spy")
         lines = [f"  it('{func_name} — request body', async () => {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "    const spy = new SpyOAuthClient();",
                 f"    await {func_name}({call_args});",
@@ -314,10 +318,10 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_auth_routing_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
-        is_auth = ep.get("auth") == "required"
+        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params, spy_name="spy")
         lines = [f"  it('{func_name} — auth routing', async () => {{"]
-        if is_auth:
+        if uses_client:
             lines += [
                 "    const spy = new SpyOAuthClient();",
                 f"    await {func_name}({call_args});",
@@ -340,12 +344,16 @@ class JavaScriptTestGenerator(BaseTestGenerator):
     ) -> str:
         """Build a comma-separated argument string for calling the function under test."""
         is_auth = ep.get("auth") == "required"
+        is_alt_host = bool(ep.get("api_host"))
         path_params = [p for p in params if p.get("in") == "path"]
         query_params = [p for p in params if p.get("in") == "query"]
+        header_params = [p for p in params if p.get("in") == "header"]
         request_body = ep.get("request_body")
 
         parts: list[str] = []
-        if is_auth:
+        if is_alt_host:
+            parts += ["'https://upload.example.com'", "'access_token'"]
+        elif is_auth:
             parts += [spy_name, "'access_token'", "'refresh_token'"]
         else:
             parts.append("'https://api.example.com'")
@@ -353,6 +361,11 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         for p in path_params:
             val = self.test_value_for_type(p.get("type", "string"), encoding=encoding)
             parts.append(_js_literal(val))
+
+        if is_alt_host:
+            required_headers = [p for p in header_params if p.get("required")]
+            for p in required_headers:
+                parts.append(_js_literal(self.test_value_for_type("string")))
 
         if isinstance(request_body, dict) and self._is_model_body(request_body):
             parts.append("{ Model: 'test_value' }")
@@ -365,6 +378,15 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             parts.append("{ " + ", ".join(field_parts) + " }")
         elif request_body:
             parts.append("{}")
+
+        if is_alt_host:
+            optional_headers = [p for p in header_params if not p.get("required")]
+            if optional_headers:
+                oh_parts = []
+                for p in optional_headers:
+                    param = self.header_to_param(p["name"])
+                    oh_parts.append(f"{param}: {_js_literal(self.test_value_for_type('string'))}")
+                parts.append("{ " + ", ".join(oh_parts) + " }")
 
         if query_params:
             q_parts = []
