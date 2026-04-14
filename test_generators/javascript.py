@@ -7,6 +7,24 @@ from naming import snake_to_camel, snake_to_pascal, header_to_param  # noqa: F40
 from .base import BaseTestGenerator, TestResult
 
 
+_JS_RESERVED = frozenset({
+    "abstract", "arguments", "await", "boolean", "break", "byte", "case", "catch",
+    "char", "class", "const", "continue", "debugger", "default", "delete", "do",
+    "double", "else", "enum", "eval", "export", "extends", "false", "final",
+    "finally", "float", "for", "function", "goto", "if", "implements", "import",
+    "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null",
+    "package", "private", "protected", "public", "return", "short", "static",
+    "super", "switch", "synchronized", "this", "throw", "throws", "transient",
+    "true", "try", "typeof", "undefined", "var", "void", "volatile", "while",
+    "with", "yield",
+})
+
+
+def _safe_inst(class_name: str) -> str:
+    inst = class_name[0].lower() + class_name[1:]
+    return f"{inst}_" if inst in _JS_RESERVED else inst
+
+
 class JavaScriptTestGenerator(BaseTestGenerator):
     framework_name = "javascript"
 
@@ -163,14 +181,13 @@ class JavaScriptTestGenerator(BaseTestGenerator):
     def emit_controller_test(
         self, controller: str, endpoints: list[dict], sdk_dir: str, test_dir: str
     ) -> None:
-        func_names = [self.snake_to_camel(ep["function_name"]) for ep in endpoints]
-        imports_str = ", ".join(func_names)
+        class_name = self.snake_to_pascal(controller)
         rel_sdk = os.path.relpath(os.path.join(sdk_dir, controller.lower() + ".js"), test_dir)
         rel_helpers = "./helpers.js"
 
         lines = [
             "// Auto-generated — do not edit",
-            f"import {{ {imports_str} }} from '{rel_sdk}';",
+            f"import {{ {class_name} }} from '{rel_sdk}';",
             f"import {{ SpyOAuthClient, makeSpyFetch }} from '{rel_helpers}';",
             "",
         ]
@@ -178,18 +195,18 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         lines.append(f"describe('{controller}', () => {{")
 
         for ep in endpoints:
-            func_name = self.snake_to_camel(ep["function_name"])
+            func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
             params = ep.get("params", [])
-            lines.extend(self._emit_existence_test(func_name))
-            lines.extend(self._emit_method_test(ep, func_name, params))
-            lines.extend(self._emit_path_test(ep, func_name, params))
+            lines.extend(self._emit_existence_test(class_name, func_name))
+            lines.extend(self._emit_method_test(ep, class_name, func_name, params))
+            lines.extend(self._emit_path_test(ep, class_name, func_name, params))
             query_params = [p for p in params if p.get("in") == "query"]
             if query_params:
-                lines.extend(self._emit_query_test(ep, func_name, params))
+                lines.extend(self._emit_query_test(ep, class_name, func_name, params))
             request_body = ep.get("request_body")
             if request_body:
-                lines.extend(self._emit_body_test(ep, func_name, params))
-            lines.extend(self._emit_auth_routing_test(ep, func_name, params))
+                lines.extend(self._emit_body_test(ep, class_name, func_name, params))
+            lines.extend(self._emit_auth_routing_test(ep, class_name, func_name, params))
 
         lines += ["});", ""]
         filename = controller.lower() + ".test.js"
@@ -198,10 +215,12 @@ class JavaScriptTestGenerator(BaseTestGenerator):
 
     # ── per-assertion emitters ────────────────────────────────────────────────
 
-    def _emit_existence_test(self, func_name: str) -> list[str]:
+    def _emit_existence_test(self, class_name: str, func_name: str) -> list[str]:
+        inst = _safe_inst(class_name)
         return [
             f"  it('{func_name} — exists', () => {{",
-            f"    expect(typeof {func_name}).toBe('function');",
+            f"    const {inst} = new {class_name}({{}});",
+            f"    expect(typeof {inst}.{func_name}).toBe('function');",
             "  });",
             "",
         ]
@@ -209,104 +228,103 @@ class JavaScriptTestGenerator(BaseTestGenerator):
     def _uses_oauth_client(self, ep: dict) -> bool:
         return ep.get("auth") == "required" and not ep.get("api_host")
 
-    def _emit_method_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
-        method = ep["method"]
+    def _build_ctx_and_instance(self, ep: dict, class_name: str) -> tuple[list[str], str]:
+        """Return (setup_lines, instance_var) for a test block."""
         uses_client = self._uses_oauth_client(ep)
-        call_args = self._build_call_args(ep, params, spy_name="spy")
-        lines = [f"  it('{func_name} — HTTP method is {method}', async () => {{"]
-        if uses_client:
-            lines += [
-                "    const spy = new SpyOAuthClient();",
-                f"    await {func_name}({call_args});",
-                f"    expect(spy.last_call().method).toBe('{method}');",
-            ]
-        else:
-            lines += [
+        is_alt_host = bool(ep.get("api_host"))
+        inst = _safe_inst(class_name)
+
+        if is_alt_host:
+            lines = [
                 "    const spy = makeSpyFetch();",
                 "    globalThis.fetch = spy;",
-                f"    await {func_name}({call_args});",
-                f"    expect(spy.last_call().method).toBe('{method}');",
+                f"    const ctx = {{ accessToken: 'access_token', requireTokens: () => {{}}, requireHost: () => 'https://upload.example.com' }};",
+                f"    const {inst} = new {class_name}(ctx);",
             ]
+        elif uses_client:
+            lines = [
+                "    const spy = new SpyOAuthClient();",
+                f"    const ctx = {{ client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {{}} }};",
+                f"    const {inst} = new {class_name}(ctx);",
+            ]
+        else:
+            lines = [
+                "    const spy = makeSpyFetch();",
+                "    globalThis.fetch = spy;",
+                f"    const ctx = {{ baseUrl: 'https://api.example.com' }};",
+                f"    const {inst} = new {class_name}(ctx);",
+            ]
+        return lines, inst
+
+    def _emit_method_test(self, ep: dict, class_name: str, func_name: str, params: list[dict]) -> list[str]:
+        method = ep["method"]
+        uses_client = self._uses_oauth_client(ep)
+        call_args = self._build_call_args(ep, params)
+        setup_lines, inst = self._build_ctx_and_instance(ep, class_name)
+        lines = [f"  it('{func_name} — HTTP method is {method}', async () => {{"]
+        lines += setup_lines
+        lines.append(f"    await {inst}.{func_name}({call_args});")
+        if uses_client:
+            lines.append(f"    expect(spy.last_call().method).toBe('{method}');")
+        else:
+            lines.append(f"    expect(spy.last_call().method).toBe('{method}');")
         lines += ["  });", ""]
         return lines
 
-    def _emit_path_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
+    def _emit_path_test(self, ep: dict, class_name: str, func_name: str, params: list[dict]) -> list[str]:
         path_params = [p for p in params if p.get("in") == "path"]
         if not path_params:
             expected_path = ep["path"]
         else:
             expected_path = self.build_expected_path(ep["path"], params)
         uses_client = self._uses_oauth_client(ep)
-        call_args = self._build_call_args(ep, params, spy_name="spy", encoding=True)
+        call_args = self._build_call_args(ep, params, encoding=True)
+        setup_lines, inst = self._build_ctx_and_instance(ep, class_name)
         lines = [f"  it('{func_name} — path construction', async () => {{"]
+        lines += setup_lines
+        lines.append(f"    await {inst}.{func_name}({call_args});")
         if uses_client:
-            lines += [
-                "    const spy = new SpyOAuthClient();",
-                f"    await {func_name}({call_args});",
-                f"    expect(spy.last_call().path).toContain('{expected_path}');",
-            ]
+            lines.append(f"    expect(spy.last_call().path).toContain('{expected_path}');")
         else:
-            lines += [
-                "    const spy = makeSpyFetch();",
-                "    globalThis.fetch = spy;",
-                f"    await {func_name}({call_args});",
-                f"    expect(spy.last_call().url).toContain('{expected_path}');",
-            ]
+            lines.append(f"    expect(spy.last_call().url).toContain('{expected_path}');")
         lines += ["  });", ""]
         return lines
 
-    def _emit_query_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
+    def _emit_query_test(self, ep: dict, class_name: str, func_name: str, params: list[dict]) -> list[str]:
         query_params = [p for p in params if p.get("in") == "query"]
         uses_client = self._uses_oauth_client(ep)
-        call_args = self._build_call_args(ep, params, spy_name="spy")
+        call_args = self._build_call_args(ep, params)
+        setup_lines, inst = self._build_ctx_and_instance(ep, class_name)
         lines = [f"  it('{func_name} — query params', async () => {{"]
+        lines += setup_lines
+        lines.append(f"    await {inst}.{func_name}({call_args});")
         if uses_client:
-            lines += [
-                "    const spy = new SpyOAuthClient();",
-                f"    await {func_name}({call_args});",
-                "    const path = spy.last_call().path;",
-            ]
+            lines.append("    const path = spy.last_call().path;")
             for qp in query_params:
                 lines.append(f"    expect(path).toContain('{qp['name']}=');")
         else:
-            lines += [
-                "    const spy = makeSpyFetch();",
-                "    globalThis.fetch = spy;",
-                f"    await {func_name}({call_args});",
-                "    const url = spy.last_call().url;",
-            ]
+            lines.append("    const url = spy.last_call().url;")
             for qp in query_params:
                 lines.append(f"    expect(url).toContain('{qp['name']}=');")
         lines += ["  });", ""]
         return lines
 
-    def _emit_body_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
+    def _emit_body_test(self, ep: dict, class_name: str, func_name: str, params: list[dict]) -> list[str]:
         request_body = ep.get("request_body")
         uses_client = self._uses_oauth_client(ep)
         content_type = ep.get("content_type") or "application/json"
         is_form = content_type == "application/x-www-form-urlencoded"
-        call_args = self._build_call_args(ep, params, spy_name="spy")
+        call_args = self._build_call_args(ep, params)
+        setup_lines, inst = self._build_ctx_and_instance(ep, class_name)
         lines = [f"  it('{func_name} — request body', async () => {{"]
+        lines += setup_lines
+        lines.append(f"    await {inst}.{func_name}({call_args});")
         if uses_client:
-            lines += [
-                "    const spy = new SpyOAuthClient();",
-                f"    await {func_name}({call_args});",
-                "    const body = spy.last_call().body;",
-            ]
+            lines.append("    const body = JSON.parse(spy.last_call().body);")
         elif is_form:
-            lines += [
-                "    const spy = makeSpyFetch();",
-                "    globalThis.fetch = spy;",
-                f"    await {func_name}({call_args});",
-                "    const body = Object.fromEntries(new URLSearchParams(spy.last_call().body));",
-            ]
+            lines.append("    const body = Object.fromEntries(new URLSearchParams(spy.last_call().body));")
         else:
-            lines += [
-                "    const spy = makeSpyFetch();",
-                "    globalThis.fetch = spy;",
-                f"    await {func_name}({call_args});",
-                "    const body = JSON.parse(spy.last_call().body);",
-            ]
+            lines.append("    const body = JSON.parse(spy.last_call().body);")
         if isinstance(request_body, dict) and self._is_model_body(request_body):
             lines.append("    expect(body).toBeDefined();")
         elif isinstance(request_body, dict):
@@ -317,33 +335,23 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         lines += ["  });", ""]
         return lines
 
-    def _emit_auth_routing_test(self, ep: dict, func_name: str, params: list[dict]) -> list[str]:
+    def _emit_auth_routing_test(self, ep: dict, class_name: str, func_name: str, params: list[dict]) -> list[str]:
         uses_client = self._uses_oauth_client(ep)
-        call_args = self._build_call_args(ep, params, spy_name="spy")
+        call_args = self._build_call_args(ep, params)
+        setup_lines, inst = self._build_ctx_and_instance(ep, class_name)
         lines = [f"  it('{func_name} — auth routing', async () => {{"]
-        if uses_client:
-            lines += [
-                "    const spy = new SpyOAuthClient();",
-                f"    await {func_name}({call_args});",
-                "    expect(spy.calls.length).toBe(1);",
-            ]
-        else:
-            lines += [
-                "    const spy = makeSpyFetch();",
-                "    globalThis.fetch = spy;",
-                f"    await {func_name}({call_args});",
-                "    expect(spy.calls.length).toBe(1);",
-            ]
+        lines += setup_lines
+        lines.append(f"    await {inst}.{func_name}({call_args});")
+        lines.append("    expect(spy.calls.length).toBe(1);")
         lines += ["  });", ""]
         return lines
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _build_call_args(
-        self, ep: dict, params: list[dict], spy_name: str = "spy", encoding: bool = False
+        self, ep: dict, params: list[dict], encoding: bool = False
     ) -> str:
-        """Build a comma-separated argument string for calling the function under test."""
-        is_auth = ep.get("auth") == "required"
+        """Build a comma-separated argument string for calling a method under test."""
         is_alt_host = bool(ep.get("api_host"))
         path_params = [p for p in params if p.get("in") == "path"]
         query_params = [p for p in params if p.get("in") == "query"]
@@ -351,12 +359,6 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         request_body = ep.get("request_body")
 
         parts: list[str] = []
-        if is_alt_host:
-            parts += ["'https://upload.example.com'", "'access_token'"]
-        elif is_auth:
-            parts += [spy_name, "'access_token'", "'refresh_token'"]
-        else:
-            parts.append("'https://api.example.com'")
 
         for p in path_params:
             val = self.test_value_for_type(p.get("type", "string"), encoding=encoding)

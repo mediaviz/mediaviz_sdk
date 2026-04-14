@@ -4,7 +4,7 @@ import pytest
 
 from resolver import parse_ref, resolve_refs, write_flattened_yaml
 
-DOCS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "../../mediaviz_docs/api-docs"))
+DOCS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "../../mediaviz_docs/api_docs"))
 TOP_ENDPOINTS = os.path.join(DOCS_DIR, "top_endpoints.yaml")
 
 

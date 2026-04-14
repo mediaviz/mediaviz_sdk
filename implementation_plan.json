@@ -538,15 +538,15 @@
   },
   {
     "id": 27,
-    "description": "Add composite YAML config format — define composites in api-docs/composites/ that chain 2+ endpoint calls with data flow, caching, and error handling",
+    "description": "Add composite YAML config format — define composites in api_docs/composites/ that chain 2+ endpoint calls with data flow, caching, and error handling",
     "touch_points": [
       {
-        "file": "../mediaviz_intelligence_hub/api-docs/composites/upload_photos.yaml",
+        "file": "../mediaviz_intelligence_hub/api_docs/composites/upload_photos.yaml",
         "location": "composite definition",
         "status": "complete"
       },
       {
-        "file": "../mediaviz_intelligence_hub/api-docs/composites.yaml",
+        "file": "../mediaviz_intelligence_hub/api_docs/composites.yaml",
         "location": "ref list",
         "status": "complete"
       }
@@ -673,7 +673,7 @@
     "description": "Convert uploadPhotos composite from batch (for_each over photos list) to unary (single photo per call) — caller loops externally, template cache persists across calls",
     "touch_points": [
       {
-        "file": "../mediaviz_intelligence_hub/api-docs/composites/upload_photos.yaml",
+        "file": "../mediaviz_intelligence_hub/api_docs/composites/upload_photos.yaml",
         "location": "composite definition",
         "status": "changed to upload_photo, single photo object param, both steps execution:once"
       },
@@ -745,7 +745,7 @@
         "status": "uses composite_paths from resolve_refs, wires up validation"
       },
       {
-        "file": "../mediaviz_intelligence_hub/api-docs/top_endpoints.yaml",
+        "file": "../mediaviz_intelligence_hub/api_docs/top_endpoints.yaml",
         "location": "refs list",
         "status": "added composite ref and its step endpoint refs"
       },
@@ -957,5 +957,54 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 43,
+    "description": "Replace local-path CLI flags with source resolution module — remove --controllers and --oauth-sdk flags, change --endpoints to flow name resolved against common_flows/sdk_endpoints/, add --branch flag (unused in local mode), create github_sources.py for path resolution",
+    "touch_points": [
+      {
+        "file": "github_sources.py",
+        "location": "fetch_sources, resolve_flow_path, SourcePaths",
+        "status": "complete — context manager yielding local sibling paths, flow resolution with error listing"
+      },
+      {
+        "file": "generate.py",
+        "location": "parse_args",
+        "status": "complete — removed --controllers and --oauth-sdk, --endpoints is now flow name, added --branch"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "complete — wrapped in fetch_sources context manager, uses resolve_flow_path"
+      },
+      {
+        "file": "spec.md",
+        "location": "Overview, Architecture, CLI Entrypoint, Run sequence",
+        "status": "complete — updated to reflect new source resolution and CLI flags"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 44,
+    "description": "Upgrade github_sources.py to shallow-clone from GitHub instead of reading local sibling dirs — use git ls-remote for branch checking, tempfile.TemporaryDirectory for clones, per-repo branch fallback to main",
+    "touch_points": [
+      {
+        "file": "github_sources.py",
+        "location": "fetch_sources",
+        "status": "pending — currently uses local paths, needs git clone logic"
+      },
+      {
+        "file": "github_sources.py",
+        "location": "branch_exists",
+        "status": "pending — needs git ls-remote implementation"
+      },
+      {
+        "file": "github_sources.py",
+        "location": "resolve_branch",
+        "status": "pending — needs branch checking + fallback logic"
+      }
+    ],
+    "completion_status": false
   }
 ]

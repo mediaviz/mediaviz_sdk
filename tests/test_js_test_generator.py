@@ -97,6 +97,7 @@ class TestEmitErrorsTest:
 class TestEmitControllerTest:
     AUTH_ENDPOINT = {
         "id": "get_keyword_user",
+        "function_name": "get_keyword_user",
         "controller": "Keywords",
         "method": "GET",
         "path": "/api/v1/keyword/{keywordId}",
@@ -105,6 +106,7 @@ class TestEmitControllerTest:
     }
     UNAUTH_ENDPOINT = {
         "id": "create_account",
+        "function_name": "create_account",
         "controller": "Auth",
         "method": "POST",
         "path": "/api/v1/auth/register",
@@ -128,7 +130,7 @@ class TestEmitControllerTest:
         os.makedirs(test_dir)
         gen.emit_controller_test("Keywords", [self.AUTH_ENDPOINT], sdk_dir, test_dir)
         content = open(os.path.join(test_dir, "keywords.test.js")).read()
-        assert "typeof getKeywordUser" in content
+        assert "typeof keywords.getKeywordUser" in content
         assert "'function'" in content
 
     def test_http_method_assertion_present(self, gen, tmp):
@@ -214,6 +216,7 @@ class TestEmitControllerTest:
     def test_query_params_asserted(self, gen, tmp):
         ep = {
             "id": "search_keywords",
+            "function_name": "search_keywords",
             "controller": "Keywords",
             "method": "GET",
             "path": "/api/v1/keyword/search",
@@ -235,6 +238,7 @@ class TestEmitControllerTest:
     def test_unstructured_body_uses_be_defined(self, gen, tmp):
         ep = {
             "id": "bulk_add",
+            "function_name": "bulk_add",
             "controller": "Collections",
             "method": "POST",
             "path": "/api/v1/collection/bulk",
@@ -254,6 +258,7 @@ class TestEmitControllerTest:
     def test_no_params_endpoint_generates_existence_and_method(self, gen, tmp):
         ep = {
             "id": "get_status",
+            "function_name": "get_status",
             "controller": "Health",
             "method": "GET",
             "path": "/api/v1/health",
@@ -266,5 +271,5 @@ class TestEmitControllerTest:
         os.makedirs(test_dir)
         gen.emit_controller_test("Health", [ep], sdk_dir, test_dir)
         content = open(os.path.join(test_dir, "health.test.js")).read()
-        assert "typeof getStatus" in content
+        assert "typeof health.getStatus" in content
         assert "'GET'" in content

@@ -2,13 +2,14 @@
 
 ## Overview
 
-A Python utility that reads YAML endpoint specifications from the `mediaviz_docs` repo and generates versioned, framework-specific SDK libraries. Each generated SDK wraps API endpoints as native functions and bundles a copy of the OAuth auth wrapper for authenticated requests.
+A Python utility that reads YAML endpoint specifications from the `mediaviz_intelligence_hub` repo and generates versioned, framework-specific SDK libraries. Each generated SDK wraps API endpoints as native functions and bundles a copy of the OAuth auth wrapper for authenticated requests. Source files are resolved from local sibling directories (with planned GitHub-clone support via `github_sources.py`).
 
 ## Architecture
 
 ```
 mediaviz_sdk/
   generate.py              # CLI entrypoint
+  github_sources.py        # Source path resolution (local now, GitHub later)
   generators/
     __init__.py             # Framework registry + discovery
     base.py                 # Abstract base generator class
@@ -123,33 +124,46 @@ Auto-discovers generator classes from the `generators/` directory. Each generato
 
 This allows adding a new framework by dropping a single file into `generators/` — no changes to orchestration code required.
 
-### 5. CLI Entrypoint (`generate.py`)
+### 5. Source Resolution (`github_sources.py`)
+
+Encapsulates source path resolution. Currently resolves against local sibling directories (`../mediaviz_intelligence_hub`, `../oauth_library`); designed to be swapped to shallow-clone from GitHub repos when ready.
+
+**Source mapping:**
+| Source | Local path | GitHub target (future) |
+|--------|-----------|----------------------|
+| Controllers | `../mediaviz_intelligence_hub/api_docs/` | `imaige/mediaviz_intelligence_hub` → `api_docs/` |
+| Flow YAML files | `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` | `imaige/mediaviz_intelligence_hub` → `common_flows/sdk_endpoints/` |
+| OAuth SDK | `../oauth_library/sdk/` | `imaige/oauth_library` → `sdk/` |
+
+**Key functions:**
+- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir)`
+- `resolve_flow_path(flow_name, flows_dir)` — returns path to `{flow_name}.yaml`, exits with available flows if not found
+
+### 6. CLI Entrypoint (`generate.py`)
 
 ```
-python generate.py \
-  --endpoints ../mediaviz_docs/api-docs/top_endpoints.yaml \
-  --controllers ../mediaviz_docs/api-docs/controllers/ \
-  --oauth-sdk ../oauth_library/sdk/ \
-  --frameworks javascript,nodeJS,php
+python generate.py --endpoints basic_sdk_flow_endpoints
+python generate.py --endpoints getting_started_sdk_endpoints --branch feature/new-api --frameworks javascript
 ```
 
 **Flags:**
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--endpoints` | yes | Path to ref-list YAML file. Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
-| `--controllers` | yes | Path to controllers directory. Parent of this path is used as the base for resolving `$ref` file paths. |
-| `--oauth-sdk` | yes | Path to OAuth SDK root (contains `javascript/`, `php/`, `python/` subdirectories) |
+| `--endpoints` | yes | Flow name in `common_flows/sdk_endpoints/` (e.g., `basic_sdk_flow_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
+| `--branch` | no | Git branch to use for all source repos. Falls back to `main` if branch not found. Currently accepted but unused in local mode. |
 | `--frameworks` | no | Comma-separated list of frameworks to generate. Default: all registered. |
 | `--destination-dir` | no | Output folder name in package root. Created if it doesn't exist. Default: `sdk_files`. |
 
 Output is written to the folder specified by `--destination-dir` (default `./sdk_files/`). Versioning and archiving behavior is identical regardless of destination.
 
 **Run sequence:**
-1. Determine next version number by scanning `sdk_files/` for `v{N}` directories
-2. Archive all existing `sdk_files/v{N}` directories to `sdk_files/archive/v{N}`
-3. Resolve refs: endpoint refs (contain `#`) are resolved into flattened endpoints; composite refs (no `#`) are collected as file paths
-4. If composites are present, resolve composite files and validate that every composite step endpoint exists in the endpoint list (fail if not)
-5. For each requested framework:
+1. Resolve source paths via `fetch_sources(branch)` — yields controllers dir, OAuth SDK root, and flows dir
+2. Resolve flow name to YAML path via `resolve_flow_path()` — fails with available flows if not found
+3. Determine next version number by scanning `sdk_files/` for `v{N}` directories
+4. Archive all existing `sdk_files/v{N}` directories to `sdk_files/archive/v{N}`
+5. Resolve refs: endpoint refs (contain `#`) are resolved into flattened endpoints; composite refs (no `#`) are collected as file paths
+6. If composites are present, resolve composite files and validate that every composite step endpoint exists in the endpoint list (fail if not)
+7. For each requested framework:
    a. Instantiate generator
    b. Create `sdk_files/v{N}/{framework}/`
    c. Call `copy_auth_wrapper()` to bundle OAuth SDK source
@@ -347,9 +361,9 @@ Full error class implementations and consumer usage examples are in `errors.md`.
 
 ## Composite Functions
 
-Composites are multi-step SDK functions that chain 2+ endpoint calls, with intermediate data flow and optional caching. They are defined in YAML config files in the `api-docs/composites/` directory and referenced via a ref-list (`composites.yaml`).
+Composites are multi-step SDK functions that chain 2+ endpoint calls, with intermediate data flow and optional caching. They are defined in YAML config files in the `api_docs/composites/` directory and referenced via a ref-list (`composites.yaml`).
 
-### Config Format (`api-docs/composites/*.yaml`)
+### Config Format (`api_docs/composites/*.yaml`)
 
 ```yaml
 id: composite_upload_photo

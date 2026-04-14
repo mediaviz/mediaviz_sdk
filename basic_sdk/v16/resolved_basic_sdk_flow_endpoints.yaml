@@ -1,0 +1,326 @@
+source: basic_sdk_flow_endpoints.yaml
+resolved_at: '2026-04-14T16:34:03Z'
+endpoints:
+- id: get_get_all_project_photo_ids
+  function_name: get_all_project_photo_ids
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/
+  summary: get_all_project_photo_ids
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_photo_from_project
+  function_name: get_photo_from_project
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/{photo_id}
+  summary: get_photo_from_project
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  - name: keyword_list_id
+    in: query
+    type: int
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
+  function_name: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/month/{month}/year/{year}/ranked
+  summary: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: month
+    in: path
+    type: int
+    required: true
+  - name: year
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_project_and_run
+  function_name: create_project_and_run
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/project_outcome/
+  summary: create_project_and_run
+  auth: required
+  params:
+  - name: outcomes
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: models
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body:
+    _model:
+      type: ProjectRunCreate
+      required: true
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_mark_project_upload_complete
+  function_name: mark_project_upload_complete
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/project/{project_table_name}/upload_complete/
+  summary: mark_project_upload_complete
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: skipped_file_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_check_project_status
+  function_name: check_project_status
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/project/status/{project_table_name}
+  summary: check_project_status
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_project
+  function_name: delete_project
+  controller: Projects
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/projects/{project_id}
+  summary: delete_project
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_user_and_company
+  function_name: create_user_and_company
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/users/new_company
+  summary: create_user_and_company
+  auth: none
+  params: []
+  request_body:
+    _model:
+      type: CompanyCreate
+      required: true
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_prelim_model_request_template
+  function_name: get_project_prelim_model_request_template
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/project_outcome/{project_table_name}
+  summary: get_project_prelim_model_request_template
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_upload_photo
+  function_name: upload_photo_to_mediaviz
+  controller: PhotoUpload
+  base_path: /
+  method: POST
+  path: /photo_upload
+  summary: Upload a preprocessed photo with metadata via headers
+  auth: required
+  params:
+  - name: x-bucket-name
+    in: header
+    type: string
+    required: true
+  - name: x-photo-index
+    in: header
+    type: string
+    required: true
+  - name: x-company-id
+    in: header
+    type: string
+    required: true
+  - name: x-user-id
+    in: header
+    type: string
+    required: true
+  - name: x-project-table-name
+    in: header
+    type: string
+    required: true
+  - name: x-client-side-id
+    in: header
+    type: string
+    required: false
+  - name: x-title
+    in: header
+    type: string (original filename)
+    required: true
+  - name: x-blur
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-colors
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-face-recognition
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-classification
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-comparison
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-size
+    in: header
+    type: string (WxH original dimensions)
+    required: false
+  - name: x-source-resolution-x
+    in: header
+    type: string (EXIF x resolution)
+    required: false
+  - name: x-source-resolution-y
+    in: header
+    type: string (EXIF y resolution)
+    required: false
+  - name: x-date-taken
+    in: header
+    type: string (EXIF DateTimeOriginal)
+    required: false
+  - name: x-latitude
+    in: header
+    type: string (EXIF GPS latitude)
+    required: false
+  - name: x-longitude
+    in: header
+    type: string (EXIF GPS longitude)
+    required: false
+  - name: x-resized-dimensions
+    in: header
+    type: string (WxH resized dimensions, present only if image was resized)
+    required: false
+  request_body:
+    file_content:
+      type: string (base64-encoded image)
+      required: true
+    mimetype:
+      type: string (e.g. image/jpeg)
+      required: true
+    file_path:
+      type: string (original filesystem path)
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: photo_upload

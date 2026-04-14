@@ -10,8 +10,8 @@ import yaml
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MEDIAVIZ_DOCS = os.path.abspath(os.path.join(REPO_ROOT, "..", "mediaviz_docs"))
-ENDPOINTS_YAML = os.path.join(MEDIAVIZ_DOCS, "api-docs", "top_endpoints.yaml")
-CONTROLLERS_DIR = os.path.join(MEDIAVIZ_DOCS, "api-docs", "controllers")
+ENDPOINTS_YAML = os.path.join(MEDIAVIZ_DOCS, "api_docs", "top_endpoints.yaml")
+CONTROLLERS_DIR = os.path.join(MEDIAVIZ_DOCS, "api_docs", "controllers")
 
 EXPECTED_ENDPOINT_COUNT = 73
 

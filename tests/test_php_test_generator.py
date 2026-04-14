@@ -42,7 +42,6 @@ class TestEmitHelpers:
         gen.emit_helpers(tmp)
         content = open(os.path.join(tmp, "helpers.php")).read()
         assert "$this->calls[]" in content
-        assert "compact(" in content
 
     def test_spy_request_captures_path_method_tokens(self, gen, tmp):
         gen.emit_helpers(tmp)
@@ -67,6 +66,21 @@ class TestEmitHelpers:
         gen.emit_helpers(tmp)
         content = open(os.path.join(tmp, "helpers.php")).read()
         assert "namespace OAuthSdk;" in content
+
+    def test_spy_auth_context_class_present(self, gen, tmp):
+        gen.emit_helpers(tmp)
+        content = open(os.path.join(tmp, "helpers.php")).read()
+        assert "class SpyAuthContext" in content
+
+    def test_spy_auth_context_has_client_property(self, gen, tmp):
+        gen.emit_helpers(tmp)
+        content = open(os.path.join(tmp, "helpers.php")).read()
+        assert "SpyOAuthClient $client" in content
+
+    def test_spy_auth_context_has_require_tokens(self, gen, tmp):
+        gen.emit_helpers(tmp)
+        content = open(os.path.join(tmp, "helpers.php")).read()
+        assert "function requireTokens()" in content
 
     def test_php_opening_tag(self, gen, tmp):
         gen.emit_helpers(tmp)
@@ -134,6 +148,7 @@ class TestEmitErrorsTest:
 class TestEmitControllerTest:
     AUTH_ENDPOINT = {
         "id": "get_keyword_user",
+        "function_name": "get_keyword_user",
         "controller": "Keywords",
         "method": "GET",
         "path": "/api/v1/keyword/{keywordId}",
@@ -142,6 +157,7 @@ class TestEmitControllerTest:
     }
     UNAUTH_ENDPOINT = {
         "id": "create_account",
+        "function_name": "create_account",
         "controller": "Auth",
         "method": "POST",
         "path": "/api/v1/auth/register",
@@ -176,16 +192,16 @@ class TestEmitControllerTest:
         gen.emit_controller_test("Keywords", [self.AUTH_ENDPOINT], sdk_dir, test_dir)
         content = open(os.path.join(test_dir, "KeywordsTest.php")).read()
         assert "'GET'" in content
-        assert "lastCall()['method']" in content
+        assert "client->lastCall()['method']" in content
 
-    def test_auth_endpoint_uses_spy_oauth_client(self, gen, tmp):
+    def test_auth_endpoint_uses_spy_auth_context(self, gen, tmp):
         sdk_dir = tmp + "/sdk"
         os.makedirs(sdk_dir)
         test_dir = tmp + "/tests"
         os.makedirs(test_dir)
         gen.emit_controller_test("Keywords", [self.AUTH_ENDPOINT], sdk_dir, test_dir)
         content = open(os.path.join(test_dir, "KeywordsTest.php")).read()
-        assert "SpyOAuthClient" in content
+        assert "SpyAuthContext" in content
 
     def test_auth_routing_asserts_spy_call_count(self, gen, tmp):
         sdk_dir = tmp + "/sdk"
@@ -194,7 +210,7 @@ class TestEmitControllerTest:
         os.makedirs(test_dir)
         gen.emit_controller_test("Keywords", [self.AUTH_ENDPOINT], sdk_dir, test_dir)
         content = open(os.path.join(test_dir, "KeywordsTest.php")).read()
-        assert "assertCount(1, $spy->calls)" in content
+        assert "assertCount(1, $ctx->client->calls)" in content
 
     def test_path_construction_asserted(self, gen, tmp):
         sdk_dir = tmp + "/sdk"
@@ -214,6 +230,7 @@ class TestEmitControllerTest:
         # Auth POST with request_body to hit the body assertion path
         ep = {
             "id": "create_keyword",
+            "function_name": "create_keyword",
             "controller": "Keywords",
             "method": "POST",
             "path": "/api/v1/keyword",
@@ -243,6 +260,7 @@ class TestEmitControllerTest:
         os.makedirs(test_dir)
         ep = {
             "id": "search_keywords",
+            "function_name": "search_keywords",
             "controller": "Keywords",
             "method": "GET",
             "path": "/api/v1/keyword/search",

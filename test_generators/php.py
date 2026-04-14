@@ -91,6 +91,22 @@ class PhpTestGenerator(BaseTestGenerator):
             "    }",
             "}",
             "",
+            "class SpyAuthContext {",
+            "    public SpyOAuthClient $client;",
+            "    public string $accessToken = 'access_token';",
+            "    public string $refreshToken = 'refresh_token';",
+            "",
+            "    public function __construct() {",
+            "        $this->client = new SpyOAuthClient();",
+            "    }",
+            "",
+            "    public function requireTokens(): void {}",
+            "",
+            "    public function requireHost(string $key = ''): string {",
+            "        return 'https://upload.example.com';",
+            "    }",
+            "}",
+            "",
         ]
         with open(os.path.join(test_dir, "helpers.php"), "w") as f:
             f.write("\n".join(lines))
@@ -203,7 +219,7 @@ class PhpTestGenerator(BaseTestGenerator):
     # ── per-assertion emitters ────────────────────────────────────────────────
 
     def _emit_existence_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["function_name"])
+        func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
         return [
             f"    public function test_{ep['id']}_exists(): void {{",
             f"        $this->assertTrue(method_exists({class_name}::class, '{func_name}'));",
@@ -212,20 +228,19 @@ class PhpTestGenerator(BaseTestGenerator):
         ]
 
     def _emit_method_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["function_name"])
+        func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
         method = ep["method"]
         uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_http_method(): void {{"]
         if uses_client:
             lines += [
-                "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
-                f"        $obj = new {class_name}($spy);",
+                "        $ctx = new \\OAuthSdk\\SpyAuthContext();",
+                f"        $obj = new {class_name}($ctx);",
                 f"        $obj->{func_name}({call_args});",
-                f"        $this->assertSame('{method}', $spy->lastCall()['method']);",
+                f"        $this->assertSame('{method}', $ctx->client->lastCall()['method']);",
             ]
         else:
-            # For unauth endpoints using curl, we test via reflection that the method exists
             lines += [
                 f"        $this->assertTrue(method_exists({class_name}::class, '{func_name}'));",
             ]
@@ -233,7 +248,7 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_path_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["function_name"])
+        func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
         params = ep.get("params", [])
         path_params = [p for p in params if p.get("in") == "path"]
         expected_path = self.build_expected_path(ep["path"], params) if path_params else ep["path"]
@@ -242,10 +257,10 @@ class PhpTestGenerator(BaseTestGenerator):
         lines = [f"    public function test_{ep['id']}_path(): void {{"]
         if uses_client:
             lines += [
-                "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
-                f"        $obj = new {class_name}($spy);",
+                "        $ctx = new \\OAuthSdk\\SpyAuthContext();",
+                f"        $obj = new {class_name}($ctx);",
                 f"        $obj->{func_name}({call_args});",
-                f"        $this->assertStringContainsString('{expected_path}', $spy->lastCall()['path']);",
+                f"        $this->assertStringContainsString('{expected_path}', $ctx->client->lastCall()['path']);",
             ]
         else:
             lines += [
@@ -255,7 +270,7 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_query_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["function_name"])
+        func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
         params = ep.get("params", [])
         query_params = [p for p in params if p.get("in") == "query"]
         uses_client = self._uses_oauth_client(ep)
@@ -263,10 +278,10 @@ class PhpTestGenerator(BaseTestGenerator):
         lines = [f"    public function test_{ep['id']}_query_params(): void {{"]
         if uses_client:
             lines += [
-                "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
-                f"        $obj = new {class_name}($spy);",
+                "        $ctx = new \\OAuthSdk\\SpyAuthContext();",
+                f"        $obj = new {class_name}($ctx);",
                 f"        $obj->{func_name}({call_args});",
-                "        $path = $spy->lastCall()['path'];",
+                "        $path = $ctx->client->lastCall()['path'];",
             ]
             for qp in query_params:
                 lines.append(f"        $this->assertStringContainsString('{qp['name']}=', $path);")
@@ -278,17 +293,17 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_body_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["function_name"])
+        func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
         request_body = ep.get("request_body")
         uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_request_body(): void {{"]
         if uses_client:
             lines += [
-                "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
-                f"        $obj = new {class_name}($spy);",
+                "        $ctx = new \\OAuthSdk\\SpyAuthContext();",
+                f"        $obj = new {class_name}($ctx);",
                 f"        $obj->{func_name}({call_args});",
-                "        $body = $spy->lastCall()['body'];",
+                "        $body = $ctx->client->lastCall()['body'];",
             ]
             if isinstance(request_body, dict) and self._is_model_body(request_body):
                 lines.append("        $this->assertIsArray($body);")
@@ -305,16 +320,16 @@ class PhpTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_auth_routing_test(self, ep: dict, class_name: str) -> list[str]:
-        func_name = self.snake_to_camel(ep["function_name"])
+        func_name = self.snake_to_camel(ep.get("function_name", ep["id"]))
         uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, ep.get("params", []))
         lines = [f"    public function test_{ep['id']}_auth_routing(): void {{"]
         if uses_client:
             lines += [
-                "        $spy = new \\OAuthSdk\\SpyOAuthClient();",
-                f"        $obj = new {class_name}($spy);",
+                "        $ctx = new \\OAuthSdk\\SpyAuthContext();",
+                f"        $obj = new {class_name}($ctx);",
                 f"        $obj->{func_name}({call_args});",
-                "        $this->assertCount(1, $spy->calls);",
+                "        $this->assertCount(1, $ctx->client->calls);",
             ]
         else:
             lines += [
@@ -331,20 +346,13 @@ class PhpTestGenerator(BaseTestGenerator):
     def _build_call_args(
         self, ep: dict, params: list[dict], encoding: bool = False
     ) -> str:
-        is_alt_host = bool(ep.get("api_host"))
-        is_auth = ep.get("auth") == "required"
         path_params = [p for p in params if p.get("in") == "path"]
         query_params = [p for p in params if p.get("in") == "query"]
         header_params = [p for p in params if p.get("in") == "header"]
+        is_alt_host = bool(ep.get("api_host"))
         request_body = ep.get("request_body")
 
         parts: list[str] = []
-        if is_alt_host:
-            parts += ["'https://upload.example.com'", "'access_token'"]
-        elif is_auth:
-            parts += ["'access_token'", "'refresh_token'"]
-        else:
-            parts.append("'https://api.example.com'")
 
         for p in path_params:
             val = self.test_value_for_type(p.get("type", "string"), encoding=encoding)
