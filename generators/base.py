@@ -14,7 +14,7 @@ class BaseGenerator(ABC):
         self._copied_modules: list[dict] = []
 
     @abstractmethod
-    def generate(self, endpoints: list[dict], output_dir: str) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None) -> None:
         """Generate SDK files from resolved endpoints into output_dir."""
 
     @abstractmethod
@@ -54,6 +54,15 @@ class BaseGenerator(ABC):
             groups.setdefault(controller, []).append(ep)
         return groups
 
+    def group_composites_by_controller(self, composites: list[dict] | None) -> dict[str, list[dict]]:
+        groups: dict[str, list[dict]] = {}
+        if not composites:
+            return groups
+        for comp in composites:
+            controller = comp["controller"].replace(" ", "_")
+            groups.setdefault(controller, []).append(comp)
+        return groups
+
     @staticmethod
     def snake_to_camel(name: str) -> str:
         return _snake_to_camel(name)
@@ -65,6 +74,22 @@ class BaseGenerator(ABC):
     @staticmethod
     def header_to_param(name: str) -> str:
         return _header_to_param(name)
+
+    def collect_alt_hosts(self, endpoints: list[dict], composites: list[dict] | None) -> set[str]:
+        """Return distinct api_host values across endpoints and composites."""
+        hosts: set[str] = set()
+        for ep in endpoints:
+            if ep.get("api_host"):
+                hosts.add(ep["api_host"])
+        for comp in (composites or []):
+            for step in comp.get("steps", []):
+                if step.get("endpoint", {}).get("api_host"):
+                    hosts.add(step["endpoint"]["api_host"])
+        return hosts
+
+    @abstractmethod
+    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str) -> None:
+        """Generate the top-level SDK client class file."""
 
     def _copy_module_files(self, module_root: str, framework_subdir: str, module_name: str, output_dir: str) -> str:
         src = os.path.join(module_root, framework_subdir)

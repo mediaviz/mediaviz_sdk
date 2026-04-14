@@ -1,0 +1,12 @@
+{
+  "name": "mediaviz/sdk",
+  "autoload": {
+    "psr-4": {
+      "MediaVizSdk\\": "./"
+    },
+    "files": [
+      "./Exceptions.php",
+      "./MediaVizClient.php"
+    ]
+  }
+}

@@ -3,20 +3,36 @@ import json
 import os
 import re
 from .base import BaseGenerator
+from naming import snake_to_camel as _snake_to_camel
 
 
 class JavaScriptBrowserGenerator(BaseGenerator):
     framework_name = "javascript"
 
-    def generate(self, endpoints: list[dict], output_dir: str) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None) -> None:
         os.makedirs(output_dir, exist_ok=True)
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
+        comp_groups = self.group_composites_by_controller(composites)
         controller_files = []
+        all_groups = {}
+        all_comp_groups = {}
         for controller, eps in groups.items():
             filename = controller.lower() + ".js"
-            self.emit_controller_file(controller, eps, os.path.join(output_dir, filename))
+            comps = comp_groups.pop(controller, [])
+            self.emit_controller_file(controller, eps, os.path.join(output_dir, filename), composites=comps)
             controller_files.append(filename)
+            all_groups[controller] = eps
+            if comps:
+                all_comp_groups[controller] = comps
+        # composites targeting controllers with no regular endpoints
+        for controller, comps in comp_groups.items():
+            filename = controller.lower() + ".js"
+            self.emit_controller_file(controller, [], os.path.join(output_dir, filename), composites=comps)
+            controller_files.append(filename)
+            all_comp_groups[controller] = comps
+        alt_hosts = self.collect_alt_hosts(endpoints, composites)
+        self.emit_client_class(all_groups, all_comp_groups, alt_hosts, output_dir)
         reexport_files = self.reexport_all_modules(output_dir)
         self.emit_barrel_index(controller_files, output_dir, extra_files=reexport_files)
         self.emit_rollup_config(output_dir)
@@ -168,24 +184,210 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         with open(os.path.join(output_dir, "errors.js"), "w") as f:
             f.write("\n".join(lines))
 
-    def emit_controller_file(self, controller: str, endpoints: list[dict], filepath: str) -> None:
-        needs_oauth = any(ep.get("auth") == "required" and not ep.get("api_host") for ep in endpoints)
+    def emit_controller_file(self, controller: str, endpoints: list[dict], filepath: str, composites: list[dict] | None = None) -> None:
         needs_errors = any(ep.get("auth") != "required" or ep.get("api_host") for ep in endpoints)
+        # cross-controller imports needed by composites
+        cross_imports: dict[str, list[str]] = {}  # filename -> [class_names]
+        for comp in (composites or []):
+            for step in comp.get("steps", []):
+                ep = step.get("endpoint", {})
+                if ep.get("auth") != "required" or ep.get("api_host"):
+                    needs_errors = True
+                step_ctrl = ep.get("controller", "").replace(" ", "_")
+                if step_ctrl and step_ctrl != controller and ep.get("auth") == "required" and not ep.get("api_host"):
+                    cls = self.snake_to_pascal(step_ctrl)
+                    js_file = step_ctrl.lower() + ".js"
+                    cross_imports.setdefault(js_file, []).append(cls)
+        class_name = self.snake_to_pascal(controller)
         lines = []
-        if needs_oauth:
-            lines += [f"import {{ OAuthClient }} from './{self._oauth_import_path()}';"]
         if needs_errors:
             lines += ["import { handleResponse } from './errors.js';"]
-        if needs_oauth or needs_errors:
+        for js_file, cls_list in sorted(cross_imports.items()):
+            lines.append(f"import {{ {', '.join(sorted(set(cls_list)))} }} from './{js_file}';")
+        if needs_errors or cross_imports:
             lines.append("")
+        # detect if any composite uses caching
+        has_caches = any(
+            s.get("cache", {}).get("enabled")
+            for comp in (composites or [])
+            for s in comp.get("steps", [])
+        )
+
+        lines.append(f"export class {class_name} {{")
+        if has_caches:
+            lines.append("  constructor(ctx) { this._ctx = ctx; this._caches = {}; }")
+        else:
+            lines.append("  constructor(ctx) { this._ctx = ctx; }")
+
         for ep in endpoints:
-            lines.extend(self._emit_function(ep))
             lines.append("")
+            lines.extend(self._emit_method(ep))
+        for comp in (composites or []):
+            lines.append("")
+            lines.extend(self._emit_composite_method(comp))
+        lines.append("}")
+        lines.append("")
         with open(filepath, "w") as f:
             f.write("\n".join(lines))
 
+    @staticmethod
+    def _to_prop_name(name: str) -> str:
+        """Convert controller name to camelCase property name (first char always lowercase)."""
+        camel = _snake_to_camel(name)
+        if not camel:
+            return camel
+        # Lowercase leading uppercase run: "AIModelCredits" -> "aiModelCredits", "OAuth" -> "oAuth"
+        i = 0
+        while i < len(camel) and camel[i].isupper():
+            i += 1
+        if i > 1:
+            return camel[:i - 1].lower() + camel[i - 1:]
+        return camel[0].lower() + camel[1:]
+
+    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str) -> None:
+        """Generate MediaViz.js — the top-level SDK client class."""
+        # Build controller info: [(prop_name, class_name, js_filename)]
+        controllers = []
+        for controller in sorted(set(list(groups.keys()) + list(comp_groups.keys()))):
+            class_name = self.snake_to_pascal(controller)
+            filename = controller.lower() + ".js"
+            prop_name = self._to_prop_name(controller)
+            controllers.append((prop_name, class_name, filename))
+
+        # Build host keys from alt_hosts set
+        host_keys = sorted(self.snake_to_camel(h) for h in alt_hosts)
+        host_env_vars = {self.snake_to_camel(h): f"MEDIAVIZ_{h.upper()}_URL" for h in alt_hosts}
+
+        lines = [
+            "// Auto-generated — do not edit",
+            f"import {{ OAuthClient }} from './{self._oauth_import_path()}';",
+        ]
+        for prop, cls, fname in controllers:
+            lines.append(f"import {{ {cls} }} from './{fname}';")
+        lines.append("")
+
+        # _env helper
+        lines.append("function _env(key) {")
+        lines.append("  if (typeof process !== 'undefined' && process.env) return process.env[key];")
+        lines.append("  return undefined;")
+        lines.append("}")
+        lines.append("")
+
+        # _Context class
+        lines.append("class _Context {")
+        lines.append("  constructor(mv) { this._mv = mv; }")
+        lines.append("  get client() { return this._mv._oauthClient; }")
+        lines.append("  get accessToken() { return this._mv._accessToken; }")
+        lines.append("  get refreshToken() { return this._mv._refreshToken; }")
+        lines.append("  get baseUrl() { return this._mv._config.baseUrl; }")
+        lines.append("  get hosts() { return this._mv._hosts; }")
+        lines.append("  requireHost(key) {")
+        lines.append("    const url = this._mv._hosts[key];")
+        lines.append("    if (!url) throw new Error(`Host '${key}' not configured. Pass hosts.${key} in MediaViz constructor or set the corresponding env var.`);")
+        lines.append("    return url;")
+        lines.append("  }")
+        lines.append("  requireTokens() {")
+        lines.append("    if (!this._mv._accessToken) throw new Error('Not authenticated. Call authenticate(), handleCallback(), or setTokens() first.');")
+        lines.append("  }")
+        lines.append("}")
+        lines.append("")
+
+        # _TokenTrackingClient class
+        lines.append("class _TokenTrackingClient {")
+        lines.append("  constructor(mv, inner) { this._mv = mv; this._inner = inner; }")
+        lines.append("  async request(url, method, accessToken, refreshToken, body) {")
+        lines.append("    const result = await this._inner.request(url, method, accessToken, refreshToken, body);")
+        lines.append("    if (result.updatedTokens) {")
+        lines.append("      this._mv._accessToken = result.updatedTokens.access_token;")
+        lines.append("      this._mv._refreshToken = result.updatedTokens.refresh_token;")
+        lines.append("      if (this._mv._onTokenRefresh) this._mv._onTokenRefresh(result.updatedTokens);")
+        lines.append("    }")
+        lines.append("    return result;")
+        lines.append("  }")
+        lines.append("}")
+        lines.append("")
+
+        # MediaViz class
+        lines.append("export class MediaViz {")
+        lines.append("  constructor(config = {}) {")
+        lines.append("    this._config = {")
+        lines.append("      clientId: config.clientId ?? _env('MEDIAVIZ_CLIENT_ID'),")
+        lines.append("      clientSecret: config.clientSecret ?? _env('MEDIAVIZ_CLIENT_SECRET'),")
+        lines.append("      baseUrl: config.baseUrl ?? _env('MEDIAVIZ_BASE_URL') ?? 'https://api.mediaviz.com',")
+        lines.append("      redirectUri: config.redirectUri ?? _env('MEDIAVIZ_REDIRECT_URI'),")
+        lines.append("    };")
+
+        # hosts
+        lines.append("    this._hosts = {")
+        for hk in host_keys:
+            env_var = host_env_vars.get(hk, f"MEDIAVIZ_{hk.upper()}_URL")
+            # Find the original alt_host name to build the env var correctly
+            lines.append(f"      {hk}: config.hosts?.{hk} ?? _env('{env_var}'),")
+        lines.append("      ...(config.hosts || {}),")
+        lines.append("    };")
+
+        lines.append("    this._accessToken = config.accessToken ?? null;")
+        lines.append("    this._refreshToken = config.refreshToken ?? null;")
+        lines.append("    this._onTokenRefresh = config.onTokenRefresh ?? null;")
+        lines.append("")
+        lines.append("    const _inner = new OAuthClient({")
+        lines.append("      clientId: this._config.clientId,")
+        lines.append("      clientSecret: this._config.clientSecret,")
+        lines.append("      baseUrl: this._config.baseUrl,")
+        lines.append("      redirectUri: this._config.redirectUri,")
+        lines.append("    });")
+        lines.append("    this._oauthClient = new _TokenTrackingClient(this, _inner);")
+        lines.append("")
+        lines.append("    const _ctx = new _Context(this);")
+        for prop, cls, _ in controllers:
+            lines.append(f"    this.{prop} = new {cls}(_ctx);")
+        lines.append("  }")
+
+        # authenticate (client credentials)
+        lines.append("")
+        lines.append("  async authenticate() {")
+        lines.append("    const tokens = await this._oauthClient._inner.getClientCredentialsToken();")
+        lines.append("    this._accessToken = tokens.access_token;")
+        lines.append("    this._refreshToken = tokens.refresh_token ?? null;")
+        lines.append("    return tokens;")
+        lines.append("  }")
+
+        # getAuthorizationUrl (PKCE)
+        lines.append("")
+        lines.append("  async getAuthorizationUrl(state) {")
+        lines.append("    return this._oauthClient._inner.generateAuthorizationUrl(state);")
+        lines.append("  }")
+
+        # handleCallback
+        lines.append("")
+        lines.append("  async handleCallback(code, codeVerifier) {")
+        lines.append("    const tokens = await this._oauthClient._inner.exchangeCode(code, codeVerifier);")
+        lines.append("    this._accessToken = tokens.access_token;")
+        lines.append("    this._refreshToken = tokens.refresh_token;")
+        lines.append("    return tokens;")
+        lines.append("  }")
+
+        # setTokens
+        lines.append("")
+        lines.append("  setTokens(accessToken, refreshToken) {")
+        lines.append("    this._accessToken = accessToken;")
+        lines.append("    this._refreshToken = refreshToken;")
+        lines.append("  }")
+
+        # getters
+        lines.append("")
+        lines.append("  get accessToken() { return this._accessToken; }")
+        lines.append("  get refreshToken() { return this._refreshToken; }")
+
+        lines.append("}")
+        lines.append("")
+
+        with open(os.path.join(output_dir, "MediaViz.js"), "w") as f:
+            f.write("\n".join(lines))
+
     def emit_barrel_index(self, controller_files: list[str], output_dir: str, extra_files: list[str] | None = None) -> None:
-        lines = ["export * from './errors.js';"]
+        lines = ["export { MediaViz } from './MediaViz.js';"]
+        lines.append("export * from './errors.js';")
         for f in sorted(extra_files or []):
             lines.append(f"export * from './{f}';")
         lines += [f"export * from './{f}';" for f in sorted(controller_files)]
@@ -240,16 +442,16 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
     # ── internal ──────────────────────────────────────────────────────────────
 
-    def _emit_function(self, ep: dict) -> list[str]:
+    def _emit_method(self, ep: dict) -> list[str]:
         func_name = self.snake_to_camel(ep["function_name"])
         path_params = [p for p in ep["params"] if p["in"] == "path"]
         query_params = [p for p in ep["params"] if p["in"] == "query"]
         header_params = [p for p in ep["params"] if p["in"] == "header"]
         if ep.get("api_host"):
-            return self._emit_alt_host_fn(func_name, ep, path_params, query_params, header_params)
+            return self._emit_alt_host_method(func_name, ep, path_params, query_params, header_params)
         if ep.get("auth") == "required":
-            return self._emit_auth_fn(func_name, ep, path_params, query_params)
-        return self._emit_unauth_fn(func_name, ep, path_params, query_params)
+            return self._emit_auth_method(func_name, ep, path_params, query_params)
+        return self._emit_unauth_method(func_name, ep, path_params, query_params)
 
     def _path_template(self, path: str, path_params: list[dict]) -> str:
         result = path
@@ -258,11 +460,11 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             result = result.replace("{" + p["name"] + "}", f"${{encodeURIComponent({camel})}}")
         return f"`{result}`"
 
-    def _emit_auth_fn(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
+    def _emit_auth_method(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
         path_args = [self.snake_to_camel(p["name"]) for p in path_params]
         request_body = ep.get("request_body")
 
-        sig_parts = ["client", "accessToken", "refreshToken"] + path_args
+        sig_parts = list(path_args)
         if isinstance(request_body, dict) and self._is_model_body(request_body):
             sig_parts.append("body")
         elif isinstance(request_body, dict):
@@ -275,22 +477,23 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             q_names = [self.snake_to_camel(p["name"]) for p in query_params]
             sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
 
-        lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+        lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
+        lines.append("    this._ctx.requireTokens();")
         tmpl = self._path_template(ep["path"], path_params)
 
         if query_params:
-            lines.append(f"  let path = {tmpl};")
-            lines.append("  const query = new URLSearchParams();")
+            lines.append(f"    let path = {tmpl};")
+            lines.append("    const query = new URLSearchParams();")
             for p in query_params:
                 camel = self.snake_to_camel(p["name"])
-                lines.append(f"  if ({camel} !== undefined) query.set('{p['name']}', {camel});")
-            lines.append("  const qs = query.toString();")
-            lines.append("  if (qs) path += '?' + qs;")
+                lines.append(f"    if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+            lines.append("    const qs = query.toString();")
+            lines.append("    if (qs) path += '?' + qs;")
         else:
-            lines.append(f"  const path = {tmpl};")
+            lines.append(f"    const path = {tmpl};")
 
         if isinstance(request_body, dict) and self._is_model_body(request_body):
-            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body));")
         elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             field_strs = []
@@ -300,16 +503,16 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 else:
                     field_strs.append(f"{snake_key}: {camel_param}")
             body_arg = "{ " + ", ".join(field_strs) + " }"
-            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify({body_arg}));")
+            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify({body_arg}));")
         elif request_body:
-            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken, JSON.stringify(body));")
+            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body));")
         else:
-            lines.append(f"  const {{ data }} = await client.request(path, '{ep['method']}', accessToken, refreshToken);")
-        lines.append("  return data;")
-        lines.append("}")
+            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken);")
+        lines.append("    return data;")
+        lines.append("  }")
         return lines
 
-    def _emit_unauth_fn(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
+    def _emit_unauth_method(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict]) -> list[str]:
         method = ep["method"]
         path_args = [self.snake_to_camel(p["name"]) for p in path_params]
         request_body = ep.get("request_body")
@@ -317,82 +520,82 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         is_form = content_type == "application/x-www-form-urlencoded"
 
         if isinstance(request_body, dict) and self._is_model_body(request_body):
-            sig_parts = ["baseUrl"] + path_args + ["body"]
-            lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+            sig_parts = list(path_args) + ["body"]
+            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
             tmpl = self._path_template(ep["path"], path_params)
-            lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{")
-            lines.append(f"    method: '{method}',")
-            lines.append(f"    headers: {{ 'Content-Type': '{content_type}' }},")
+            lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
+            lines.append(f"      method: '{method}',")
+            lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
             if is_form:
-                lines.append("    body: new URLSearchParams(body).toString(),")
+                lines.append("      body: new URLSearchParams(body).toString(),")
             else:
-                lines.append("    body: JSON.stringify(body),")
-            lines.append("  });")
-            lines.append("  return handleResponse(resp);")
+                lines.append("      body: JSON.stringify(body),")
+            lines.append("    });")
+            lines.append("    return handleResponse(resp);")
         elif isinstance(request_body, dict):
             fields = self._flatten_body(request_body)
             param_names = [camel for _, camel in fields]
-            sig_parts = ["baseUrl"] + path_args + ["{ " + ", ".join(param_names) + " }"]
-            lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+            sig_parts = list(path_args) + ["{ " + ", ".join(param_names) + " }"]
+            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
             tmpl = self._path_template(ep["path"], path_params)
-            lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{")
-            lines.append(f"    method: '{method}',")
-            lines.append(f"    headers: {{ 'Content-Type': '{content_type}' }},")
+            lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
+            lines.append(f"      method: '{method}',")
+            lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
             field_strs = []
             for snake_key, camel_param in fields:
                 if snake_key == camel_param:
-                    field_strs.append(f"      {camel_param}")
+                    field_strs.append(f"        {camel_param}")
                 else:
-                    field_strs.append(f"      {snake_key}: {camel_param}")
+                    field_strs.append(f"        {snake_key}: {camel_param}")
             if is_form:
-                lines.append("    body: new URLSearchParams({")
+                lines.append("      body: new URLSearchParams({")
             else:
-                lines.append("    body: JSON.stringify({")
+                lines.append("      body: JSON.stringify({")
             lines.append(",\n".join(field_strs))
-            lines.append("    }).toString(),") if is_form else lines.append("    }),")
-            lines.append("  });")
-            lines.append("  return handleResponse(resp);")
+            lines.append("      }).toString(),") if is_form else lines.append("      }),")
+            lines.append("    });")
+            lines.append("    return handleResponse(resp);")
         elif request_body:
-            # Dynamic/unstructured body string
-            sig_parts = ["baseUrl"] + path_args + ["body = {}"]
-            lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+            sig_parts = list(path_args) + ["body = {}"]
+            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
             tmpl = self._path_template(ep["path"], path_params)
-            lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{")
-            lines.append(f"    method: '{method}',")
-            lines.append(f"    headers: {{ 'Content-Type': '{content_type}' }},")
+            lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
+            lines.append(f"      method: '{method}',")
+            lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
             if is_form:
-                lines.append("    body: new URLSearchParams(body).toString(),")
+                lines.append("      body: new URLSearchParams(body).toString(),")
             else:
-                lines.append("    body: JSON.stringify(body),")
-            lines.append("  });")
-            lines.append("  return handleResponse(resp);")
+                lines.append("      body: JSON.stringify(body),")
+            lines.append("    });")
+            lines.append("    return handleResponse(resp);")
         else:
-            # No body — GET or DELETE
-            sig_parts = ["baseUrl"] + path_args
+            sig_parts = list(path_args)
             if query_params:
                 q_names = [self.snake_to_camel(p["name"]) for p in query_params]
                 sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
-            lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
             tmpl = self._path_template(ep["path"], path_params)
             if query_params:
-                lines.append(f"  let path = {tmpl};")
-                lines.append("  const query = new URLSearchParams();")
+                lines.append(f"    let path = {tmpl};")
+                lines.append("    const query = new URLSearchParams();")
                 for p in query_params:
                     camel = self.snake_to_camel(p["name"])
-                    lines.append(f"  if ({camel} !== undefined) query.set('{p['name']}', {camel});")
-                lines.append("  const qs = query.toString();")
-                lines.append("  if (qs) path += '?' + qs;")
-                lines.append(f"  const resp = await fetch(baseUrl + path, {{ method: '{method}' }});")
+                    lines.append(f"    if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+                lines.append("    const qs = query.toString();")
+                lines.append("    if (qs) path += '?' + qs;")
+                lines.append(f"    const resp = await fetch(this._ctx.baseUrl + path, {{ method: '{method}' }});")
             else:
-                lines.append(f"  const resp = await fetch(baseUrl + {tmpl}, {{ method: '{method}' }});")
-            lines.append("  return handleResponse(resp);")
+                lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{ method: '{method}' }});")
+            lines.append("    return handleResponse(resp);")
 
-        lines.append("}")
+        lines.append("  }")
         return lines
 
-    def _emit_alt_host_fn(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict], header_params: list[dict]) -> list[str]:
-        """Emit function for endpoints on a non-default API host (e.g. photo_upload)."""
+    def _emit_alt_host_method(self, func_name: str, ep: dict, path_params: list[dict], query_params: list[dict], header_params: list[dict]) -> list[str]:
+        """Emit method for endpoints on a non-default API host (e.g. photo_upload)."""
         method = ep["method"]
+        api_host = ep["api_host"]
+        host_key = self.snake_to_camel(api_host)
         path_args = [self.snake_to_camel(p["name"]) for p in path_params]
         request_body = ep.get("request_body")
         content_type = ep.get("content_type") or "application/json"
@@ -400,7 +603,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         required_headers = [p for p in header_params if p.get("required")]
         optional_headers = [p for p in header_params if not p.get("required")]
 
-        sig_parts = ["baseUrl", "accessToken"] + path_args
+        sig_parts = list(path_args)
         for p in required_headers:
             sig_parts.append(self.header_to_param(p["name"]))
         if isinstance(request_body, dict) and self._is_model_body(request_body):
@@ -417,31 +620,33 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             q_names = [self.snake_to_camel(p["name"]) for p in query_params]
             sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
 
-        lines = [f"export async function {func_name}({', '.join(sig_parts)}) {{"]
+        lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
+        lines.append("    this._ctx.requireTokens();")
+        lines.append(f"    const baseUrl = this._ctx.requireHost('{host_key}');")
         tmpl = self._path_template(ep["path"], path_params)
 
         # Build headers object
-        lines.append("  const headers = {")
-        lines.append(f"    'Content-Type': '{content_type}',")
-        lines.append("    'Authorization': accessToken,")
+        lines.append("    const headers = {")
+        lines.append(f"      'Content-Type': '{content_type}',")
+        lines.append("      'Authorization': this._ctx.accessToken,")
         for p in required_headers:
             param = self.header_to_param(p["name"])
-            lines.append(f"    '{p['name']}': {param},")
-        lines.append("  };")
+            lines.append(f"      '{p['name']}': {param},")
+        lines.append("    };")
         if optional_headers:
             for p in optional_headers:
                 param = self.header_to_param(p["name"])
-                lines.append(f"  if ({param} !== undefined) headers['{p['name']}'] = {param};")
+                lines.append(f"    if ({param} !== undefined) headers['{p['name']}'] = {param};")
 
         # Build path with query params
         if query_params:
-            lines.append(f"  let path = {tmpl};")
-            lines.append("  const query = new URLSearchParams();")
+            lines.append(f"    let path = {tmpl};")
+            lines.append("    const query = new URLSearchParams();")
             for p in query_params:
                 camel = self.snake_to_camel(p["name"])
-                lines.append(f"  if ({camel} !== undefined) query.set('{p['name']}', {camel});")
-            lines.append("  const qs = query.toString();")
-            lines.append("  if (qs) path += '?' + qs;")
+                lines.append(f"    if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+            lines.append("    const qs = query.toString();")
+            lines.append("    if (qs) path += '?' + qs;")
             fetch_url = "baseUrl + path"
         else:
             fetch_url = f"baseUrl + {tmpl}"
@@ -463,15 +668,325 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         else:
             body_str = None
 
-        lines.append(f"  const resp = await fetch({fetch_url}, {{")
-        lines.append(f"    method: '{method}',")
-        lines.append("    headers,")
+        lines.append(f"    const resp = await fetch({fetch_url}, {{")
+        lines.append(f"      method: '{method}',")
+        lines.append("      headers,")
         if body_str:
-            lines.append(f"    body: {body_str},")
-        lines.append("  });")
-        lines.append("  return handleResponse(resp);")
-        lines.append("}")
+            lines.append(f"      body: {body_str},")
+        lines.append("    });")
+        lines.append("    return handleResponse(resp);")
+        lines.append("  }")
         return lines
+
+    # ── composites ─────────────────────────────────────────────────────────
+
+    def _emit_composite_method(self, comp: dict) -> list[str]:
+        func_name = self.snake_to_camel(comp["function_name"])
+        params = comp.get("params", [])
+        steps = comp.get("steps", [])
+
+        sig_parts = []
+        for p in params:
+            sig_parts.append(self.snake_to_camel(p["name"]))
+
+        lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
+        lines.append("    this._ctx.requireTokens();")
+
+        for step in steps:
+            lines.append("")
+            ep = step["endpoint"]
+            step_id = step["step_id"]
+            execution = step.get("execution", "once")
+            cache = step.get("cache", {})
+            input_map = step.get("input_map", {})
+            output_as = step.get("output_as")
+            on_error = step.get("on_error", "abort")
+
+            if execution == "once":
+                lines.extend(self._emit_composite_once_step(step_id, ep, input_map, output_as, cache, comp))
+            elif execution == "for_each":
+                for_each_over = step["for_each_over"]
+                for_each_as = step["for_each_as"]
+                lines.extend(self._emit_composite_foreach_step(
+                    step_id, ep, input_map, output_as, on_error,
+                    for_each_over, for_each_as, comp,
+                ))
+
+        # return statement
+        returns = comp.get("returns")
+        if returns:
+            lines.append("")
+            ret_var = self._resolve_js_expr(returns, comp)
+            last_step = steps[-1] if steps else None
+            if last_step and last_step.get("on_error") == "collect":
+                lines.append(f"    return {{ results: {ret_var}, errors: {ret_var}Errors }};")
+            else:
+                lines.append(f"    return {ret_var};")
+
+        lines.append("  }")
+        return lines
+
+    def _emit_composite_once_step(self, step_id: str, ep: dict, input_map: dict, output_as: str | None, cache: dict, comp: dict) -> list[str]:
+        lines = []
+        var = output_as or step_id
+        cache_enabled = cache.get("enabled", False)
+
+        if cache_enabled:
+            cache_key_expr = self._resolve_js_expr(cache["key"], comp)
+            cache_name = f"_{step_id}"
+            lines.append(f"    if (!this._caches['{cache_name}']) this._caches['{cache_name}'] = new Map();")
+            lines.append(f"    const _cacheKey_{step_id} = String({cache_key_expr});")
+            lines.append(f"    let {var} = this._caches['{cache_name}'].get(_cacheKey_{step_id});")
+            lines.append(f"    if ({var} === undefined) {{")
+            indent = "      "
+            needs_decl = False
+        else:
+            indent = "    "
+            needs_decl = True
+
+        if ep.get("auth") == "required" and not ep.get("api_host"):
+            lines.extend(self._emit_call_auth_endpoint(ep, input_map, var, comp, indent, declare=needs_decl))
+        else:
+            lines.extend(self._emit_call_alt_host_endpoint(ep, input_map, var, comp, indent, declare=needs_decl))
+
+        if cache_enabled:
+            lines.append(f"      this._caches['{cache_name}'].set(_cacheKey_{step_id}, {var});")
+            lines.append("    }")
+
+        return lines
+
+    def _emit_call_auth_endpoint(self, ep: dict, input_map: dict, var: str, comp: dict, indent: str, declare: bool = False) -> list[str]:
+        """Emit a call to an auth endpoint via the context's client."""
+        lines = []
+        path_params = [p for p in ep["params"] if p["in"] == "path"]
+        query_params = [p for p in ep["params"] if p["in"] == "query"]
+
+        # Build the path inline
+        path = ep["path"]
+        for p in path_params:
+            mapped = input_map.get(p["name"], "undefined")
+            val = self._resolve_js_expr(mapped, comp)
+            path = path.replace("{" + p["name"] + "}", f"${{encodeURIComponent({val})}}")
+        path_str = f"`{path}`"
+
+        # Query params
+        if query_params:
+            lines.append(f"{indent}let _path = {path_str};")
+            lines.append(f"{indent}const _q = new URLSearchParams();")
+            for p in query_params:
+                mapped = input_map.get(p["name"])
+                if mapped:
+                    val = self._resolve_js_expr(mapped, comp)
+                    lines.append(f"{indent}if ({val} !== undefined) _q.set('{p['name']}', {val});")
+            lines.append(f"{indent}const _qs = _q.toString();")
+            lines.append(f"{indent}if (_qs) _path += '?' + _qs;")
+            path_ref = "_path"
+        else:
+            path_ref = path_str
+
+        decl = "const " if declare else ""
+        lines.append(f"{indent}{decl}{var} = (await this._ctx.client.request({path_ref}, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken)).data;")
+        return lines
+
+    def _emit_call_alt_host_endpoint(self, ep: dict, input_map: dict, var: str, comp: dict, indent: str, declare: bool = False) -> list[str]:
+        """Emit an inline fetch call for alt-host endpoints (photo_upload, etc.)."""
+        lines = []
+        method = ep["method"]
+        api_host = ep.get("api_host", "")
+        host_key = self.snake_to_camel(api_host)
+        path_params = [p for p in ep["params"] if p["in"] == "path"]
+        header_params = [p for p in ep["params"] if p["in"] == "header"]
+        request_body = ep.get("request_body")
+        content_type = ep.get("content_type") or "application/json"
+
+        # resolve host
+        lines.append(f"{indent}const _baseUrl_{var} = this._ctx.requireHost('{host_key}');")
+
+        # build path
+        path = ep["path"]
+        for p in path_params:
+            mapped = input_map.get(p["name"], "undefined")
+            val = self._resolve_js_expr(mapped, comp)
+            path = path.replace("{" + p["name"] + "}", f"${{encodeURIComponent({val})}}")
+        path_str = f"`{path}`"
+
+        # build headers
+        lines.append(f"{indent}const _headers_{var} = {{")
+        lines.append(f"{indent}  'Content-Type': '{content_type}',")
+        lines.append(f"{indent}  'Authorization': this._ctx.accessToken,")
+        for p in header_params:
+            if p.get("required"):
+                mapped = input_map.get(p["name"])
+                if mapped:
+                    val = self._resolve_js_expr(mapped, comp)
+                    lines.append(f"{indent}  '{p['name']}': String({val}),")
+        lines.append(f"{indent}}};")
+        # optional headers
+        for p in header_params:
+            if not p.get("required"):
+                mapped = input_map.get(p["name"])
+                if mapped:
+                    val = self._resolve_js_expr(mapped, comp)
+                    lines.append(f"{indent}if ({val} !== undefined) _headers_{var}['{p['name']}'] = String({val});")
+
+        # build body
+        body_str = None
+        if isinstance(request_body, dict) and not self._is_model_body(request_body):
+            fields = self._flatten_body(request_body)
+            field_strs = []
+            for snake_key, _ in fields:
+                mapped = input_map.get(snake_key)
+                if mapped:
+                    val = self._resolve_js_expr(mapped, comp)
+                    field_strs.append(f"{snake_key}: {val}")
+            body_str = "JSON.stringify({ " + ", ".join(field_strs) + " })"
+
+        lines.append(f"{indent}const _resp_{var} = await fetch(_baseUrl_{var} + {path_str}, {{")
+        lines.append(f"{indent}  method: '{method}',")
+        lines.append(f"{indent}  headers: _headers_{var},")
+        if body_str:
+            lines.append(f"{indent}  body: {body_str},")
+        lines.append(f"{indent}}});")
+        decl = "const " if declare else ""
+        lines.append(f"{indent}{decl}{var} = await handleResponse(_resp_{var});")
+        return lines
+
+    def _emit_composite_foreach_step(self, step_id: str, ep: dict, input_map: dict, output_as: str | None, on_error: str, for_each_over: str, for_each_as: str, comp: dict) -> list[str]:
+        lines = []
+        var = output_as or step_id
+        arr_expr = self._resolve_js_expr(for_each_over, comp)
+        item = for_each_as
+
+        lines.append(f"    const {var} = [];")
+        if on_error == "collect":
+            lines.append(f"    const {var}Errors = [];")
+        lines.append(f"    for (let _index = 0; _index < {arr_expr}.length; _index++) {{")
+        lines.append(f"      const {item} = {arr_expr}[_index];")
+
+        if on_error in ("collect", "continue"):
+            lines.append("      try {")
+            inner_indent = "        "
+        else:
+            inner_indent = "      "
+
+        if ep.get("api_host"):
+            lines.extend(self._emit_inline_foreach_fetch(ep, input_map, var, comp, item, inner_indent))
+        elif ep.get("auth") == "required":
+            lines.extend(self._emit_inline_foreach_call(ep, input_map, var, comp, item, inner_indent))
+        else:
+            lines.extend(self._emit_inline_foreach_fetch(ep, input_map, var, comp, item, inner_indent))
+
+        if on_error == "collect":
+            lines.append("      } catch (_err) {")
+            lines.append(f"        {var}Errors.push({{ index: _index, error: _err }});")
+            lines.append("      }")
+        elif on_error == "continue":
+            lines.append("      } catch (_err) {")
+            lines.append("        // skip failed item")
+            lines.append("      }")
+
+        lines.append("    }")
+        return lines
+
+    def _emit_inline_foreach_fetch(self, ep: dict, input_map: dict, results_var: str, comp: dict, item: str, indent: str) -> list[str]:
+        """Inline a fetch call inside a for_each loop body."""
+        lines = []
+        method = ep["method"]
+        api_host = ep.get("api_host")
+        path_params = [p for p in ep["params"] if p["in"] == "path"]
+        header_params = [p for p in ep["params"] if p["in"] == "header"]
+        request_body = ep.get("request_body")
+        content_type = ep.get("content_type") or "application/json"
+
+        # resolve base URL
+        if api_host:
+            host_key = self.snake_to_camel(api_host)
+            base_expr = f"this._ctx.requireHost('{host_key}')"
+        else:
+            base_expr = "this._ctx.baseUrl"
+
+        path = ep["path"]
+        for p in path_params:
+            mapped = input_map.get(p["name"], "undefined")
+            val = self._resolve_js_expr_loop(mapped, comp, item)
+            path = path.replace("{" + p["name"] + "}", f"${{encodeURIComponent({val})}}")
+        path_str = f"`{path}`"
+
+        lines.append(f"{indent}const _hdrs = {{")
+        lines.append(f"{indent}  'Content-Type': '{content_type}',")
+        lines.append(f"{indent}  'Authorization': this._ctx.accessToken,")
+        for p in header_params:
+            if p.get("required"):
+                mapped = input_map.get(p["name"])
+                if mapped:
+                    val = self._resolve_js_expr_loop(mapped, comp, item)
+                    lines.append(f"{indent}  '{p['name']}': String({val}),")
+        lines.append(f"{indent}}};")
+        for p in header_params:
+            if not p.get("required"):
+                mapped = input_map.get(p["name"])
+                if mapped:
+                    val = self._resolve_js_expr_loop(mapped, comp, item)
+                    lines.append(f"{indent}if ({val} !== undefined) _hdrs['{p['name']}'] = String({val});")
+
+        body_str = None
+        if isinstance(request_body, dict) and not self._is_model_body(request_body):
+            fields = self._flatten_body(request_body)
+            field_strs = []
+            for snake_key, _ in fields:
+                mapped = input_map.get(snake_key)
+                if mapped:
+                    val = self._resolve_js_expr_loop(mapped, comp, item)
+                    field_strs.append(f"{snake_key}: {val}")
+            body_str = "JSON.stringify({ " + ", ".join(field_strs) + " })"
+
+        lines.append(f"{indent}const _resp = await fetch({base_expr} + {path_str}, {{")
+        lines.append(f"{indent}  method: '{method}',")
+        lines.append(f"{indent}  headers: _hdrs,")
+        if body_str:
+            lines.append(f"{indent}  body: {body_str},")
+        lines.append(f"{indent}}});")
+        lines.append(f"{indent}{results_var}.push(await handleResponse(_resp));")
+        return lines
+
+    def _emit_inline_foreach_call(self, ep: dict, input_map: dict, results_var: str, comp: dict, item: str, indent: str) -> list[str]:
+        """Emit an inline auth request inside a for_each loop."""
+        lines = []
+        path_params = [p for p in ep["params"] if p["in"] == "path"]
+
+        path = ep["path"]
+        for p in path_params:
+            mapped = input_map.get(p["name"], "undefined")
+            val = self._resolve_js_expr_loop(mapped, comp, item)
+            path = path.replace("{" + p["name"] + "}", f"${{encodeURIComponent({val})}}")
+        path_str = f"`{path}`"
+
+        lines.append(f"{indent}{results_var}.push((await this._ctx.client.request({path_str}, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken)).data);")
+        return lines
+
+    def _resolve_js_expr(self, expr: str, comp: dict) -> str:
+        """Convert dot-path expression to JS variable reference."""
+        if expr.startswith("params."):
+            param_name = expr.split(".", 1)[1]
+            parts = param_name.split(".", 1)
+            if len(parts) == 2:
+                return f"{self.snake_to_camel(parts[0])}.{self.snake_to_camel(parts[1])}"
+            return self.snake_to_camel(param_name)
+        if expr.startswith("steps."):
+            parts = expr.split(".", 2)
+            if len(parts) == 2:
+                return parts[1]  # steps.template -> template
+            return f"{parts[1]}.{parts[2]}"  # steps.template.bucket_name -> template.bucket_name
+        return expr
+
+    def _resolve_js_expr_loop(self, expr: str, comp: dict, loop_var: str) -> str:
+        """Convert dot-path expression to JS variable reference inside a for_each loop."""
+        if expr == f"{loop_var}._index":
+            return "_index"
+        if expr.startswith(f"{loop_var}."):
+            prop = expr.split(".", 1)[1]
+            return f"{loop_var}.{self.snake_to_camel(prop)}"
+        return self._resolve_js_expr(expr, comp)
 
     def _is_model_body(self, body: dict) -> bool:
         """Check if request_body uses the _model convention (body IS the model, not wrapped)."""

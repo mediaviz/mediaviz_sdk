@@ -1,4 +1,12 @@
-sdk_files/archive/
+**/archive/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# JavaScript/Node dependencies
+node_modules/
+package-lock.json
+
+# PHP dependencies
+vendor/
+composer.lock

@@ -491,5 +491,471 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 25,
+    "description": "Add --destination-dir CLI param to override default sdk_files output directory — creates folder if missing, applies same versioning/archiving logic",
+    "touch_points": [
+      {
+        "file": "generate.py",
+        "location": "parse_args",
+        "status": "added --destination-dir argument"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "resolve destination_dir to package root, create if missing, use as output_dir"
+      },
+      {
+        "file": "spec.md",
+        "location": "CLI Entrypoint flags table",
+        "status": "added --destination-dir row, updated output description"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 26,
+    "description": "Wire --controllers flag into resolve_refs so controller file paths resolve relative to the controllers directory parent, not the endpoints YAML location",
+    "touch_points": [
+      {
+        "file": "resolver.py",
+        "location": "resolve_refs",
+        "status": "added controllers_dir param, used as resolve_base when provided"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "pass parent of args.controllers as controllers_dir to resolve_refs"
+      },
+      {
+        "file": "spec.md",
+        "location": "Resolver section, CLI flags table",
+        "status": "updated --controllers description and resolver input docs"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 27,
+    "description": "Add composite YAML config format — define composites in api-docs/composites/ that chain 2+ endpoint calls with data flow, caching, and error handling",
+    "touch_points": [
+      {
+        "file": "../mediaviz_intelligence_hub/api-docs/composites/upload_photos.yaml",
+        "location": "composite definition",
+        "status": "complete"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api-docs/composites.yaml",
+        "location": "ref list",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 28,
+    "description": "Add resolve_composites() to resolver — reads composites ref-list, resolves step endpoint refs, embeds flattened endpoint data inline",
+    "touch_points": [
+      {
+        "file": "resolver.py",
+        "location": "resolve_composites",
+        "status": "complete"
+      },
+      {
+        "file": "resolver.py",
+        "location": "write_flattened_composites_yaml",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 29,
+    "description": "Add --composites CLI flag to generate.py — resolve composites and pass to generators",
+    "touch_points": [
+      {
+        "file": "generate.py",
+        "location": "parse_args",
+        "status": "complete"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 30,
+    "description": "Update BaseGenerator — add composites param to generate(), add group_composites_by_controller()",
+    "touch_points": [
+      {
+        "file": "generators/base.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "generators/base.py",
+        "location": "group_composites_by_controller",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 31,
+    "description": "Implement composite function emission in JS generator — once steps with caching, for_each with inline fetch, cross-controller imports, on_error modes",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_controller_file",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_function",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_once_step",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_foreach_step",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 32,
+    "description": "Implement composite method emission in PHP generator — static cache, foreach with inline curl, on_error collect mode",
+    "touch_points": [
+      {
+        "file": "generators/php.py",
+        "location": "generate",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "emit_controller_file",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_composite_method",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_php_once_step",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_php_foreach_step",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 33,
+    "description": "Convert uploadPhotos composite from batch (for_each over photos list) to unary (single photo per call) — caller loops externally, template cache persists across calls",
+    "touch_points": [
+      {
+        "file": "../mediaviz_intelligence_hub/api-docs/composites/upload_photos.yaml",
+        "location": "composite definition",
+        "status": "changed to upload_photo, single photo object param, both steps execution:once"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_resolve_js_expr",
+        "status": "added nested param support: params.photo.title -> photo.title"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_once_step",
+        "status": "added declare flag for non-cached steps to emit const/let"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_call_alt_host_endpoint",
+        "status": "added declare param for variable declaration"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_resolve_php_expr",
+        "status": "added nested param support: params.photo.title -> $photo['title']"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_php_once_step",
+        "status": "changed cache from static method var to $this->_cache instance property"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "emit_controller_file",
+        "status": "declares cache instance properties from composite step configs"
+      },
+      {
+        "file": "spec.md",
+        "location": "Composite Functions section",
+        "status": "updated example, schema fields, generator behavior docs"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 34,
+    "description": "Move composites into --endpoints ref-list (refs without '#' are composites), remove --composites flag, validate all composite step endpoints exist in the endpoint list",
+    "touch_points": [
+      {
+        "file": "resolver.py",
+        "location": "resolve_refs",
+        "status": "returns (endpoints, composite_paths) tuple; refs without '#' collected as composite paths"
+      },
+      {
+        "file": "resolver.py",
+        "location": "resolve_composite_files",
+        "status": "complete — resolves individual composite YAML files"
+      },
+      {
+        "file": "resolver.py",
+        "location": "validate_composite_endpoints",
+        "status": "complete — errors if step endpoints missing from endpoint list"
+      },
+      {
+        "file": "generate.py",
+        "location": "parse_args",
+        "status": "removed --composites flag"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "uses composite_paths from resolve_refs, wires up validation"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api-docs/top_endpoints.yaml",
+        "location": "refs list",
+        "status": "added composite ref and its step endpoint refs"
+      },
+      {
+        "file": "spec.md",
+        "location": "CLI flags, Composite Functions section",
+        "status": "updated to reflect composites in ref-list, removed --composites flag docs"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 35,
+    "description": "Add collect_alt_hosts() helper and abstract emit_client_class() to BaseGenerator — enables generators to discover alt-host URLs and emit top-level client class",
+    "touch_points": [
+      {
+        "file": "generators/base.py",
+        "location": "collect_alt_hosts",
+        "status": "complete — scans endpoints and composites for distinct api_host values"
+      },
+      {
+        "file": "generators/base.py",
+        "location": "emit_client_class",
+        "status": "complete — abstract method signature added"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 36,
+    "description": "Rewrite JS generator to emit class-based controllers — each controller is an ES class with constructor(ctx), methods use this._ctx for client/tokens/hosts instead of explicit params",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_controller_file",
+        "status": "complete — emits class with _ctx constructor, caches on instance"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_method",
+        "status": "complete — replaced _emit_function, dispatches to auth/unauth/alt_host method emitters"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_auth_method",
+        "status": "complete — uses this._ctx.client/accessToken/refreshToken, requireTokens() guard"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_unauth_method",
+        "status": "complete — uses this._ctx.baseUrl"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_alt_host_method",
+        "status": "complete — resolves host from this._ctx.requireHost()"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_method",
+        "status": "complete — drops auth/host params, uses this._ctx throughout"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 37,
+    "description": "Add emit_client_class() to JS generator — generates MediaViz.js with _Context, _TokenTrackingClient, and MediaViz client class supporting both auth flows",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_client_class",
+        "status": "complete — emits _env(), _Context, _TokenTrackingClient, MediaViz class"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "generate",
+        "status": "complete — calls emit_client_class with groups, comp_groups, alt_hosts"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_barrel_index",
+        "status": "complete — exports MediaViz first, then controller classes"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_to_prop_name",
+        "status": "complete — camelCase property name with acronym handling"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 38,
+    "description": "Rewrite PHP generator to emit class-based controllers — methods use $this->ctx for client/tokens/hosts instead of explicit params",
+    "touch_points": [
+      {
+        "file": "generators/php.py",
+        "location": "emit_controller_file",
+        "status": "complete — constructor takes object $ctx instead of OAuthClient"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_auth_method",
+        "status": "complete — uses $this->ctx->client/accessToken/refreshToken, requireTokens() guard"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_unauth_method",
+        "status": "complete — uses $this->ctx->baseUrl"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_alt_host_method",
+        "status": "complete — uses $this->ctx->requireHost()"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_composite_method",
+        "status": "complete — drops token/host params, uses $this->ctx"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 39,
+    "description": "Add emit_client_class() to PHP generator — generates MediaVizClient.php with _Context, _TokenTrackingClient, and MediaVizClient class",
+    "touch_points": [
+      {
+        "file": "generators/php.py",
+        "location": "emit_client_class",
+        "status": "complete — emits _Context, _TokenTrackingClient, MediaVizClient class"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "generate",
+        "status": "complete — calls emit_client_class with groups, comp_groups, alt_hosts"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "emit_autoload_config",
+        "status": "complete — includes MediaVizClient.php in autoload files"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_to_prop_name",
+        "status": "complete — camelCase property name with acronym handling"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 40,
+    "description": "Update spec.md to document new client class architecture — MediaViz/MediaVizClient, constructor config, auth lifecycle, controller namespace pattern",
+    "touch_points": [
+      {
+        "file": "spec.md",
+        "location": "Generated SDK Shape section",
+        "status": "complete — replaced flat-function docs with class-based architecture"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 41,
+    "description": "Update test generators to match new class-based output — tests currently expect flat function exports, need to assert class structure and _ctx usage",
+    "touch_points": [
+      {
+        "file": "tests/test_javascript_browser.py",
+        "location": "all tests",
+        "status": "pending — still asserts flat function pattern"
+      },
+      {
+        "file": "tests/test_php.py",
+        "location": "all tests",
+        "status": "pending — still asserts old method signatures"
+      }
+    ],
+    "completion_status": false
+  },
+  {
+    "id": 42,
+    "description": "Verify OAuth fully abstracted in generated output — re-ran generator (v28), confirmed: no tokens in public method signatures, constructor env-var fallbacks, _Context/TokenTrackingClient pattern, alt-host endpoints use direct fetch with ctx tokens (no 401 retry by design)",
+    "touch_points": [
+      {
+        "file": "sdk_files/v28/javascript/MediaViz.js",
+        "location": "MediaViz class",
+        "status": "verified — _Context, _TokenTrackingClient, env-var config, auth lifecycle methods"
+      },
+      {
+        "file": "sdk_files/v28/php/MediaVizClient.php",
+        "location": "MediaVizClient class",
+        "status": "verified — same pattern as JS"
+      },
+      {
+        "file": "sdk_files/v28/javascript/photos.js",
+        "location": "Photos class",
+        "status": "verified — methods take only business params, tokens from _ctx"
+      },
+      {
+        "file": "sdk_files/v28/javascript/photoupload.js",
+        "location": "Photoupload class",
+        "status": "verified — alt-host resolved from _ctx, composite caching works"
+      },
+      {
+        "file": "spec.md",
+        "location": "Alt-host endpoints section",
+        "status": "added note about no 401-retry on alt-host endpoints"
+      }
+    ],
+    "completion_status": true
   }
 ]

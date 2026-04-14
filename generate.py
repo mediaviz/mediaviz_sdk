@@ -4,7 +4,10 @@ import shutil
 import sys
 
 from generators import discover_generators
-from resolver import resolve_refs, write_flattened_yaml
+from resolver import (
+    resolve_refs, resolve_composite_files, validate_composite_endpoints,
+    write_flattened_yaml, write_flattened_composites_yaml,
+)
 from test_generators import discover_test_generators
 from test_generators.base import TestResult
 from versioning import get_next_version
@@ -18,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--controllers", required=True, help="Path to controllers directory (used for documentation; resolver infers from --endpoints location)")
     p.add_argument("--oauth-sdk", required=True, dest="oauth_sdk", help="Path to OAuth SDK root")
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
+    p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk_files.")
     return p.parse_args()
 
 
@@ -62,7 +66,11 @@ def archive_existing_versions(output_dir: str) -> None:
 def main() -> None:
     args = parse_args()
 
-    output_dir = SDK_OUTPUT_DIR
+    if args.destination_dir:
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.destination_dir)
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        output_dir = SDK_OUTPUT_DIR
     endpoints_path = os.path.abspath(args.endpoints)
     oauth_sdk_root = os.path.abspath(args.oauth_sdk)
 
@@ -83,9 +91,21 @@ def main() -> None:
 
     version_dir = os.path.join(output_dir, f"v{version}")
 
-    endpoints = resolve_refs(endpoints_path)
+    controllers_dir = os.path.dirname(os.path.abspath(args.controllers)) if args.controllers else None
+    endpoints, composite_paths = resolve_refs(endpoints_path, controllers_dir=controllers_dir)
     resolved_path = write_flattened_yaml(endpoints, endpoints_path, version_dir)
     print(f"Resolved {len(endpoints)} endpoints → {resolved_path}")
+
+    composites = None
+    if composite_paths:
+        composites = resolve_composite_files(composite_paths, controllers_dir=controllers_dir)
+        try:
+            validate_composite_endpoints(composites, endpoints)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        resolved_comp_path = write_flattened_composites_yaml(composites, composite_paths[0], version_dir)
+        print(f"Resolved {len(composites)} composite(s) → {resolved_comp_path}")
 
     file_counts: dict[str, int] = {}
     for framework in requested:
@@ -93,7 +113,7 @@ def main() -> None:
         fw_dir = os.path.join(version_dir, framework)
         os.makedirs(fw_dir, exist_ok=True)
         gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)
-        gen.generate(endpoints, fw_dir)
+        gen.generate(endpoints, fw_dir, composites=composites)
         file_counts[framework] = sum(len(files) for _, _, files in os.walk(fw_dir))
 
     print(f"\nSDK v{version} generated:")

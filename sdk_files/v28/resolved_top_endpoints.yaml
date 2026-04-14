@@ -1,0 +1,1799 @@
+source: top_endpoints.yaml
+resolved_at: '2026-04-14T14:20:14Z'
+endpoints:
+- id: get_get_category_labels
+  function_name: get_category_labels
+  controller: Admin
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/admin/category_labels/{category}
+  summary: get_category_labels
+  auth: required
+  params:
+  - name: category
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_keyword_groups_and_subgroups
+  function_name: get_all_keyword_groups_and_subgroups
+  controller: Admin
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/admin/keyword_group
+  summary: get_all_keyword_groups_and_subgroups
+  auth: required
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_keyword_groups_labels_by_keyword_group
+  function_name: get_keyword_groups_labels_by_keyword_group
+  controller: Admin
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/admin/keyword_group/{keyword_group}/
+  summary: get_keyword_groups_labels_by_keyword_group
+  auth: required
+  params:
+  - name: keyword_group
+    in: path
+    type: str
+    required: true
+  - name: subgroup
+    in: query
+    type: Optional[str]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_get_google_sheets_credentials
+  function_name: get_google_sheets_credentials
+  controller: Admin
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/admin/get_google_sheets_credentials
+  summary: get_google_sheets_credentials
+  auth: required
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_get_access_token_login
+  function_name: get_access_token_login
+  controller: Token
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/token/
+  summary: get_access_token_login
+  auth: none
+  params: []
+  request_body:
+    username:
+      type: string (email)
+      required: true
+    password:
+      type: string
+      required: true
+  response: null
+  content_type: application/x-www-form-urlencoded
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_request_password_reset
+  function_name: request_password_reset
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/request-password-reset
+  summary: request_password_reset
+  auth: none
+  params: []
+  request_body:
+    _model:
+      type: EmailStr
+      required: true
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_reset_password
+  function_name: reset_password
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/reset-password
+  summary: reset_password
+  auth: none
+  params: []
+  request_body:
+    _model:
+      type: PasswordResetConfirmation
+      required: true
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_invalidate_token_logout
+  function_name: invalidate_token_logout
+  controller: Token
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/logout
+  summary: invalidate_token_logout
+  auth: required
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_project_curated_albums
+  function_name: get_all_project_curated_albums
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/project/{project_table_name}
+  summary: get_all_project_curated_albums
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_curated_album_photos
+  function_name: get_curated_album_photos
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/photos/{album_id}/
+  summary: get_curated_album_photos
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+    default: 5000
+  - name: confidence_value
+    in: query
+    type: Optional[float]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_curated_album_photos_ranked
+  function_name: get_curated_album_photos_ranked
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/photos/ranked/{album_id}/
+  summary: get_curated_album_photos_ranked
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+    default: 5000
+  - name: confidence_value
+    in: query
+    type: Optional[float]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    body:
+      best: array
+      middle: array
+      worst: array
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_create_project_custom_album
+  function_name: create_project_custom_album
+  controller: Custom Albums
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/custom_album/project/{project_table_name}
+  summary: Called by createCustomAlbum(albumName, photoIds, projectTableName)
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _model:
+      type: CustomAlbumCreateUpdate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_all_project_custom_albums
+  function_name: get_all_project_custom_albums
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/project/{project_table_name}
+  summary: Called by getCustomAlbums(projectTableName)
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_custom_album_detail_by_id
+  function_name: get_custom_album_detail_by_id
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/{custom_album_id}
+  summary: Called by getCustomAlbum(customAlbumId)
+  auth: required
+  params:
+  - name: custom_album_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: delete_delete_custom_album
+  function_name: delete_custom_album
+  controller: Custom Albums
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/custom_album/{album_id}
+  summary: Called by deleteCustomAlbum(customAlbumId)
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  - name: customAlbumId
+    in: path
+    type: integer
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_custom_album
+  function_name: update_custom_album
+  controller: Custom Albums
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/custom_album/{album_id}
+  summary: Called by updateCustomAlbum(customAlbumId, customAlbumData)
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  - name: customAlbumId
+    in: path
+    type: integer
+    required: true
+  request_body:
+    _model:
+      type: CustomAlbumCreateUpdate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_custom_album_photos_by_id
+  function_name: get_custom_album_photos_by_id
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/photos/{custom_album_id}/
+  summary: Called by getCustomAlbumPhotoIds(customAlbumId, sortOrder, batchSize)
+  auth: required
+  params:
+  - name: custom_album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+    default: 5000
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_top_middle_bottom_custom_album_by_id
+  function_name: get_top_middle_bottom_custom_album_by_id
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/photos/ranked/{custom_album_id}/
+  summary: Called by getCustomBestMidWorstPhotoIds(customAlbumId, sortOrder)
+  auth: required
+  params:
+  - name: custom_album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    body:
+      best: array
+      middle: array
+      worst: array
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_check_project_status
+  function_name: check_project_status
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/project/status/{project_table_name}
+  summary: check_project_status
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_data_export_upload_status
+  function_name: get_project_data_export_upload_status
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/{project_table_name}/upload_status/{model_name}
+  summary: get_project_data_export_upload_status
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: model_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_project_export
+  function_name: request_project_export
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects_export/{project_table_name}
+  summary: request_project_export
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_persons_from_photo
+  function_name: get_all_persons_from_photo
+  controller: Person
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/person/{project_table_name}/photo/{photo_id}
+  summary: get_all_persons_from_photo
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_person
+  function_name: update_person
+  controller: Person
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/person/{project_table_name}/{person_id}
+  summary: update_person
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: person_id
+    in: path
+    type: str
+    required: true
+  - name: person_name
+    in: query
+    type: str
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_persons_from_project
+  function_name: get_all_persons_from_project
+  controller: Person
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/person/{project_table_name}/
+  summary: get_all_persons_from_project
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user_keyword_filtering_lists
+  function_name: get_user_keyword_filtering_lists
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/user
+  summary: Called by getUserKeywordsLists()
+  auth: required
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_create_keyword_filtering_list
+  function_name: create_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/keyword/
+  summary: Called by createKeywordsList(listName)
+  auth: required
+  params: []
+  request_body:
+    _model:
+      type: KeywordListCreate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_keyword_filtering_list_by_id
+  function_name: get_keyword_filtering_list_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/list/{keyword_list_id}
+  summary: Called by getKeywordsListValues(keywordListId)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_default_keyword_filtering_list_by_project
+  function_name: get_default_keyword_filtering_list_by_project
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/project/{project_table_name}/default
+  summary: Called by getCollectionKeywordsValues(projectTableName)
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_existing_keyword_filtering_list_by_project
+  function_name: get_existing_keyword_filtering_list_by_project
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/project/{project_table_name}
+  summary: Called by getCollectionActiveKeywordsList(projectTableName)
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_keywords_and_ids
+  function_name: get_keywords_and_ids
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/all_keywords/id/label
+  summary: Called by getKeywordsLabels()
+  auth: required
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_keyword_filtering_list_labels
+  function_name: update_keyword_filtering_list_labels
+  controller: Keywords
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/keyword/{keyword_list_id}
+  summary: Called by updateKeywordsList(keywordsListId, keywordIds, list_keywords_to_exclude)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  - name: keywordsListId
+    in: path
+    type: integer
+    required: true
+  request_body:
+    _model:
+      type: KeywordListLabelsUpdate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_keyword_filtering_list_details
+  function_name: update_keyword_filtering_list_details
+  controller: Keywords
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/keyword/details/{keyword_list_id}
+  summary: Called by renameKeywordsList(selectedId, keywordsListId, keywordsListName)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  - name: keywordsListId
+    in: path
+    type: integer
+    required: true
+  request_body:
+    _model:
+      type: KeywordListDetailsUpdate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_add_project_to_keyword_filtering_list
+  function_name: add_project_to_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/keyword/{keyword_list_id}/projects
+  summary: Called by associateKeywordsListToCollections(keywordListId, collectionIds)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  - name: project_ids
+    in: query
+    type: List[str]
+    required: false
+  request_body: array of collection IDs
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_keyword_filtering_list_and_projects_by_id
+  function_name: get_keyword_filtering_list_and_projects_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/{keyword_list_id}
+  summary: Called by getAssociatedCollectionsForKeywordList(keywordListId)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: delete_remove_projects_from_keyword_filtering_list
+  function_name: remove_projects_from_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/keyword/{keyword_list_id}/projects
+  summary: Called by removeKeywordsListFromCollections(keywordListId, collectionIds)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  - name: project_ids
+    in: query
+    type: List[str]
+    required: false
+  request_body: array of collection IDs
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: delete_delete_keyword_filtering_list_by_id
+  function_name: delete_keyword_filtering_list_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/keyword/{keyword_list_id}
+  summary: Called by deleteKeywordsList(keywordListId)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_request_keyword_list_export
+  function_name: request_keyword_list_export
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/export/{keyword_list_id}
+  summary: Called by downloadKeywordListExport(keywordListId)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_request_keyword_list_export_status
+  function_name: request_keyword_list_export_status
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/export_status/{keyword_list_id}
+  summary: Called by fetchKeywordExportProgress(keywordListId)
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_all_project_photo_ids
+  function_name: get_all_project_photo_ids
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/
+  summary: Called by getAllPhotoIds(table_name, sortOrder, batchSize) / fetchPhotoIds()
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+    default: 5000
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_photo_from_project
+  function_name: get_photo_from_project
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/{photo_id}
+  summary: Called by getPhoto(table_name, photo_id)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  - name: keyword_list_id
+    in: query
+    type: int
+    required: false
+  - name: id
+    in: path
+    type: integer (photo_id)
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: delete_delete_photo_from_project
+  function_name: delete_photo_from_project
+  controller: Photos
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/photos/{table_name}/delete/
+  summary: Called by deletePhoto(table_name, photo_id)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_ids
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_thumbnail
+  function_name: get_project_thumbnail
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos_project/{table_name}
+  summary: Called by getProjectTableData(projectTable)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_month_years_with_photos
+  function_name: get_project_month_years_with_photos
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photo_month_years/{table_name}
+  summary: Called by getFilterableMonths(projectTable)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_photo_ids_by_month
+  function_name: get_project_photo_ids_by_month
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/month/{month}/year/{year}
+  summary: Called by getPhotoIdsByMonthYear(projectTable, month, year, sortOrder)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: month
+    in: path
+    type: int
+    required: true
+  - name: year
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  - name: last_id
+    in: query
+    type: integer
+    required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_photo_ids_no_date_taken
+  function_name: get_project_photo_ids_no_date_taken
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/date_taken/none
+  summary: Called by getPhotosWithoutDateTaken(projectTable)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_photo_ranking
+  function_name: update_photo_ranking
+  controller: Photos
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/photos_update/{table_name}/id/{photo_id}/rank/{new_category}
+  summary: Called by updatePhotoRank(photoId, newCategory, projectTable)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  - name: new_category
+    in: path
+    type: str
+    required: true
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  - name: id
+    in: path
+    type: integer (photo_id)
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked
+  function_name: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos_ranked/{table_name}
+  summary: Called by getAllPhotosBestMidWorstPhotoIds(tableName, sortOrder, batchSize)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: last_id
+    in: query
+    type: integer
+    required: false
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 5000
+  request_body: null
+  response:
+    status: 200
+    body:
+      best: array
+      middle: array
+      worst: array
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
+  function_name: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/month/{month}/year/{year}/ranked
+  summary: Called by getMonthYearBestMidWorstPhotoIds(projectTable, month, year, sortOrder)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: month
+    in: path
+    type: int
+    required: true
+  - name: year
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  request_body: null
+  response:
+    status: 200
+    body:
+      best: array
+      middle: array
+      worst: array
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_top_project_photos_by_table_name_no_date_taken_new_ranked
+  function_name: get_top_project_photos_by_table_name_no_date_taken_new_ranked
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/date_taken/none/ranked
+  summary: Called by getUnknownDateBestMidWorstPhotoIds(projectTable)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+    default: ASC
+  - name: projectTable
+    in: path
+    type: string
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_user_projects
+  function_name: get_user_projects
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/user
+  summary: Called by getCollections()
+  auth: required
+  params:
+  - name: company_id
+    in: query
+    type: integer (fetch variant only, webapp)
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_by_directory
+  function_name: get_project_by_directory
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/directory/{directory}
+  summary: Called by getProjectFromDir()
+  auth: required
+  params:
+  - name: directory
+    in: path
+    type: str
+    required: true
+  - name: directory_path
+    in: path
+    type: string (URL-encoded filesystem path)
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_by_id
+  function_name: get_project_by_id
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/{project_id}
+  summary: Called by getCollection(project_id)
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_create_project_and_run
+  function_name: create_project_and_run
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/project_outcome/
+  summary: Called by createCollection(data)
+  auth: required
+  params:
+  - name: outcomes
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: models
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body:
+    _model:
+      type: ProjectRunCreate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_project
+  function_name: update_project
+  controller: Projects
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/projects/{project_id}
+  summary: Called by updateCollection(projectId, name)
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body:
+    _model:
+      type: ProjectUpdate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_project_photo_count
+  function_name: update_project_photo_count
+  controller: Projects
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/projects_photos/{table_name}/
+  summary: Called by updateCollectionPhotoCount(table_name)
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: files_failed_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: delete_delete_project
+  function_name: delete_project
+  controller: Projects
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/projects/{project_id}
+  summary: Called by deleteCollection(projectId)
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_mark_project_upload_complete
+  function_name: mark_project_upload_complete
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/project/{project_table_name}/upload_complete/
+  summary: mark_project_upload_complete
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: skipped_file_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_add_project_event
+  function_name: add_project_event
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/projects/{project_table_name}/event
+  summary: Called by sendUploadEvent()
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _model:
+      type: ProjectEvent
+      required: true
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_project_create_upload_report
+  function_name: update_project_create_upload_report
+  controller: Projects
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/project_upload_report/{table_name}/
+  summary: update_project_create_upload_report
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: files_failed_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_search_project_photos
+  function_name: search_project_photos
+  controller: Search
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/search/{project_table_name}/
+  summary: search_project_photos
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: and_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: and_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: or_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: or_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: not_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: not_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: date_min
+    in: query
+    type: Optional[str]
+    required: false
+  - name: date_max
+    in: query
+    type: Optional[str]
+    required: false
+  - name: date_null_and
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: date_null_or
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: date_order
+    in: query
+    type: Optional[str]
+    required: false
+  - name: custom_album_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: best_of_similar_sets_only
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: curated_album_name
+    in: query
+    type: Optional[str]
+    required: false
+  - name: split_by_tier
+    in: query
+    type: Optional[bool]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user
+  function_name: get_user
+  controller: Users
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/users/{user_id}
+  summary: Called by getUser()
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_create_user_and_company
+  function_name: create_user_and_company
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/users/new_company
+  summary: Called by createUser(user)
+  auth: none
+  params: []
+  request_body:
+    _model:
+      type: CompanyCreate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: put_update_user
+  function_name: update_user
+  controller: Users
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/users/{user_id}
+  summary: Called by updateUser(updatedData)
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body:
+    _model:
+      type: UserUpdate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: delete_delete_user
+  function_name: delete_user
+  controller: Users
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/users/delete/{user_id}
+  summary: Called by deleteUser()
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  - name: new_company_owner_id
+    in: query
+    type: int
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_change_password
+  function_name: change_password
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/user/change_password
+  summary: Called by changeUserPassword(changedData)
+  auth: required
+  params: []
+  request_body:
+    _model:
+      type: PasswordChangeRequest
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: post_create_user
+  function_name: create_user
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/users/
+  summary: Called by adminCreateUser(user)
+  auth: required
+  params: []
+  request_body:
+    _model:
+      type: UserCreate
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_all_users_by_company
+  function_name: get_all_users_by_company
+  controller: Users
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/users/company/{company_id}
+  summary: Called by getUsers()
+  auth: required
+  params:
+  - name: company_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - top
+  hidden: false
+  api_host: null
+- id: get_get_project_prelim_model_request_template
+  function_name: get_project_prelim_model_request_template
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/project_outcome/{project_table_name}
+  summary: get_project_prelim_model_request_template
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_upload_photo
+  function_name: upload_photo_to_mediaviz
+  controller: PhotoUpload
+  base_path: /
+  method: POST
+  path: /photo_upload
+  summary: Upload a preprocessed photo with metadata via headers
+  auth: required
+  params:
+  - name: x-bucket-name
+    in: header
+    type: string
+    required: true
+  - name: x-photo-index
+    in: header
+    type: string
+    required: true
+  - name: x-company-id
+    in: header
+    type: string
+    required: true
+  - name: x-user-id
+    in: header
+    type: string
+    required: true
+  - name: x-project-table-name
+    in: header
+    type: string
+    required: true
+  - name: x-client-side-id
+    in: header
+    type: string
+    required: false
+  - name: x-title
+    in: header
+    type: string (original filename)
+    required: true
+  - name: x-blur
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-colors
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-face-recognition
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-classification
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-comparison
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-size
+    in: header
+    type: string (WxH original dimensions)
+    required: false
+  - name: x-source-resolution-x
+    in: header
+    type: string (EXIF x resolution)
+    required: false
+  - name: x-source-resolution-y
+    in: header
+    type: string (EXIF y resolution)
+    required: false
+  - name: x-date-taken
+    in: header
+    type: string (EXIF DateTimeOriginal)
+    required: false
+  - name: x-latitude
+    in: header
+    type: string (EXIF GPS latitude)
+    required: false
+  - name: x-longitude
+    in: header
+    type: string (EXIF GPS longitude)
+    required: false
+  - name: x-resized-dimensions
+    in: header
+    type: string (WxH resized dimensions, present only if image was resized)
+    required: false
+  request_body:
+    file_content:
+      type: string (base64-encoded image)
+      required: true
+    mimetype:
+      type: string (e.g. image/jpeg)
+      required: true
+    file_path:
+      type: string (original filesystem path)
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: photo_upload

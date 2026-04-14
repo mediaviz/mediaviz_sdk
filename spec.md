@@ -35,7 +35,7 @@ mediaviz_sdk/
 
 Reads a ref-list YAML file (e.g., `top_endpoints.yaml`), follows each `$ref` into controller YAML files, extracts the matching endpoint by `id`, and writes a single flattened YAML file. During flattening, path placeholders with type converters (e.g. `{directory:path}`) are normalized to `{directory}`, and any corresponding params are promoted to `in: path`.
 
-**Input:** Path to a ref-list YAML, path to the controllers directory.
+**Input:** Path to a ref-list YAML. Optionally, a controllers base directory for resolving `$ref` file paths (when refs point to files outside the ref-list YAML's directory).
 
 **Output:** A flattened YAML file written to `sdk_files/v{N}/resolved_{ref_list_name}.yaml`, packaged alongside the generated SDK files.
 
@@ -136,18 +136,20 @@ python generate.py \
 **Flags:**
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--endpoints` | yes | Path to ref-list YAML file |
-| `--controllers` | yes | Path to controllers directory |
+| `--endpoints` | yes | Path to ref-list YAML file. Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
+| `--controllers` | yes | Path to controllers directory. Parent of this path is used as the base for resolving `$ref` file paths. |
 | `--oauth-sdk` | yes | Path to OAuth SDK root (contains `javascript/`, `php/`, `python/` subdirectories) |
 | `--frameworks` | no | Comma-separated list of frameworks to generate. Default: all registered. |
+| `--destination-dir` | no | Output folder name in package root. Created if it doesn't exist. Default: `sdk_files`. |
 
-Output is always written to `./sdk_files/` (static, not configurable).
+Output is written to the folder specified by `--destination-dir` (default `./sdk_files/`). Versioning and archiving behavior is identical regardless of destination.
 
 **Run sequence:**
 1. Determine next version number by scanning `sdk_files/` for `v{N}` directories
 2. Archive all existing `sdk_files/v{N}` directories to `sdk_files/archive/v{N}`
-3. Resolve endpoints via `resolver.py`, write flattened YAML to `sdk_files/v{N}/resolved_{name}.yaml`
-4. For each requested framework:
+3. Resolve refs: endpoint refs (contain `#`) are resolved into flattened endpoints; composite refs (no `#`) are collected as file paths
+4. If composites are present, resolve composite files and validate that every composite step endpoint exists in the endpoint list (fail if not)
+5. For each requested framework:
    a. Instantiate generator
    b. Create `sdk_files/v{N}/{framework}/`
    c. Call `copy_auth_wrapper()` to bundle OAuth SDK source
@@ -156,103 +158,128 @@ Output is always written to `./sdk_files/` (static, not configurable).
 
 ## Generated SDK Shape
 
-### Per-Controller File
+### Client Class (`MediaViz.js` / `MediaVizClient.php`)
 
-Each controller gets its own file (e.g., `photos.js`, `Photos.php`). Functions within map 1:1 to endpoints.
+The SDK entry point is a single client class. All OAuth setup, token lifecycle, and host routing is handled internally. Users interact with controller namespaces on the client instance.
 
-**JavaScript (browser) example — `photos.js`:**
+**JavaScript usage:**
 ```javascript
-import { OAuthClient } from './oauth/index.js';
+import { MediaViz } from '@mediaviz/sdk';
 
-export function getPhotosSort(client, accessToken, refreshToken, tableName, sortOrder, { limit, lastId } = {}) {
-  let path = `/api/v1/photos/${encodeURIComponent(tableName)}/sort/${encodeURIComponent(sortOrder)}/`;
-  const query = new URLSearchParams();
-  if (limit !== undefined) query.set('limit', limit);
-  if (lastId !== undefined) query.set('last_id', lastId);
-  const qs = query.toString();
-  if (qs) path += '?' + qs;
-  return client.request(path, 'GET', accessToken, refreshToken);
-}
+// Client credentials (server-to-server)
+const mv = new MediaViz({ onTokenRefresh: (t) => saveTokens(t) });
+await mv.authenticate();
+const photos = await mv.photos.getAllProjectPhotoIds(tableName, { limit: 10 });
+await mv.photoUpload.uploadPhoto(projectTableName, companyId, userId, 0, photo);
 
-export function getPhotos(client, accessToken, refreshToken, tableName) {
-  const path = `/api/v1/photos/${encodeURIComponent(tableName)}/`;
-  return client.request(path, 'GET', accessToken, refreshToken);
-}
-// ...
+// PKCE (browser)
+const mv = new MediaViz({ redirectUri: 'https://app.com/cb' });
+const { url, codeVerifier } = await mv.getAuthorizationUrl();
+// ...after redirect callback...
+await mv.handleCallback(code, codeVerifier);
+const photos = await mv.photos.getAllProjectPhotoIds(tableName);
+
+// Seed with existing tokens
+const mv = new MediaViz({ accessToken: saved.at, refreshToken: saved.rt });
 ```
 
-**JavaScript (Node.js) example — same code, ESM module format.** The Rollup build step in the browser variant produces UMD from it.
+**PHP usage:**
+```php
+$mv = new \MediaVizSdk\MediaVizClient(['onTokenRefresh' => fn($t) => saveTokens($t)]);
+$mv->authenticate();
+$photos = $mv->photos->getAllProjectPhotoIds($tableName, limit: 10);
+```
+
+**Constructor config (all optional):**
+| Key | Env var fallback | Description |
+|-----|------------------|-------------|
+| `clientId` | `MEDIAVIZ_CLIENT_ID` | OAuth client ID |
+| `clientSecret` | `MEDIAVIZ_CLIENT_SECRET` | OAuth client secret |
+| `baseUrl` | `MEDIAVIZ_BASE_URL` | API base URL (default: `https://api.mediaviz.com`) |
+| `redirectUri` | `MEDIAVIZ_REDIRECT_URI` | PKCE redirect URI |
+| `hosts.photoUpload` | `MEDIAVIZ_PHOTO_UPLOAD_URL` | Alt-host URL for photo upload service |
+| `accessToken` | — | Seed access token |
+| `refreshToken` | — | Seed refresh token |
+| `onTokenRefresh` | — | Callback `(tokens) => void` fired on automatic token refresh |
+
+**Auth lifecycle methods:**
+| Method | Purpose |
+|--------|---------|
+| `authenticate()` | Client credentials grant — gets tokens automatically |
+| `getAuthorizationUrl(state?)` | Returns `{ url, state, codeVerifier }` for PKCE redirect |
+| `handleCallback(code, codeVerifier)` | Exchanges auth code for tokens after PKCE redirect |
+| `setTokens(accessToken, refreshToken)` | Manually seed tokens |
+
+**Token refresh:** A `_TokenTrackingClient` proxy wraps `OAuthClient` and intercepts `request()` responses. When the OAuth client auto-refreshes on 401, the proxy updates the stored tokens and fires the `onTokenRefresh` callback.
+
+### Per-Controller File
+
+Each controller gets its own file (e.g., `photos.js`, `Photos.php`) exporting a class. Methods map 1:1 to endpoints. All auth, token, and host resolution is handled via an internal `_Context` object — user-facing method signatures contain only business parameters.
+
+**JavaScript example — `photos.js`:**
+```javascript
+export class Photos {
+  constructor(ctx) { this._ctx = ctx; }
+
+  async getAllProjectPhotoIds(tableName, { ascOrDesc, lastId, limit } = {}) {
+    this._ctx.requireTokens();
+    let path = `/api/v1/photos/${encodeURIComponent(tableName)}/`;
+    const query = new URLSearchParams();
+    if (ascOrDesc !== undefined) query.set('asc_or_desc', ascOrDesc);
+    if (lastId !== undefined) query.set('last_id', lastId);
+    if (limit !== undefined) query.set('limit', limit);
+    const qs = query.toString();
+    if (qs) path += '?' + qs;
+    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
+    return data;
+  }
+}
+```
 
 **PHP example — `Photos.php`:**
 ```php
-<?php
-declare(strict_types=1);
-namespace MediaVizSdk;
-
 class Photos {
-    private \OAuthSdk\OAuthClient $client;
+    private object $ctx;
 
-    public function __construct(\OAuthSdk\OAuthClient $client) {
-        $this->client = $client;
+    public function __construct(object $ctx) {
+        $this->ctx = $ctx;
     }
 
-    public function getPhotosSort(
-        string $accessToken,
-        string $refreshToken,
+    public function getAllProjectPhotoIds(
         string $tableName,
-        string $sortOrder,
-        ?int $limit = null,
-        ?int $lastId = null
-    ): \OAuthSdk\AuthenticatedResponse {
-        $path = "/api/v1/photos/" . urlencode($tableName) . "/sort/" . urlencode($sortOrder) . "/";
-        $query = [];
-        if ($limit !== null) $query['limit'] = $limit;
-        if ($lastId !== null) $query['last_id'] = $lastId;
-        if ($query) $path .= '?' . http_build_query($query);
-        return $this->client->request($path, 'GET', $accessToken, $refreshToken);
+        ?string $ascOrDesc = null,
+        ?int $lastId = null,
+        ?int $limit = null
+    ): mixed {
+        $this->ctx->requireTokens();
+        // ...path, query, request...
+        return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
     }
-    // ...
 }
 ```
 
-**Unauthenticated endpoint example (JS, JSON body):**
+**Alt-host endpoints** resolve their base URL from context instead of requiring user input:
 ```javascript
-export async function createUsersNewCompany(baseUrl, { name, email, password, accountType, companyId, profilePicture, companyName }) {
-  const resp = await fetch(baseUrl + '/api/v1/users/new_company', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user: { name, email, password, account_type: accountType, company_id: companyId, profile_picture: profilePicture },
-      company: { name: companyName }
-    })
-  });
-  return resp.json();
+async uploadPhotoToMediaviz(bucketName, photoIndex, ...) {
+  this._ctx.requireTokens();
+  const baseUrl = this._ctx.requireHost('photoUpload');
+  // ...fetch(baseUrl + path, ...)
 }
 ```
 
-**Unauthenticated endpoint example (JS, form-urlencoded body):**
+Alt-host endpoints use direct `fetch` (JS) / `curl` (PHP) with `this._ctx.accessToken` in the `Authorization` header. They do **not** go through the OAuth client's `request()` method, so there is no automatic 401-retry/token-refresh for these calls. This is intentional: alt-host services (e.g., the photo upload service) are separate from the core API and may not support the same token refresh flow.
 
-When an endpoint's `content_type` is `application/x-www-form-urlencoded`, the generator uses `URLSearchParams` (JS) or `http_build_query` (PHP) instead of JSON serialization:
-```javascript
-export async function getAccessTokenLogin(baseUrl, { username, password }) {
-  const resp = await fetch(baseUrl + `/api/v1/token/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ username, password }).toString(),
-  });
-  return handleResponse(resp);
-}
-```
+**Unauthenticated endpoints** use `this._ctx.baseUrl` and do not call `requireTokens()`.
 
 ### Barrel/Index File
 
-Each version directory gets an index file that re-exports all controller modules:
+Re-exports the `MediaViz` class and all controller classes:
 
 ```javascript
-// index.js
+export { MediaViz } from './MediaViz.js';
+export * from './errors.js';
 export * from './photos.js';
 export * from './projects.js';
-export * from './users.js';
 // ...
 ```
 
@@ -318,9 +345,96 @@ All responses include an `x-request-id` header for tracing.
 
 Full error class implementations and consumer usage examples are in `errors.md`.
 
+## Composite Functions
+
+Composites are multi-step SDK functions that chain 2+ endpoint calls, with intermediate data flow and optional caching. They are defined in YAML config files in the `api-docs/composites/` directory and referenced via a ref-list (`composites.yaml`).
+
+### Config Format (`api-docs/composites/*.yaml`)
+
+```yaml
+id: composite_upload_photo
+function_name: upload_photo
+summary: "Fetch upload template (cached per project), then upload a single photo"
+controller: PhotoUpload        # groups into photoupload.js / Photoupload.php
+auth: required
+params:                        # top-level args the caller passes
+  - name: project_table_name
+    type: str
+    required: true
+  - name: photo_index
+    type: int
+    required: true
+  - name: photo
+    type: object
+    required: true
+steps:
+  - step_id: get_template
+    ref: "controllers/project.yaml#endpoint_id"
+    execution: once
+    cache:
+      enabled: true
+      key: "params.project_table_name"
+    input_map:
+      project_table_name: "params.project_table_name"
+    output_as: template
+  - step_id: upload
+    ref: "photo_upload/photo_upload.yaml#post_upload_photo"
+    execution: once
+    output_as: upload_result
+    input_map:
+      x-bucket-name: "steps.template.bucket_name"
+      x-photo-index: "params.photo_index"
+      x-title: "params.photo.title"
+      file_content: "params.photo.file_content"
+returns: "steps.upload_result"
+```
+
+### Key Schema Fields
+
+| Field | Purpose |
+|---|---|
+| `steps[].ref` | Points to existing endpoint (same format as top_endpoints refs) |
+| `steps[].execution` | `once` or `for_each` |
+| `steps[].cache` | Static/module-level cache — `key` is a dot-path expression for the cache key |
+| `steps[].input_map` | Maps endpoint params to dot-path expressions: `params.*`, `params.<obj>.<prop>`, `steps.<id>.*` |
+| `steps[].output_as` | Name to store step response under for later steps |
+| `steps[].on_error` | `abort` (throw), `continue` (skip), `collect` (accumulate errors alongside results) |
+
+### Resolver
+
+`resolve_composites()` reads the composites ref-list, resolves each step's endpoint `ref` through the existing `parse_ref()` + controller lookup, and embeds the flattened endpoint data inline into each step. The resolved output is written to `resolved_composites.yaml`.
+
+### Generator Behavior
+
+- **Grouping:** Composites declare a `controller` field and are appended to that controller's output file
+- **Cross-controller imports:** If a composite step calls an endpoint from a different controller, the generator adds the necessary import (JS) or inlines the call (PHP)
+- **Once steps:** Call the existing generated function (hybrid approach). If cache is enabled, wrap in a static `Map` (JS) or instance-property array (PHP)
+- **For-each steps:** Loop over the array. Inline the HTTP call when intermediate data flow requires it (e.g., passing cached template values as headers). Otherwise call the generated function
+- **On-error modes:** `abort` throws immediately; `collect` wraps in try/catch and returns `{ results, errors }`
+- **Nested param expressions:** `params.<obj>.<prop>` resolves to property access (JS: `obj.prop`, PHP: `$obj['prop']`)
+- **Alt-host endpoints:** When a composite includes alt-host steps, `baseUrl` is added to the function signature
+
+### Inclusion
+
+Composites are listed in the same ref-list YAML as endpoints. Refs containing `#` are endpoints; refs without `#` are composite file paths:
+
+```yaml
+refs:
+  - ref: "controllers/project.yaml#get_get_project_prelim_model_request_template"
+  - ref: "photo_upload/photo_upload.yaml#post_upload_photo"
+  - ref: "composites/upload_photos.yaml"
+```
+
+No separate CLI flag is needed — composites are included by adding them to the `--endpoints` ref-list.
+
+### Endpoint Validation
+
+Every endpoint referenced by a composite's steps must also be present in the same ref-list as an endpoint ref. If any step references an endpoint not in the list, generation aborts with an error listing each missing endpoint by composite ID, step ID, and endpoint ID. This prevents silent inconsistencies where the SDK contains composite functions that call endpoints not included in the build.
+
 ## Constraints
 
 - All generated code is read-only by convention. Manual edits go into a separate layer (not covered by this spec).
 - Previous version directories are archived to `sdk_files/archive/` when a new version is generated. Archived versions are never modified or deleted.
+- When adding a new framework generator, the project `.gitignore` must be updated to ignore that framework's dependency/install directories (e.g., `node_modules/` for JS, `vendor/` for PHP). This prevents committed generated SDKs from including third-party dependency trees.
 - The resolved YAML is the source of truth for what was generated in a given version — it is an immutable snapshot, packaged inside the version directory.
 - No runtime dependencies beyond the bundled OAuth SDK and the language's standard HTTP primitives (`fetch` for JS, `curl` for PHP).
