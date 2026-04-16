@@ -52,33 +52,33 @@ def test_snake_to_camel(gen):
     assert gen.snake_to_camel("create_users_new_company") == "createUsersNewCompany"
 
 
-# ── authenticated function emission ───────────────────────────────────────────
+# ── authenticated method emission ─────────────────────────────────────────────
 
 
-def test_auth_fn_no_params(gen):
+def test_auth_method_no_params(gen):
     ep = _auth_ep("get_status", "/api/v1/status")
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "export async function getStatus(client, accessToken, refreshToken)" in src
-    assert "const { data } = await client.request" in src
+    assert "async getStatus()" in src
+    assert "this._ctx.requireTokens();" in src
+    assert "const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);" in src
     assert "return data;" in src
-    assert "'GET'" in src
 
 
-def test_auth_fn_path_params(gen):
+def test_auth_method_path_params(gen):
     ep = _auth_ep(
         "get_photos",
         "/api/v1/photos/{table_name}/",
         params=[{"name": "table_name", "in": "path", "type": "string", "required": True}],
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "tableName" in src
+    assert "async getPhotos(tableName)" in src
     assert "encodeURIComponent(tableName)" in src
-    assert "await client.request(path, 'GET', accessToken, refreshToken)" in src
+    assert "await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken)" in src
 
 
-def test_auth_fn_query_params(gen):
+def test_auth_method_query_params(gen):
     ep = _auth_ep(
         "get_photos_sort",
         "/api/v1/photos/{table_name}/sort/{sortOrder}/",
@@ -89,16 +89,16 @@ def test_auth_fn_query_params(gen):
             {"name": "last_id", "in": "query", "type": "integer", "required": False},
         ],
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "export async function getPhotosSort(client, accessToken, refreshToken, tableName, sortOrder, { limit, lastId } = {})" in src
+    assert "async getPhotosSort(tableName, sortOrder, { limit, lastId } = {})" in src
     assert "query.set('limit', limit)" in src
     assert "query.set('last_id', lastId)" in src
     assert "URLSearchParams" in src
-    assert "if (qs) path +=" in src
+    assert "if (qs) path += '?' + qs;" in src
 
 
-def test_auth_fn_dynamic_body(gen):
+def test_auth_method_dynamic_body(gen):
     ep = _auth_ep(
         "update_projects",
         "/api/v1/projects/{project_id}",
@@ -106,14 +106,14 @@ def test_auth_fn_dynamic_body(gen):
         params=[{"name": "project_id", "in": "path", "type": "integer", "required": True}],
         request_body="varies by caller: name, directory, or thumbnail",
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "body = {}" in src
+    assert "async updateProjects(projectId, body = {})" in src
     assert "JSON.stringify(body)" in src
-    assert "await client.request(path, 'PUT', accessToken, refreshToken, JSON.stringify(body))" in src
+    assert "await this._ctx.client.request(path, 'PUT', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body))" in src
 
 
-def test_auth_fn_structured_body(gen):
+def test_auth_method_structured_body(gen):
     ep = _auth_ep(
         "create_projects_event",
         "/api/v1/projects/{project_table_name}/event",
@@ -124,17 +124,17 @@ def test_auth_fn_structured_body(gen):
             "detail": {"type": "string", "required": True},
         },
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "{ event, detail }" in src
+    assert "async createProjectsEvent(projectTableName, { event, detail })" in src
     assert "JSON.stringify({ event, detail })" in src
-    assert "await client.request(path, 'POST', accessToken, refreshToken, JSON.stringify({ event, detail }))" in src
+    assert "await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify({ event, detail }))" in src
 
 
-# ── unauthenticated function emission ─────────────────────────────────────────
+# ── unauthenticated method emission ───────────────────────────────────────────
 
 
-def test_unauth_fn_structured_body(gen):
+def test_unauth_method_structured_body(gen):
     ep = _unauth_ep(
         "create_token",
         "/api/v1/token/",
@@ -144,19 +144,16 @@ def test_unauth_fn_structured_body(gen):
             "password": {"type": "string", "required": True},
         },
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "createToken" in src
-    assert "{ username, password }" in src
-    assert "username" in src
-    assert "password" in src
-    assert "JSON.stringify" in src
-    assert "fetch(baseUrl +" in src
-    assert "'POST'" in src
+    assert "async createToken({ username, password })" in src
+    assert "fetch(this._ctx.baseUrl +" in src
+    assert "method: 'POST'," in src
+    assert "JSON.stringify({ username, password })" in src
     assert "handleResponse(resp)" in src
 
 
-def test_unauth_fn_dynamic_body(gen):
+def test_unauth_method_dynamic_body(gen):
     ep = _unauth_ep(
         "update_users",
         "/api/v1/users/{user_id}",
@@ -164,22 +161,23 @@ def test_unauth_fn_dynamic_body(gen):
         params=[{"name": "user_id", "in": "path", "type": "integer", "required": True}],
         request_body="dynamic (updatedData object)",
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "export async function updateUsers(baseUrl, userId, body = {})" in src
+    assert "async updateUsers(userId, body = {})" in src
+    assert "fetch(this._ctx.baseUrl +" in src
+    assert "method: 'PUT'," in src
     assert "JSON.stringify(body)" in src
 
 
-def test_unauth_fn_no_body(gen):
+def test_unauth_method_no_body(gen):
     ep = _unauth_ep("get_public_status", "/api/v1/status")
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "export async function getPublicStatus(baseUrl)" in src
-    assert "fetch(baseUrl +" in src
-    assert "'GET'" in src
+    assert "async getPublicStatus()" in src
+    assert "fetch(this._ctx.baseUrl + `/api/v1/status`, { method: 'GET' })" in src
 
 
-def test_unauth_fn_form_urlencoded(gen):
+def test_unauth_method_form_urlencoded(gen):
     ep = _unauth_ep(
         "create_token",
         "/api/v1/token/",
@@ -190,7 +188,7 @@ def test_unauth_fn_form_urlencoded(gen):
         },
         content_type="application/x-www-form-urlencoded",
     )
-    lines = gen._emit_function(ep)
+    lines = gen._emit_method(ep)
     src = "\n".join(lines)
     assert "application/x-www-form-urlencoded" in src
     assert "new URLSearchParams" in src
@@ -215,6 +213,7 @@ def test_generate_output_structure(gen, tmp_path):
     assert (tmp_path / "photos.js").exists()
     assert (tmp_path / "index.js").exists()
     assert (tmp_path / "rollup.config.js").exists()
+    assert (tmp_path / "MediaViz.js").exists()
 
 
 def test_barrel_index_exports(gen, tmp_path):
@@ -225,6 +224,8 @@ def test_barrel_index_exports(gen, tmp_path):
     gen.generate(endpoints, str(tmp_path))
     index_src = (tmp_path / "index.js").read_text()
     assert "export * from './photos.js';" in index_src
+    assert "export { MediaViz } from './MediaViz.js';" in index_src
+    assert "export * from './errors.js';" in index_src
 
 
 def test_controller_with_spaces_produces_underscored_filename(gen, tmp_path):
@@ -237,27 +238,21 @@ def test_controller_with_spaces_produces_underscored_filename(gen, tmp_path):
     assert "export * from './curated_albums.js';" in index_src
 
 
-def test_oauth_import_only_for_auth(gen, tmp_path):
-    auth_endpoints = [_auth_ep("get_photos", "/api/v1/photos/")]
-    gen.generate(auth_endpoints, str(tmp_path))
+def test_oauth_import_lives_in_mediaviz_not_controllers(gen, tmp_path):
+    """OAuthClient is imported by the top-level MediaViz client, not by per-controller files."""
+    gen.generate([_auth_ep("get_photos", "/api/v1/photos/")], str(tmp_path))
     photos_src = (tmp_path / "photos.js").read_text()
-    assert "import { OAuthClient }" in photos_src
+    mv_src = (tmp_path / "MediaViz.js").read_text()
+    assert "import { OAuthClient }" not in photos_src
+    assert "import { OAuthClient }" in mv_src
 
 
 def test_oauth_import_uses_reexport_when_module_registered(gen, tmp_path):
+    """When an oauth module is registered, MediaViz.js imports from the _oauth.js facade."""
     gen._copied_modules.append({"name": "oauth", "path": str(tmp_path / "oauth")})
     gen.generate([_auth_ep("get_photos", "/api/v1/photos/")], str(tmp_path))
-    photos_src = (tmp_path / "photos.js").read_text()
-    assert "import { OAuthClient } from './_oauth.js';" in photos_src
-
-
-def test_no_oauth_import_for_unauth(gen, tmp_path):
-    unauth_ep = _unauth_ep("get_public", "/api/v1/public")
-    # Override controller to "Photos" so it writes to photos.js
-    unauth_ep["controller"] = "Photos"
-    gen.generate([unauth_ep], str(tmp_path))
-    photos_src = (tmp_path / "photos.js").read_text()
-    assert "import { OAuthClient }" not in photos_src
+    mv_src = (tmp_path / "MediaViz.js").read_text()
+    assert "from './_oauth.js'" in mv_src
 
 
 def test_rollup_config_content(gen, tmp_path):

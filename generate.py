@@ -6,14 +6,14 @@ import sys
 from generators import discover_generators
 from github_sources import fetch_sources, resolve_flow_path
 from resolver import (
-    resolve_refs, resolve_composite_files, validate_composite_endpoints,
+    load_schemas, resolve_refs, resolve_composite_files, validate_composite_endpoints,
     write_flattened_yaml, write_flattened_composites_yaml,
 )
 from test_generators import discover_test_generators
 from test_generators.base import TestResult
-from versioning import get_next_version
+from versioning import get_next_version, version_str
 
-SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk_files")
+SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk")
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,7 +21,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--endpoints", required=True, help="Flow name in common_flows/sdk_endpoints (e.g. 'basic_sdk_flow_endpoints')")
     p.add_argument("--branch", default=None, help="Git branch to use for all source repos. Falls back to main if not found.")
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
-    p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk_files.")
+    p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk.")
+    bump = p.add_mutually_exclusive_group()
+    bump.add_argument("--minor-version", action="store_true", help="Increment minor version and reset iteration to 0.")
+    bump.add_argument("--major-version", action="store_true", help="Increment major version and reset minor+iteration to 0.")
     return p.parse_args()
 
 
@@ -89,18 +92,25 @@ def main() -> None:
         oauth_sdk_root = sources.oauth_sdk_root
         controllers_dir = sources.controllers_dir
 
-        version = get_next_version(output_dir)
+        bump = "major" if args.major_version else "minor" if args.minor_version else "iteration"
+        version = get_next_version(output_dir, bump)
         archive_existing_versions(output_dir)
 
-        version_dir = os.path.join(output_dir, f"v{version}")
+        ver = version_str(*version)
+        version_dir = os.path.join(output_dir, f"v{ver}")
 
-        endpoints, composite_paths = resolve_refs(endpoints_path, controllers_dir=controllers_dir)
+        schemas = load_schemas(sources.schemas_path)
+        endpoints, composite_paths = resolve_refs(
+            endpoints_path, controllers_dir=controllers_dir, schemas=schemas,
+        )
         resolved_path = write_flattened_yaml(endpoints, endpoints_path, version_dir)
         print(f"Resolved {len(endpoints)} endpoints → {resolved_path}")
 
         composites = None
         if composite_paths:
-            composites = resolve_composite_files(composite_paths, controllers_dir=controllers_dir)
+            composites = resolve_composite_files(
+                composite_paths, controllers_dir=controllers_dir, schemas=schemas,
+            )
             try:
                 validate_composite_endpoints(composites, endpoints)
             except ValueError as e:
@@ -118,7 +128,7 @@ def main() -> None:
             gen.generate(endpoints, fw_dir, composites=composites)
             file_counts[framework] = sum(len(files) for _, _, files in os.walk(fw_dir))
 
-        print(f"\nSDK v{version} generated:")
+        print(f"\nSDK v{ver} generated:")
         for fw, count in file_counts.items():
             print(f"  {fw}: {count} file(s) → {os.path.join(version_dir, fw)}")
 

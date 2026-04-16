@@ -18,6 +18,7 @@ class TestResult:
 # Deterministic test values per YAML type string
 TEST_VALUES: dict[str, object] = {
     "string": "test_value",
+    "str": "test_value",
     "integer": 42,
     "int": 42,
     "boolean": True,
@@ -25,11 +26,19 @@ TEST_VALUES: dict[str, object] = {
     "number": 3.14,
     "float": 3.14,
     "array": ["item1", "item2"],
+    "datetime": "2024-01-01T00:00:00Z",
+    "date": "2024-01-01",
+    "emailstr": "user@example.com",
+    "EmailStr": "user@example.com",
+    "UUID": "00000000-0000-0000-0000-000000000000",
+    "bytes": "test_bytes",
+    "Dict": {"k": "v"},
 }
 
 # Values chosen to exercise URL encoding
 ENCODING_TEST_VALUES: dict[str, object] = {
     "string": "hello world",
+    "str": "hello world",
     "integer": 42,
     "int": 42,
     "boolean": True,
@@ -37,6 +46,13 @@ ENCODING_TEST_VALUES: dict[str, object] = {
     "number": 3.14,
     "float": 3.14,
     "array": ["item1", "item2"],
+    "datetime": "2024-01-01T00:00:00Z",
+    "date": "2024-01-01",
+    "emailstr": "hello world@example.com",
+    "EmailStr": "hello world@example.com",
+    "UUID": "00000000-0000-0000-0000-000000000000",
+    "bytes": "hello bytes",
+    "Dict": {"k": "v"},
 }
 
 
@@ -94,6 +110,34 @@ class BaseTestGenerator(ABC):
         return "?" + urlencode(pairs)
 
     @staticmethod
-    def _is_model_body(body: dict) -> bool:
-        """Check if request_body uses the _model convention (body IS the model, not wrapped)."""
-        return list(body.keys()) == ["_model"]
+    def _body_shape(request_body) -> str | None:
+        """Mirror of BaseGenerator._body_shape for test fixture construction."""
+        if request_body is None:
+            return None
+        if isinstance(request_body, dict):
+            shape = request_body.get("_shape")
+            if shape in ("scalar", "expanded"):
+                return shape
+            return "flat_dict"
+        return "generic"
+
+    @staticmethod
+    def _expanded_fields(request_body: dict) -> list[dict]:
+        return request_body.get("fields", [])
+
+    @staticmethod
+    def _order_expanded_fields(fields: list[dict]) -> list[dict]:
+        required = [f for f in fields if f.get("required")]
+        optional = [f for f in fields if not f.get("required")]
+        return required + optional
+
+    @staticmethod
+    def _expanded_top_level_keys(fields: list[dict]) -> list[str]:
+        """Unique first-segment snake keys across all field orig_paths (preserving order)."""
+        seen: list[str] = []
+        for f in fields:
+            path = f.get("orig_path") or [f["snake"]]
+            first = path[0]
+            if first not in seen:
+                seen.append(first)
+        return seen

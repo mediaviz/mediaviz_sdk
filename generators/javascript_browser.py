@@ -5,6 +5,21 @@ import re
 from .base import BaseGenerator
 from naming import snake_to_camel as _snake_to_camel
 
+# Reserved words that cannot be used as JS parameter names in strict/module mode.
+_JS_RESERVED = {
+    "break", "case", "catch", "class", "const", "continue", "debugger", "default",
+    "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for",
+    "function", "if", "import", "in", "instanceof", "new", "null", "return", "super",
+    "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with",
+    "yield", "let", "static", "implements", "interface", "package", "private",
+    "protected", "public", "await",
+}
+
+
+def _js_safe(name: str) -> str:
+    """Escape JS reserved words by appending an underscore suffix."""
+    return name + "_" if name in _JS_RESERVED else name
+
 
 class JavaScriptBrowserGenerator(BaseGenerator):
     framework_name = "javascript"
@@ -186,6 +201,11 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
     def emit_controller_file(self, controller: str, endpoints: list[dict], filepath: str, composites: list[dict] | None = None) -> None:
         needs_errors = any(ep.get("auth") != "required" or ep.get("api_host") for ep in endpoints)
+        needs_strip = any(self._body_shape(ep.get("request_body")) == "expanded" for ep in endpoints)
+        for comp in (composites or []):
+            for step in comp.get("steps", []):
+                if self._body_shape(step.get("endpoint", {}).get("request_body")) == "expanded":
+                    needs_strip = True
         # cross-controller imports needed by composites
         cross_imports: dict[str, list[str]] = {}  # filename -> [class_names]
         for comp in (composites or []):
@@ -205,6 +225,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         for js_file, cls_list in sorted(cross_imports.items()):
             lines.append(f"import {{ {', '.join(sorted(set(cls_list)))} }} from './{js_file}';")
         if needs_errors or cross_imports:
+            lines.append("")
+        if needs_strip:
+            lines.append("function stripUndef(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }")
             lines.append("")
         # detect if any composite uses caching
         has_caches = any(
@@ -465,14 +488,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         request_body = ep.get("request_body")
 
         sig_parts = list(path_args)
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            sig_parts.append("body")
-        elif isinstance(request_body, dict):
-            fields = self._flatten_body(request_body)
-            param_names = [camel for _, camel in fields]
-            sig_parts.append("{ " + ", ".join(param_names) + " }")
-        elif request_body:
-            sig_parts.append("body = {}")
+        sig_parts.extend(self._js_body_sig_tokens(request_body))
         if query_params:
             q_names = [self.snake_to_camel(p["name"]) for p in query_params]
             sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
@@ -492,22 +508,12 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         else:
             lines.append(f"    const path = {tmpl};")
 
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body));")
-        elif isinstance(request_body, dict):
-            fields = self._flatten_body(request_body)
-            field_strs = []
-            for snake_key, camel_param in fields:
-                if snake_key == camel_param:
-                    field_strs.append(camel_param)
-                else:
-                    field_strs.append(f"{snake_key}: {camel_param}")
-            body_arg = "{ " + ", ".join(field_strs) + " }"
-            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify({body_arg}));")
-        elif request_body:
-            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body));")
-        else:
+        preamble, body_expr = self._js_body_build(request_body, "application/json", "    ")
+        lines.extend(preamble)
+        if body_expr is None:
             lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken);")
+        else:
+            lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken, {body_expr});")
         lines.append("    return data;")
         lines.append("  }")
         return lines
@@ -517,55 +523,18 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         path_args = [self.snake_to_camel(p["name"]) for p in path_params]
         request_body = ep.get("request_body")
         content_type = ep.get("content_type") or "application/json"
-        is_form = content_type == "application/x-www-form-urlencoded"
 
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            sig_parts = list(path_args) + ["body"]
+        if request_body:
+            sig_parts = list(path_args)
+            sig_parts.extend(self._js_body_sig_tokens(request_body))
             lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
             tmpl = self._path_template(ep["path"], path_params)
+            preamble, body_expr = self._js_body_build(request_body, content_type, "    ")
+            lines.extend(preamble)
             lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
             lines.append(f"      method: '{method}',")
             lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
-            if is_form:
-                lines.append("      body: new URLSearchParams(body).toString(),")
-            else:
-                lines.append("      body: JSON.stringify(body),")
-            lines.append("    });")
-            lines.append("    return handleResponse(resp);")
-        elif isinstance(request_body, dict):
-            fields = self._flatten_body(request_body)
-            param_names = [camel for _, camel in fields]
-            sig_parts = list(path_args) + ["{ " + ", ".join(param_names) + " }"]
-            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
-            tmpl = self._path_template(ep["path"], path_params)
-            lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
-            lines.append(f"      method: '{method}',")
-            lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
-            field_strs = []
-            for snake_key, camel_param in fields:
-                if snake_key == camel_param:
-                    field_strs.append(f"        {camel_param}")
-                else:
-                    field_strs.append(f"        {snake_key}: {camel_param}")
-            if is_form:
-                lines.append("      body: new URLSearchParams({")
-            else:
-                lines.append("      body: JSON.stringify({")
-            lines.append(",\n".join(field_strs))
-            lines.append("      }).toString(),") if is_form else lines.append("      }),")
-            lines.append("    });")
-            lines.append("    return handleResponse(resp);")
-        elif request_body:
-            sig_parts = list(path_args) + ["body = {}"]
-            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
-            tmpl = self._path_template(ep["path"], path_params)
-            lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
-            lines.append(f"      method: '{method}',")
-            lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
-            if is_form:
-                lines.append("      body: new URLSearchParams(body).toString(),")
-            else:
-                lines.append("      body: JSON.stringify(body),")
+            lines.append(f"      body: {body_expr},")
             lines.append("    });")
             lines.append("    return handleResponse(resp);")
         else:
@@ -606,13 +575,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         sig_parts = list(path_args)
         for p in required_headers:
             sig_parts.append(self.header_to_param(p["name"]))
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            sig_parts.append("body")
-        elif isinstance(request_body, dict):
-            fields = self._flatten_body(request_body)
-            sig_parts.append("{ " + ", ".join(camel for _, camel in fields) + " }")
-        elif request_body:
-            sig_parts.append("body = {}")
+        sig_parts.extend(self._js_body_sig_tokens(request_body))
         if optional_headers:
             opt_names = [self.header_to_param(p["name"]) for p in optional_headers]
             sig_parts.append("{ " + ", ".join(opt_names) + " } = {}")
@@ -652,21 +615,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             fetch_url = f"baseUrl + {tmpl}"
 
         # Build fetch call
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            body_str = "JSON.stringify(body)"
-        elif isinstance(request_body, dict):
-            fields = self._flatten_body(request_body)
-            field_strs = []
-            for snake_key, camel_param in fields:
-                if snake_key == camel_param:
-                    field_strs.append(camel_param)
-                else:
-                    field_strs.append(f"{snake_key}: {camel_param}")
-            body_str = "JSON.stringify({ " + ", ".join(field_strs) + " })"
-        elif request_body:
-            body_str = "JSON.stringify(body)"
-        else:
-            body_str = None
+        preamble, body_str = self._js_body_build(request_body, content_type, "    ")
+        lines.extend(preamble)
 
         lines.append(f"    const resp = await fetch({fetch_url}, {{")
         lines.append(f"      method: '{method}',")
@@ -777,7 +727,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 mapped = input_map.get(p["name"])
                 if mapped:
                     val = self._resolve_js_expr(mapped, comp)
-                    lines.append(f"{indent}if ({val} !== undefined) _q.set('{p['name']}', {val});")
+                    lines.append(f"{indent}if ({self._optional_check_expr(val)}) _q.set('{p['name']}', {val});")
             lines.append(f"{indent}const _qs = _q.toString();")
             lines.append(f"{indent}if (_qs) _path += '?' + _qs;")
             path_ref = "_path"
@@ -827,11 +777,11 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 mapped = input_map.get(p["name"])
                 if mapped:
                     val = self._resolve_js_expr(mapped, comp)
-                    lines.append(f"{indent}if ({val} !== undefined) _headers_{var}['{p['name']}'] = String({val});")
+                    lines.append(f"{indent}if ({self._optional_check_expr(val)}) _headers_{var}['{p['name']}'] = String({val});")
 
         # build body
         body_str = None
-        if isinstance(request_body, dict) and not self._is_model_body(request_body):
+        if self._body_shape(request_body) == "flat_dict":
             fields = self._flatten_body(request_body)
             field_strs = []
             for snake_key, _ in fields:
@@ -927,10 +877,10 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 mapped = input_map.get(p["name"])
                 if mapped:
                     val = self._resolve_js_expr_loop(mapped, comp, item)
-                    lines.append(f"{indent}if ({val} !== undefined) _hdrs['{p['name']}'] = String({val});")
+                    lines.append(f"{indent}if ({self._optional_check_expr(val)}) _hdrs['{p['name']}'] = String({val});")
 
         body_str = None
-        if isinstance(request_body, dict) and not self._is_model_body(request_body):
+        if self._body_shape(request_body) == "flat_dict":
             fields = self._flatten_body(request_body)
             field_strs = []
             for snake_key, _ in fields:
@@ -964,6 +914,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append(f"{indent}{results_var}.push((await this._ctx.client.request({path_str}, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken)).data);")
         return lines
 
+    def _optional_check_expr(self, expr: str) -> str:
+        return f"{expr} !== undefined"
+
     def _resolve_js_expr(self, expr: str, comp: dict) -> str:
         """Convert dot-path expression to JS variable reference."""
         if expr.startswith("params."):
@@ -988,14 +941,100 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             return f"{loop_var}.{self.snake_to_camel(prop)}"
         return self._resolve_js_expr(expr, comp)
 
-    def _is_model_body(self, body: dict) -> bool:
-        """Check if request_body uses the _model convention (body IS the model, not wrapped)."""
-        return list(body.keys()) == ["_model"]
-
     def _flatten_body(self, body: dict) -> list[tuple[str, str]]:
-        """Extract field names from request_body schema, returning [(snake_key, camelKey), ...]."""
+        """Extract field names from a legacy flat-dict request_body, returning [(snake_key, camelKey), ...]."""
         fields: list[tuple[str, str]] = []
         for field_name in body:
             camel = self.snake_to_camel(field_name)
             fields.append((field_name, camel))
         return fields
+
+    # ── expanded-body signature + serialization helpers ───────────────────────
+
+    def _js_body_sig_tokens(self, request_body) -> list[str]:
+        """Return JS signature tokens for body params given a resolved request_body."""
+        shape = self._body_shape(request_body)
+        if shape is None:
+            return []
+        if shape == "scalar":
+            return [_js_safe(request_body["param_name"])]
+        if shape == "expanded":
+            ordered = self._order_expanded_fields(self._expanded_fields(request_body))
+            tokens = []
+            for f in ordered:
+                name = _js_safe(f["name"])
+                if f.get("required"):
+                    tokens.append(name)
+                else:
+                    tokens.append(f"{name} = undefined")
+            return tokens
+        if shape == "flat_dict":
+            camels = [_js_safe(self.snake_to_camel(k)) for k in request_body.keys()]
+            return ["{ " + ", ".join(camels) + " }"]
+        if shape == "generic":
+            return ["body = {}"]
+        return []
+
+    def _js_body_build(self, request_body, content_type: str, indent: str) -> tuple[list[str], str | None]:
+        """Return (preamble_lines, body_expr) for emitting the HTTP request body.
+
+        body_expr is the JS expression to assign to fetch's `body:` field (or pass as
+        the request payload); None if there is no body.
+        For form-encoded content, wraps the assembled object in URLSearchParams().
+        """
+        shape = self._body_shape(request_body)
+        if shape is None:
+            return [], None
+        is_form = content_type == "application/x-www-form-urlencoded"
+
+        if shape == "scalar":
+            name = _js_safe(request_body["param_name"])
+            if is_form:
+                return [], f"new URLSearchParams({name}).toString()"
+            return [], f"JSON.stringify({name})"
+
+        if shape == "expanded":
+            fields = self._expanded_fields(request_body)
+            lines = self._render_object_tree_js(self._group_fields_by_path(fields), indent)
+            lines[0] = f"{indent}const body = " + lines[0].lstrip()
+            lines[-1] = lines[-1] + ";"
+            if is_form:
+                return lines, "new URLSearchParams(body).toString()"
+            return lines, "JSON.stringify(body)"
+
+        if shape == "flat_dict":
+            fields = self._flatten_body(request_body)
+            parts = []
+            for snake, camel in fields:
+                safe = _js_safe(camel)
+                if snake == safe:
+                    parts.append(safe)
+                else:
+                    parts.append(f"{snake}: {safe}")
+            obj = "{ " + ", ".join(parts) + " }"
+            if is_form:
+                return [], f"new URLSearchParams({obj}).toString()"
+            return [], f"JSON.stringify({obj})"
+
+        if shape == "generic":
+            if is_form:
+                return [], "new URLSearchParams(body).toString()"
+            return [], "JSON.stringify(body)"
+
+        return [], None
+
+    def _render_object_tree_js(self, tree: dict, base_indent: str) -> list[str]:
+        """Recursively render a field-path tree as a multi-line stripUndef(...) JS literal."""
+        inner = base_indent + "  "
+        lines = [base_indent + "stripUndef({"]
+        for key, node in tree.items():
+            if "_leaf" in node:
+                f = node["_leaf"]
+                lines.append(f"{inner}{key}: {_js_safe(f['name'])},")
+            else:
+                sub = self._render_object_tree_js(node, inner)
+                lines.append(f"{inner}{key}: " + sub[0].lstrip())
+                lines.extend(sub[1:-1])
+                lines.append(sub[-1] + ",")
+        lines.append(base_indent + "})")
+        return lines

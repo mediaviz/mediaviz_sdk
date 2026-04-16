@@ -5,7 +5,11 @@ import re
 from .base import BaseGenerator
 from naming import snake_to_camel as _snake_to_camel
 
-_TYPE_MAP = {"string": "string", "integer": "int", "boolean": "bool", "number": "float"}
+_TYPE_MAP = {
+    "string": "string", "integer": "int", "boolean": "bool", "number": "float",
+    "str": "string", "int": "int", "bool": "bool", "float": "float",
+    "datetime": "string", "emailstr": "string", "any": "mixed",
+}
 
 
 def _php_type(t) -> str:
@@ -471,18 +475,7 @@ class PhpGenerator(BaseGenerator):
         for p in path_params:
             sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
 
-        body_fields = []
-        has_generic_body = False
-        is_model = isinstance(request_body, dict) and self._is_model_body(request_body)
-        if is_model:
-            sig_parts.append("array $body")
-        elif isinstance(request_body, dict):
-            body_fields = self._flatten_body(request_body)
-            for _, camel_param in body_fields:
-                sig_parts.append(f"mixed ${camel_param}")
-        elif request_body:
-            has_generic_body = True
-            sig_parts.append("array $body = []")
+        sig_parts.extend(self._php_body_sig_tokens(request_body))
 
         for p in query_params:
             t = _php_type(p.get("type"))
@@ -503,19 +496,12 @@ class PhpGenerator(BaseGenerator):
         lines.append("        $this->ctx->requireTokens();")
         lines.extend(self._build_path(ep["path"], path_params, query_params, "auth"))
 
-        req = "$this->ctx->client->request($path, '{method}', $this->ctx->accessToken, $this->ctx->refreshToken{body})->data"
-        if is_model:
-            lines.append(f"        return $this->ctx->client->request($path, '{ep['method']}', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;")
-        elif body_fields:
-            lines.append("        $body = [")
-            for snake_key, camel_param in body_fields:
-                lines.append(f"            '{snake_key}' => ${camel_param},")
-            lines.append("        ];")
-            lines.append(f"        return $this->ctx->client->request($path, '{ep['method']}', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;")
-        elif has_generic_body:
-            lines.append(f"        return $this->ctx->client->request($path, '{ep['method']}', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;")
-        else:
+        preamble, body_expr = self._php_body_build(request_body, "application/json", "        ")
+        lines.extend(preamble)
+        if body_expr is None:
             lines.append(f"        return $this->ctx->client->request($path, '{ep['method']}', $this->ctx->accessToken, $this->ctx->refreshToken)->data;")
+        else:
+            lines.append(f"        return $this->ctx->client->request($path, '{ep['method']}', $this->ctx->accessToken, $this->ctx->refreshToken, {body_expr})->data;")
         lines.append("    }")
         return lines
 
@@ -527,44 +513,22 @@ class PhpGenerator(BaseGenerator):
         for p in path_params:
             sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
 
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            sig_parts.append("array $body")
-            if sig_parts:
+        if request_body:
+            sig_parts.extend(self._php_body_sig_tokens(request_body))
+            if len(sig_parts) > 1:
                 indent = "        "
                 sig = f"    public function {func_name}(\n"
                 sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
                 sig += "\n    ): mixed {"
+            elif sig_parts:
+                sig = f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"
             else:
                 sig = f"    public function {func_name}(): mixed {{"
             lines = [sig]
             lines.append("        $baseUrl = $this->ctx->baseUrl;")
             lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
-            lines.extend(self._curl_post(method, content_type))
-        elif isinstance(request_body, dict):
-            fields = self._flatten_body(request_body)
-            for _, camel_param in fields:
-                sig_parts.append(f"mixed ${camel_param}")
-            if sig_parts:
-                indent = "        "
-                sig = f"    public function {func_name}(\n"
-                sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
-                sig += "\n    ): mixed {"
-            else:
-                sig = f"    public function {func_name}(): mixed {{"
-            lines = [sig]
-            lines.append("        $baseUrl = $this->ctx->baseUrl;")
-            lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
-            lines.append("        $body = [")
-            for snake_key, camel_param in fields:
-                lines.append(f"            '{snake_key}' => ${camel_param},")
-            lines.append("        ];")
-            lines.extend(self._curl_post(method, content_type))
-        elif request_body:
-            sig_parts.append("array $body = []")
-            lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
-            lines.append("        $baseUrl = $this->ctx->baseUrl;")
-            lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
-            lines.append("        $body = $body;")
+            preamble, _ = self._php_body_build(request_body, content_type, "        ")
+            lines.extend(preamble)
             lines.extend(self._curl_post(method, content_type))
         else:
             for p in query_params:
@@ -609,16 +573,7 @@ class PhpGenerator(BaseGenerator):
         for p in required_headers:
             sig_parts.append(f"string ${self.header_to_param(p['name'])}")
 
-        body_fields = []
-        is_model = isinstance(request_body, dict) and self._is_model_body(request_body)
-        if is_model:
-            sig_parts.append("array $body")
-        elif isinstance(request_body, dict):
-            body_fields = self._flatten_body(request_body)
-            for _, camel_param in body_fields:
-                sig_parts.append(f"mixed ${camel_param}")
-        elif request_body:
-            sig_parts.append("array $body = []")
+        sig_parts.extend(self._php_body_sig_tokens(request_body))
 
         for p in optional_headers:
             sig_parts.append(f"?string ${self.header_to_param(p['name'])} = null")
@@ -650,13 +605,8 @@ class PhpGenerator(BaseGenerator):
             lines.append(f"        if (${param} !== null) $headers[] = '{p['name']}: ' . ${param};")
 
         # Build body
-        if is_model:
-            pass  # $body already set from param
-        elif body_fields:
-            lines.append("        $body = [")
-            for snake_key, camel_param in body_fields:
-                lines.append(f"            '{snake_key}' => ${camel_param},")
-            lines.append("        ];")
+        preamble, _ = self._php_body_build(request_body, content_type, "        ")
+        lines.extend(preamble)
 
         # cURL call
         lines.append("        $ch = curl_init();")
@@ -855,9 +805,9 @@ class PhpGenerator(BaseGenerator):
                 mapped = input_map.get(p["name"])
                 if mapped:
                     val = self._resolve_php_expr_loop(mapped, comp, loop_var) if loop_var else self._resolve_php_expr(mapped, comp)
-                    lines.append(f"{indent}if ({val} !== null) $_headers[] = '{p['name']}: ' . {val};")
+                    lines.append(f"{indent}if ({self._optional_check_expr(val)}) $_headers[] = '{p['name']}: ' . {val};")
 
-        if isinstance(request_body, dict) and not self._is_model_body(request_body):
+        if self._body_shape(request_body) == "flat_dict":
             fields = self._flatten_body(request_body)
             lines.append(f"{indent}$_body = [")
             for snake_key, _ in fields:
@@ -940,6 +890,9 @@ class PhpGenerator(BaseGenerator):
         lines.append(f"{indent}${results_var}[] = $this->ctx->client->request($_path, '{ep['method']}', $this->ctx->accessToken, $this->ctx->refreshToken)->data;")
         return lines
 
+    def _optional_check_expr(self, expr: str) -> str:
+        return f"({expr} ?? null) !== null"
+
     def _resolve_php_expr(self, expr: str, comp: dict) -> str:
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
@@ -962,17 +915,90 @@ class PhpGenerator(BaseGenerator):
             return f"${loop_var}['{prop}']"
         return self._resolve_php_expr(expr, comp)
 
-    def _is_model_body(self, body: dict) -> bool:
-        """Check if request_body uses the _model convention (body IS the model, not wrapped)."""
-        return list(body.keys()) == ["_model"]
-
     def _flatten_body(self, body: dict) -> list[tuple[str, str]]:
-        """Extract field names from request_body schema, returning [(snake_key, camelKey), ...]."""
+        """Extract field names from a legacy flat-dict request_body, returning [(snake_key, camelKey), ...]."""
         fields: list[tuple[str, str]] = []
         for field_name in body:
             camel = self.snake_to_camel(field_name)
             fields.append((field_name, camel))
         return fields
+
+    # ── expanded-body signature + serialization helpers ───────────────────────
+
+    def _php_body_sig_tokens(self, request_body) -> list[str]:
+        """Return PHP signature tokens for body params given a resolved request_body."""
+        shape = self._body_shape(request_body)
+        if shape is None:
+            return []
+        if shape == "scalar":
+            name = request_body["param_name"]
+            t = _php_type(request_body["type"])
+            return [f"{t} ${name}"]
+        if shape == "expanded":
+            ordered = self._order_expanded_fields(self._expanded_fields(request_body))
+            tokens = []
+            for f in ordered:
+                camel = f["name"]
+                t = "array" if f.get("kind") == "list" else _php_type(f.get("type"))
+                if f.get("required"):
+                    tokens.append(f"{t} ${camel}")
+                elif t == "mixed":
+                    tokens.append(f"mixed ${camel} = null")
+                else:
+                    tokens.append(f"?{t} ${camel} = null")
+            return tokens
+        if shape == "flat_dict":
+            fields = self._flatten_body(request_body)
+            return [f"mixed ${camel}" for _, camel in fields]
+        if shape == "generic":
+            return ["array $body = []"]
+        return []
+
+    def _php_body_build(self, request_body, content_type: str, indent: str) -> tuple[list[str], str | None]:
+        """Return (preamble_lines, body_expr) for assembling the PHP request body.
+
+        Preamble sets up `$body` when appropriate; body_expr is the PHP expression
+        to pass to the underlying request/curl call (typically `$body`).
+        """
+        shape = self._body_shape(request_body)
+        if shape is None:
+            return [], None
+        if shape == "scalar":
+            name = request_body["param_name"]
+            return [f"{indent}$body = ${name};"], "$body"
+        if shape == "expanded":
+            fields = self._expanded_fields(request_body)
+            tree = self._group_fields_by_path(fields)
+            rendered = self._render_object_tree_php(tree, indent)
+            rendered[0] = f"{indent}$body = " + rendered[0].lstrip()
+            rendered[-1] = rendered[-1] + ";"
+            return rendered, "$body"
+        if shape == "flat_dict":
+            fields = self._flatten_body(request_body)
+            lines = [f"{indent}$body = ["]
+            for snake_key, camel in fields:
+                lines.append(f"{indent}    '{snake_key}' => ${camel},")
+            lines.append(f"{indent}];")
+            return lines, "$body"
+        if shape == "generic":
+            return [], "$body"
+        return [], None
+
+    def _render_object_tree_php(self, tree: dict, base_indent: str) -> list[str]:
+        """Recursively render a field-path tree as a multi-line array_filter([...]) PHP literal."""
+        inner = base_indent + "    "
+        lines = [base_indent + "array_filter(["]
+        for key, node in tree.items():
+            if "_leaf" in node:
+                f = node["_leaf"]
+                lines.append(f"{inner}'{key}' => ${f['name']},")
+            else:
+                sub = self._render_object_tree_php(node, inner)
+                lines.append(f"{inner}'{key}' => " + sub[0].lstrip())
+                lines.extend(sub[1:-1])
+                lines.append(sub[-1] + ",")
+        lines.append(base_indent + "], fn($v) => $v !== null)")
+        return lines
 
     def _split_types_file(self, module_path: str) -> None:
         """Split a monolithic Types.php into one file per class (PSR-4)."""

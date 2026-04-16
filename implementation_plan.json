@@ -1,15 +1,20 @@
 [
   {
     "id": 1,
-    "description": "Create versioning module that scans output directory for existing versions and returns next version number",
+    "description": "Create versioning module with semver (major.minor.iteration) support, bump parameter, and version_str helper",
     "touch_points": [
       {
         "file": "mediaviz_sdk/versioning.py",
         "location": "get_next_version",
-        "status": "new file"
+        "status": "complete — returns (major, minor, iteration) tuple with bump param"
+      },
+      {
+        "file": "mediaviz_sdk/versioning.py",
+        "location": "version_str",
+        "status": "complete — formats tuple as dotted string"
       }
     ],
-    "completion_status": false
+    "completion_status": true
   },
   {
     "id": 2,
@@ -59,7 +64,7 @@
   },
   {
     "id": 5,
-    "description": "Create JavaScript browser generator — emits ES module files per controller, barrel index, copies JS OAuth SDK, adds Rollup config for UMD build",
+    "description": "Create JavaScript browser generator \u2014 emits ES module files per controller, barrel index, copies JS OAuth SDK, adds Rollup config for UMD build",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/javascript_browser.py",
@@ -96,7 +101,7 @@
   },
   {
     "id": 6,
-    "description": "Create Node.js generator — emits ESM files per controller, barrel index, copies JS OAuth SDK (no Rollup)",
+    "description": "Create Node.js generator \u2014 emits ESM files per controller, barrel index, copies JS OAuth SDK (no Rollup)",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/javascript_node.py",
@@ -128,7 +133,7 @@
   },
   {
     "id": 7,
-    "description": "Create PHP generator — emits one class per controller, autoload config, copies PHP OAuth SDK",
+    "description": "Create PHP generator \u2014 emits one class per controller, autoload config, copies PHP OAuth SDK",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/php.py",
@@ -160,24 +165,24 @@
   },
   {
     "id": 8,
-    "description": "Create CLI entrypoint (generate.py) that wires together versioning, resolver, registry, and generators with argparse flags",
+    "description": "Create CLI entrypoint (generate.py) with argparse flags including --minor-version and --major-version, default output dir sdk/",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generate.py",
         "location": "main",
-        "status": "new file"
+        "status": "complete — uses semver version_str, passes bump to get_next_version"
       },
       {
         "file": "mediaviz_sdk/generate.py",
         "location": "parse_args",
-        "status": "new file"
+        "status": "complete — --minor-version/--major-version mutually exclusive group, default sdk/"
       }
     ],
-    "completion_status": false
+    "completion_status": true
   },
   {
     "id": 9,
-    "description": "Test resolver against top_endpoints.yaml — verify all 76 refs resolve, flattened YAML is valid, endpoint fields are preserved",
+    "description": "Test resolver against top_endpoints.yaml \u2014 verify all 76 refs resolve, flattened YAML is valid, endpoint fields are preserved",
     "touch_points": [
       {
         "file": "mediaviz_sdk/tests/test_resolver.py",
@@ -194,7 +199,7 @@
   },
   {
     "id": 10,
-    "description": "Test versioning — verify v1 default, auto-increment, correct scanning of output directory",
+    "description": "Test versioning \u2014 verify semver defaults, iteration/minor/major bumps, version_str, old format ignored",
     "touch_points": [
       {
         "file": "mediaviz_sdk/tests/test_versioning.py",
@@ -203,15 +208,25 @@
       },
       {
         "file": "mediaviz_sdk/tests/test_versioning.py",
-        "location": "test_increment",
+        "location": "test_iteration_bump",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_versioning.py",
+        "location": "test_minor_bump",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/tests/test_versioning.py",
+        "location": "test_major_bump",
         "status": "complete"
       }
     ],
-    "completion_status": false
+    "completion_status": true
   },
   {
     "id": 11,
-    "description": "Test JavaScript browser generator — verify output file structure, function naming (camelCase), path interpolation, query param handling, auth routing, Rollup config presence",
+    "description": "Test JavaScript browser generator \u2014 verify output file structure, function naming (camelCase), path interpolation, query param handling, auth routing, Rollup config presence",
     "touch_points": [
       {
         "file": "mediaviz_sdk/tests/test_javascript_browser.py",
@@ -228,7 +243,7 @@
   },
   {
     "id": 12,
-    "description": "Test PHP generator — verify output file structure, function naming (camelCase), class structure (PascalCase), path interpolation, query param handling, auth routing",
+    "description": "Test PHP generator \u2014 verify output file structure, function naming (camelCase), class structure (PascalCase), path interpolation, query param handling, auth routing",
     "touch_points": [
       {
         "file": "mediaviz_sdk/tests/test_php.py",
@@ -245,7 +260,7 @@
   },
   {
     "id": 13,
-    "description": "Test framework registry auto-discovery — verify all generators found, unknown framework raises error",
+    "description": "Test framework registry auto-discovery \u2014 verify all generators found, unknown framework raises error",
     "touch_points": [
       {
         "file": "mediaviz_sdk/tests/test_registry.py",
@@ -262,7 +277,7 @@
   },
   {
     "id": 14,
-    "description": "End-to-end test — run full generate.py against top_endpoints.yaml, verify output directory structure, version numbering, file contents for one endpoint per framework",
+    "description": "End-to-end test \u2014 run full generate.py against top_endpoints.yaml, verify output directory structure, version numbering, file contents for one endpoint per framework",
     "touch_points": [
       {
         "file": "mediaviz_sdk/tests/test_e2e.py",
@@ -274,7 +289,7 @@
   },
   {
     "id": 15,
-    "description": "Add emit_errors_file to JavaScript browser generator — emits errors.js with ApiError hierarchy and handleResponse function",
+    "description": "Add emit_errors_file to JavaScript browser generator \u2014 emits errors.js with ApiError hierarchy and handleResponse function",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/javascript_browser.py",
@@ -296,7 +311,7 @@
   },
   {
     "id": 16,
-    "description": "Wire handleResponse into JS unauth functions — replace return resp.json() with return handleResponse(resp)",
+    "description": "Wire handleResponse into JS unauth functions \u2014 replace return resp.json() with return handleResponse(resp)",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/javascript_browser.py",
@@ -313,7 +328,7 @@
   },
   {
     "id": 17,
-    "description": "Add emit_errors_file to PHP generator — emits Exceptions.php with ApiException hierarchy and handleResponse function",
+    "description": "Add emit_errors_file to PHP generator \u2014 emits Exceptions.php with ApiException hierarchy and handleResponse function",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/php.py",
@@ -330,7 +345,7 @@
   },
   {
     "id": 18,
-    "description": "Wire handleResponse into PHP unauth methods — replace json_decode return with handleResponse call",
+    "description": "Wire handleResponse into PHP unauth methods \u2014 replace json_decode return with handleResponse call",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/php.py",
@@ -347,7 +362,7 @@
   },
   {
     "id": 19,
-    "description": "Ensure Node.js generator inherits error handling — verify emit_errors_file is called in generate() override",
+    "description": "Ensure Node.js generator inherits error handling \u2014 verify emit_errors_file is called in generate() override",
     "touch_points": [
       {
         "file": "mediaviz_sdk/generators/javascript_node.py",
@@ -369,7 +384,7 @@
       {
         "file": "generators/php.py",
         "location": "generate",
-        "status": "removed redundant .replace(' ', '_') — base handles it"
+        "status": "removed redundant .replace(' ', '_') \u2014 base handles it"
       }
     ],
     "completion_status": false
@@ -413,12 +428,12 @@
   },
   {
     "id": 22,
-    "description": "Normalize path converter syntax ({param:type}) in resolver — strip type suffix and promote misclassified params to in:path",
+    "description": "Normalize path converter syntax ({param:type}) in resolver \u2014 strip type suffix and promote misclassified params to in:path",
     "touch_points": [
       {
         "file": "resolver.py",
         "location": "_normalize_path",
-        "status": "new function — strips :converter from path placeholders, promotes params to path"
+        "status": "new function \u2014 strips :converter from path placeholders, promotes params to path"
       },
       {
         "file": "resolver.py",
@@ -435,7 +450,7 @@
   },
   {
     "id": 23,
-    "description": "Respect endpoint content_type in generators — use URLSearchParams/http_build_query for application/x-www-form-urlencoded instead of hardcoded JSON",
+    "description": "Respect endpoint content_type in generators \u2014 use URLSearchParams/http_build_query for application/x-www-form-urlencoded instead of hardcoded JSON",
     "touch_points": [
       {
         "file": "generators/javascript_browser.py",
@@ -472,7 +487,7 @@
   },
   {
     "id": 24,
-    "description": "Split copied Types.php into individual PSR-4 class files during PHP module copy — one file per class, remove files autoload entry from composer.json",
+    "description": "Split copied Types.php into individual PSR-4 class files during PHP module copy \u2014 one file per class, remove files autoload entry from composer.json",
     "touch_points": [
       {
         "file": "generators/php.py",
@@ -482,7 +497,7 @@
       {
         "file": "generators/php.py",
         "location": "_split_types_file",
-        "status": "new method — parses Types.php, writes individual class files, updates composer.json"
+        "status": "new method \u2014 parses Types.php, writes individual class files, updates composer.json"
       },
       {
         "file": "tests/test_php.py",
@@ -494,7 +509,7 @@
   },
   {
     "id": 25,
-    "description": "Add --destination-dir CLI param to override default sdk_files output directory — creates folder if missing, applies same versioning/archiving logic",
+    "description": "Add --destination-dir CLI param to override default sdk_files output directory \u2014 creates folder if missing, applies same versioning/archiving logic",
     "touch_points": [
       {
         "file": "generate.py",
@@ -538,7 +553,7 @@
   },
   {
     "id": 27,
-    "description": "Add composite YAML config format — define composites in api_docs/composites/ that chain 2+ endpoint calls with data flow, caching, and error handling",
+    "description": "Add composite YAML config format \u2014 define composites in api_docs/composites/ that chain 2+ endpoint calls with data flow, caching, and error handling",
     "touch_points": [
       {
         "file": "../mediaviz_intelligence_hub/api_docs/composites/upload_photos.yaml",
@@ -555,7 +570,7 @@
   },
   {
     "id": 28,
-    "description": "Add resolve_composites() to resolver — reads composites ref-list, resolves step endpoint refs, embeds flattened endpoint data inline",
+    "description": "Add resolve_composites() to resolver \u2014 reads composites ref-list, resolves step endpoint refs, embeds flattened endpoint data inline",
     "touch_points": [
       {
         "file": "resolver.py",
@@ -572,7 +587,7 @@
   },
   {
     "id": 29,
-    "description": "Add --composites CLI flag to generate.py — resolve composites and pass to generators",
+    "description": "Add --composites CLI flag to generate.py \u2014 resolve composites and pass to generators",
     "touch_points": [
       {
         "file": "generate.py",
@@ -589,7 +604,7 @@
   },
   {
     "id": 30,
-    "description": "Update BaseGenerator — add composites param to generate(), add group_composites_by_controller()",
+    "description": "Update BaseGenerator \u2014 add composites param to generate(), add group_composites_by_controller()",
     "touch_points": [
       {
         "file": "generators/base.py",
@@ -606,7 +621,7 @@
   },
   {
     "id": 31,
-    "description": "Implement composite function emission in JS generator — once steps with caching, for_each with inline fetch, cross-controller imports, on_error modes",
+    "description": "Implement composite function emission in JS generator \u2014 once steps with caching, for_each with inline fetch, cross-controller imports, on_error modes",
     "touch_points": [
       {
         "file": "generators/javascript_browser.py",
@@ -638,7 +653,7 @@
   },
   {
     "id": 32,
-    "description": "Implement composite method emission in PHP generator — static cache, foreach with inline curl, on_error collect mode",
+    "description": "Implement composite method emission in PHP generator \u2014 static cache, foreach with inline curl, on_error collect mode",
     "touch_points": [
       {
         "file": "generators/php.py",
@@ -670,7 +685,7 @@
   },
   {
     "id": 33,
-    "description": "Convert uploadPhotos composite from batch (for_each over photos list) to unary (single photo per call) — caller loops externally, template cache persists across calls",
+    "description": "Convert uploadPhotos composite from batch (for_each over photos list) to unary (single photo per call) \u2014 caller loops externally, template cache persists across calls",
     "touch_points": [
       {
         "file": "../mediaviz_intelligence_hub/api_docs/composites/upload_photos.yaml",
@@ -727,12 +742,12 @@
       {
         "file": "resolver.py",
         "location": "resolve_composite_files",
-        "status": "complete — resolves individual composite YAML files"
+        "status": "complete \u2014 resolves individual composite YAML files"
       },
       {
         "file": "resolver.py",
         "location": "validate_composite_endpoints",
-        "status": "complete — errors if step endpoints missing from endpoint list"
+        "status": "complete \u2014 errors if step endpoints missing from endpoint list"
       },
       {
         "file": "generate.py",
@@ -759,196 +774,196 @@
   },
   {
     "id": 35,
-    "description": "Add collect_alt_hosts() helper and abstract emit_client_class() to BaseGenerator — enables generators to discover alt-host URLs and emit top-level client class",
+    "description": "Add collect_alt_hosts() helper and abstract emit_client_class() to BaseGenerator \u2014 enables generators to discover alt-host URLs and emit top-level client class",
     "touch_points": [
       {
         "file": "generators/base.py",
         "location": "collect_alt_hosts",
-        "status": "complete — scans endpoints and composites for distinct api_host values"
+        "status": "complete \u2014 scans endpoints and composites for distinct api_host values"
       },
       {
         "file": "generators/base.py",
         "location": "emit_client_class",
-        "status": "complete — abstract method signature added"
+        "status": "complete \u2014 abstract method signature added"
       }
     ],
     "completion_status": true
   },
   {
     "id": 36,
-    "description": "Rewrite JS generator to emit class-based controllers — each controller is an ES class with constructor(ctx), methods use this._ctx for client/tokens/hosts instead of explicit params",
+    "description": "Rewrite JS generator to emit class-based controllers \u2014 each controller is an ES class with constructor(ctx), methods use this._ctx for client/tokens/hosts instead of explicit params",
     "touch_points": [
       {
         "file": "generators/javascript_browser.py",
         "location": "emit_controller_file",
-        "status": "complete — emits class with _ctx constructor, caches on instance"
+        "status": "complete \u2014 emits class with _ctx constructor, caches on instance"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_method",
-        "status": "complete — replaced _emit_function, dispatches to auth/unauth/alt_host method emitters"
+        "status": "complete \u2014 replaced _emit_function, dispatches to auth/unauth/alt_host method emitters"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_auth_method",
-        "status": "complete — uses this._ctx.client/accessToken/refreshToken, requireTokens() guard"
+        "status": "complete \u2014 uses this._ctx.client/accessToken/refreshToken, requireTokens() guard"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_unauth_method",
-        "status": "complete — uses this._ctx.baseUrl"
+        "status": "complete \u2014 uses this._ctx.baseUrl"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_alt_host_method",
-        "status": "complete — resolves host from this._ctx.requireHost()"
+        "status": "complete \u2014 resolves host from this._ctx.requireHost()"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_composite_method",
-        "status": "complete — drops auth/host params, uses this._ctx throughout"
+        "status": "complete \u2014 drops auth/host params, uses this._ctx throughout"
       }
     ],
     "completion_status": true
   },
   {
     "id": 37,
-    "description": "Add emit_client_class() to JS generator — generates MediaViz.js with _Context, _TokenTrackingClient, and MediaViz client class supporting both auth flows",
+    "description": "Add emit_client_class() to JS generator \u2014 generates MediaViz.js with _Context, _TokenTrackingClient, and MediaViz client class supporting both auth flows",
     "touch_points": [
       {
         "file": "generators/javascript_browser.py",
         "location": "emit_client_class",
-        "status": "complete — emits _env(), _Context, _TokenTrackingClient, MediaViz class"
+        "status": "complete \u2014 emits _env(), _Context, _TokenTrackingClient, MediaViz class"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "generate",
-        "status": "complete — calls emit_client_class with groups, comp_groups, alt_hosts"
+        "status": "complete \u2014 calls emit_client_class with groups, comp_groups, alt_hosts"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "emit_barrel_index",
-        "status": "complete — exports MediaViz first, then controller classes"
+        "status": "complete \u2014 exports MediaViz first, then controller classes"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_to_prop_name",
-        "status": "complete — camelCase property name with acronym handling"
+        "status": "complete \u2014 camelCase property name with acronym handling"
       }
     ],
     "completion_status": true
   },
   {
     "id": 38,
-    "description": "Rewrite PHP generator to emit class-based controllers — methods use $this->ctx for client/tokens/hosts instead of explicit params",
+    "description": "Rewrite PHP generator to emit class-based controllers \u2014 methods use $this->ctx for client/tokens/hosts instead of explicit params",
     "touch_points": [
       {
         "file": "generators/php.py",
         "location": "emit_controller_file",
-        "status": "complete — constructor takes object $ctx instead of OAuthClient"
+        "status": "complete \u2014 constructor takes object $ctx instead of OAuthClient"
       },
       {
         "file": "generators/php.py",
         "location": "_emit_auth_method",
-        "status": "complete — uses $this->ctx->client/accessToken/refreshToken, requireTokens() guard"
+        "status": "complete \u2014 uses $this->ctx->client/accessToken/refreshToken, requireTokens() guard"
       },
       {
         "file": "generators/php.py",
         "location": "_emit_unauth_method",
-        "status": "complete — uses $this->ctx->baseUrl"
+        "status": "complete \u2014 uses $this->ctx->baseUrl"
       },
       {
         "file": "generators/php.py",
         "location": "_emit_alt_host_method",
-        "status": "complete — uses $this->ctx->requireHost()"
+        "status": "complete \u2014 uses $this->ctx->requireHost()"
       },
       {
         "file": "generators/php.py",
         "location": "_emit_composite_method",
-        "status": "complete — drops token/host params, uses $this->ctx"
+        "status": "complete \u2014 drops token/host params, uses $this->ctx"
       }
     ],
     "completion_status": true
   },
   {
     "id": 39,
-    "description": "Add emit_client_class() to PHP generator — generates MediaVizClient.php with _Context, _TokenTrackingClient, and MediaVizClient class",
+    "description": "Add emit_client_class() to PHP generator \u2014 generates MediaVizClient.php with _Context, _TokenTrackingClient, and MediaVizClient class",
     "touch_points": [
       {
         "file": "generators/php.py",
         "location": "emit_client_class",
-        "status": "complete — emits _Context, _TokenTrackingClient, MediaVizClient class"
+        "status": "complete \u2014 emits _Context, _TokenTrackingClient, MediaVizClient class"
       },
       {
         "file": "generators/php.py",
         "location": "generate",
-        "status": "complete — calls emit_client_class with groups, comp_groups, alt_hosts"
+        "status": "complete \u2014 calls emit_client_class with groups, comp_groups, alt_hosts"
       },
       {
         "file": "generators/php.py",
         "location": "emit_autoload_config",
-        "status": "complete — includes MediaVizClient.php in autoload files"
+        "status": "complete \u2014 includes MediaVizClient.php in autoload files"
       },
       {
         "file": "generators/php.py",
         "location": "_to_prop_name",
-        "status": "complete — camelCase property name with acronym handling"
+        "status": "complete \u2014 camelCase property name with acronym handling"
       }
     ],
     "completion_status": true
   },
   {
     "id": 40,
-    "description": "Update spec.md to document new client class architecture — MediaViz/MediaVizClient, constructor config, auth lifecycle, controller namespace pattern",
+    "description": "Update spec.md to document new client class architecture \u2014 MediaViz/MediaVizClient, constructor config, auth lifecycle, controller namespace pattern",
     "touch_points": [
       {
         "file": "spec.md",
         "location": "Generated SDK Shape section",
-        "status": "complete — replaced flat-function docs with class-based architecture"
+        "status": "complete \u2014 replaced flat-function docs with class-based architecture"
       }
     ],
     "completion_status": true
   },
   {
     "id": 41,
-    "description": "Update test generators to match new class-based output — tests currently expect flat function exports, need to assert class structure and _ctx usage",
+    "description": "Update test generators to match new class-based output \u2014 tests currently expect flat function exports, need to assert class structure and _ctx usage",
     "touch_points": [
       {
         "file": "tests/test_javascript_browser.py",
         "location": "all tests",
-        "status": "pending — still asserts flat function pattern"
+        "status": "pending \u2014 still asserts flat function pattern"
       },
       {
         "file": "tests/test_php.py",
         "location": "all tests",
-        "status": "pending — still asserts old method signatures"
+        "status": "pending \u2014 still asserts old method signatures"
       }
     ],
     "completion_status": false
   },
   {
     "id": 42,
-    "description": "Verify OAuth fully abstracted in generated output — re-ran generator (v28), confirmed: no tokens in public method signatures, constructor env-var fallbacks, _Context/TokenTrackingClient pattern, alt-host endpoints use direct fetch with ctx tokens (no 401 retry by design)",
+    "description": "Verify OAuth fully abstracted in generated output \u2014 re-ran generator (v28), confirmed: no tokens in public method signatures, constructor env-var fallbacks, _Context/TokenTrackingClient pattern, alt-host endpoints use direct fetch with ctx tokens (no 401 retry by design)",
     "touch_points": [
       {
         "file": "sdk_files/v28/javascript/MediaViz.js",
         "location": "MediaViz class",
-        "status": "verified — _Context, _TokenTrackingClient, env-var config, auth lifecycle methods"
+        "status": "verified \u2014 _Context, _TokenTrackingClient, env-var config, auth lifecycle methods"
       },
       {
         "file": "sdk_files/v28/php/MediaVizClient.php",
         "location": "MediaVizClient class",
-        "status": "verified — same pattern as JS"
+        "status": "verified \u2014 same pattern as JS"
       },
       {
         "file": "sdk_files/v28/javascript/photos.js",
         "location": "Photos class",
-        "status": "verified — methods take only business params, tokens from _ctx"
+        "status": "verified \u2014 methods take only business params, tokens from _ctx"
       },
       {
         "file": "sdk_files/v28/javascript/photoupload.js",
         "location": "Photoupload class",
-        "status": "verified — alt-host resolved from _ctx, composite caching works"
+        "status": "verified \u2014 alt-host resolved from _ctx, composite caching works"
       },
       {
         "file": "spec.md",
@@ -960,51 +975,301 @@
   },
   {
     "id": 43,
-    "description": "Replace local-path CLI flags with source resolution module — remove --controllers and --oauth-sdk flags, change --endpoints to flow name resolved against common_flows/sdk_endpoints/, add --branch flag (unused in local mode), create github_sources.py for path resolution",
+    "description": "Replace local-path CLI flags with source resolution module \u2014 remove --controllers and --oauth-sdk flags, change --endpoints to flow name resolved against common_flows/sdk_endpoints/, add --branch flag (unused in local mode), create github_sources.py for path resolution",
     "touch_points": [
       {
         "file": "github_sources.py",
         "location": "fetch_sources, resolve_flow_path, SourcePaths",
-        "status": "complete — context manager yielding local sibling paths, flow resolution with error listing"
+        "status": "complete \u2014 context manager yielding local sibling paths, flow resolution with error listing"
       },
       {
         "file": "generate.py",
         "location": "parse_args",
-        "status": "complete — removed --controllers and --oauth-sdk, --endpoints is now flow name, added --branch"
+        "status": "complete \u2014 removed --controllers and --oauth-sdk, --endpoints is now flow name, added --branch"
       },
       {
         "file": "generate.py",
         "location": "main",
-        "status": "complete — wrapped in fetch_sources context manager, uses resolve_flow_path"
+        "status": "complete \u2014 wrapped in fetch_sources context manager, uses resolve_flow_path"
       },
       {
         "file": "spec.md",
         "location": "Overview, Architecture, CLI Entrypoint, Run sequence",
-        "status": "complete — updated to reflect new source resolution and CLI flags"
+        "status": "complete \u2014 updated to reflect new source resolution and CLI flags"
       }
     ],
     "completion_status": true
   },
   {
     "id": 44,
-    "description": "Upgrade github_sources.py to shallow-clone from GitHub instead of reading local sibling dirs — use git ls-remote for branch checking, tempfile.TemporaryDirectory for clones, per-repo branch fallback to main",
+    "description": "Upgrade github_sources.py to shallow-clone from GitHub instead of reading local sibling dirs \u2014 use git ls-remote for branch checking, tempfile.TemporaryDirectory for clones, per-repo branch fallback to main",
     "touch_points": [
       {
         "file": "github_sources.py",
         "location": "fetch_sources",
-        "status": "pending — currently uses local paths, needs git clone logic"
+        "status": "pending \u2014 currently uses local paths, needs git clone logic"
       },
       {
         "file": "github_sources.py",
         "location": "branch_exists",
-        "status": "pending — needs git ls-remote implementation"
+        "status": "pending \u2014 needs git ls-remote implementation"
       },
       {
         "file": "github_sources.py",
         "location": "resolve_branch",
-        "status": "pending — needs branch checking + fallback logic"
+        "status": "pending \u2014 needs branch checking + fallback logic"
       }
     ],
     "completion_status": false
+  },
+  {
+    "id": 45,
+    "description": "Add load_schemas() and _resolved_fields() (with extends merge) to resolver.py",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "load_schemas",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "_resolved_fields",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 46,
+    "description": "Add expand_model_body() with flat-object, nested-schema, list-passthrough, and scalar-fallback paths",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "expand_model_body",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "_expand_fields_to_list",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "_schema_ref_type",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 47,
+    "description": "Wire schemas through resolve_refs, resolve_composites, resolve_composite_files, and _flatten; add schemas_path to SourcePaths",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/resolver.py",
+        "location": "_flatten",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/github_sources.py",
+        "location": "SourcePaths",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generate.py",
+        "location": "main",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 48,
+    "description": "Add _body_shape, _expanded_fields, _order_expanded_fields, _group_fields_by_path helpers to BaseGenerator",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/base.py",
+        "location": "BaseGenerator",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 49,
+    "description": "Refactor JS generator emit methods to consume expanded fields; emit stripUndef helper and nested body reassembly; escape JS reserved keywords in param names",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_emit_auth_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_emit_unauth_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_emit_alt_host_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_js_body_sig_tokens",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_js_body_build",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/javascript_browser.py",
+        "location": "_render_object_tree_js",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 50,
+    "description": "Refactor PHP generator emit methods to consume expanded fields; emit typed-nullable params and array_filter body reassembly",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_emit_auth_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_emit_unauth_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_emit_alt_host_method",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_php_body_sig_tokens",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_php_body_build",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/generators/php.py",
+        "location": "_render_object_tree_php",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 51,
+    "description": "Update test generators to supply typed values for expanded-body params and assert on top-level nested keys",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/test_generators/base.py",
+        "location": "BaseTestGenerator",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/test_generators/javascript.py",
+        "location": "_build_call_args",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/test_generators/javascript.py",
+        "location": "_emit_body_test",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/test_generators/php.py",
+        "location": "_build_call_args",
+        "status": "complete"
+      },
+      {
+        "file": "mediaviz_sdk/test_generators/php.py",
+        "location": "_emit_body_test",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 52,
+    "description": "Add pytest coverage for expanded-body resolver + JS/PHP generator emission (UserCreate, KeywordListCreate, EmailStr scalar, nested envelope, reserved-keyword escape)",
+    "touch_points": [
+      {
+        "file": "mediaviz_sdk/tests/test_expanded_body.py",
+        "location": "new file",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 53,
+    "description": "Update Mediaviz-SDK-Quickstart/browser/app.js call sites to match new unary signatures; flag CompanyCreate schema discrepancy for createUserAndCompany",
+    "touch_points": [
+      {
+        "file": "Mediaviz-SDK-Quickstart/browser/app.js",
+        "location": "register",
+        "status": "flagged discrepancy"
+      },
+      {
+        "file": "Mediaviz-SDK-Quickstart/browser/app.js",
+        "location": "upload",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 54,
+    "description": "Add _optional_check_expr abstract method to BaseGenerator and implement in each framework generator for null-safe optional field access on composite parameters",
+    "touch_points": [
+      {
+        "file": "generators/base.py",
+        "location": "_optional_check_expr",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_optional_check_expr",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_optional_check_expr",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_php_inline_curl",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_call_alt_host_endpoint",
+        "status": "complete"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_call_alt_host_endpoint_loop",
+        "status": "complete"
+      },
+      {
+        "file": "tests/test_base_generator.py",
+        "location": "ConcreteGenerator",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
   }
 ]

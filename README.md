@@ -21,9 +21,11 @@ The generator resolves source files from local sibling directories:
 | `--endpoints` | yes | Flow name in `common_flows/sdk_endpoints/` (e.g. `basic_sdk_flow_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
 | `--branch` | no | Git branch for source repos. Currently accepted but unused in local mode; will be used when GitHub-clone support is added. |
 | `--frameworks` | no | Comma-separated frameworks to generate. Default: all registered. |
-| `--destination-dir` | no | Output folder name in the package root. Created if missing. Default: `sdk_files`. |
+| `--destination-dir` | no | Output folder name in the package root. Created if missing. Default: `sdk`. |
+| `--minor-version` | no | Increment the minor version number and reset iteration to 0. |
+| `--major-version` | no | Increment the major version number and reset minor + iteration to 0. |
 
-Output is written to `<destination-dir>/v{N}/<framework>/`. Previous version directories are auto-archived to `<destination-dir>/archive/v{N}/` on each run.
+Output is written to `<destination-dir>/v{major}.{minor}.{iteration}/<framework>/`. Previous version directories are auto-archived to `<destination-dir>/archive/` on each run. By default, only the iteration number increments; use `--minor-version` or `--major-version` to bump higher segments.
 
 ## Usage
 

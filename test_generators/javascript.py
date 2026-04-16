@@ -325,9 +325,13 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             lines.append("    const body = Object.fromEntries(new URLSearchParams(spy.last_call().body));")
         else:
             lines.append("    const body = JSON.parse(spy.last_call().body);")
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
+        shape = self._body_shape(request_body)
+        if shape == "scalar":
             lines.append("    expect(body).toBeDefined();")
-        elif isinstance(request_body, dict):
+        elif shape == "expanded":
+            for key in self._expanded_top_level_keys(self._expanded_fields(request_body)):
+                lines.append(f"    expect(body).toHaveProperty('{key}');")
+        elif shape == "flat_dict":
             for field in request_body:
                 lines.append(f"    expect(body).toHaveProperty('{field}');")
         else:
@@ -369,9 +373,15 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             for p in required_headers:
                 parts.append(_js_literal(self.test_value_for_type("string")))
 
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            parts.append("{ Model: 'test_value' }")
-        elif isinstance(request_body, dict):
+        shape = self._body_shape(request_body)
+        if shape == "scalar":
+            parts.append(_js_literal(self.test_value_for_type("string")))
+        elif shape == "expanded":
+            ordered = self._order_expanded_fields(self._expanded_fields(request_body))
+            for f in ordered:
+                val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
+                parts.append(_js_literal(val))
+        elif shape == "flat_dict":
             field_parts = []
             for field in request_body:
                 camel = self.snake_to_camel(field)

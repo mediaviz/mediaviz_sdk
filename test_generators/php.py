@@ -305,9 +305,13 @@ class PhpTestGenerator(BaseTestGenerator):
                 f"        $obj->{func_name}({call_args});",
                 "        $body = $ctx->client->lastCall()['body'];",
             ]
-            if isinstance(request_body, dict) and self._is_model_body(request_body):
-                lines.append("        $this->assertIsArray($body);")
-            elif isinstance(request_body, dict):
+            shape = self._body_shape(request_body)
+            if shape == "scalar":
+                lines.append("        $this->assertNotNull($body);")
+            elif shape == "expanded":
+                for key in self._expanded_top_level_keys(self._expanded_fields(request_body)):
+                    lines.append(f"        $this->assertArrayHasKey('{key}', $body);")
+            elif shape == "flat_dict":
                 for field in request_body:
                     lines.append(f"        $this->assertArrayHasKey('{field}', $body);")
             else:
@@ -363,9 +367,15 @@ class PhpTestGenerator(BaseTestGenerator):
             for p in required_headers:
                 parts.append(_php_literal(self.test_value_for_type("string")))
 
-        if isinstance(request_body, dict) and self._is_model_body(request_body):
-            parts.append("['Model' => 'test_value']")
-        elif isinstance(request_body, dict):
+        shape = self._body_shape(request_body)
+        if shape == "scalar":
+            parts.append(_php_literal(self.test_value_for_type("string")))
+        elif shape == "expanded":
+            ordered = self._order_expanded_fields(self._expanded_fields(request_body))
+            for f in ordered:
+                val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
+                parts.append(_php_literal(val))
+        elif shape == "flat_dict":
             for field in request_body:
                 val_type = (
                     request_body[field].get("type", "string")

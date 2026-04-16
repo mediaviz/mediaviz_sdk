@@ -25,6 +25,7 @@ class SourcePaths(NamedTuple):
     controllers_dir: str   # api_docs/ root — refs like controllers/photo.yaml resolve from here
     oauth_sdk_root: str    # oauth SDK root with javascript/, php/ subdirs
     flows_dir: str         # directory containing flow YAML files
+    schemas_path: str      # api_docs/api_schemas.yaml — Pydantic schema registry
 
 
 @contextmanager
@@ -41,13 +42,22 @@ def fetch_sources(branch: str | None = None):
     controllers_dir = os.path.join(_HUB_LOCAL, HUB_API_DOCS)
     oauth_sdk_root = os.path.join(_OAUTH_LOCAL, OAUTH_SDK_SUBPATH)
     flows_dir = os.path.join(_HUB_LOCAL, FLOW_SUBPATH)
+    schemas_path = os.path.join(controllers_dir, "api_schemas.yaml")
 
     for label, path in [("controllers", controllers_dir), ("oauth SDK", oauth_sdk_root), ("flows", flows_dir)]:
         if not os.path.isdir(path):
             print(f"Error: {label} directory not found: {path}", file=sys.stderr)
             sys.exit(1)
+    if not os.path.isfile(schemas_path):
+        print(f"Error: schemas file not found: {schemas_path}", file=sys.stderr)
+        sys.exit(1)
 
-    yield SourcePaths(controllers_dir=controllers_dir, oauth_sdk_root=oauth_sdk_root, flows_dir=flows_dir)
+    yield SourcePaths(
+        controllers_dir=controllers_dir,
+        oauth_sdk_root=oauth_sdk_root,
+        flows_dir=flows_dir,
+        schemas_path=schemas_path,
+    )
 
 
 def resolve_flow_path(flow_name: str, flows_dir: str) -> str:

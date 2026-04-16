@@ -20,6 +20,12 @@ class ConcreteGenerator(BaseGenerator):
     def emit_reexports(self, module_name, exports, output_dir):
         return None
 
+    def emit_client_class(self, groups, comp_groups, alt_hosts, output_dir):
+        pass
+
+    def _optional_check_expr(self, expr):
+        return f"{expr} is not None"
+
 
 @pytest.fixture
 def gen():

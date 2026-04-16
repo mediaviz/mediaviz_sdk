@@ -61,9 +61,9 @@ def test_auth_method_no_params(gen):
     ep = _auth_ep("get_status", "/api/v1/status")
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "public function getStatus(string $accessToken, string $refreshToken)" in src
-    assert "): mixed {" in src
-    assert "$this->client->request($path, 'GET', $accessToken, $refreshToken)->data" in src
+    assert "public function getStatus(): mixed {" in src
+    assert "$this->ctx->requireTokens();" in src
+    assert "$this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data" in src
 
 
 def test_auth_method_path_params(gen):
@@ -74,9 +74,9 @@ def test_auth_method_path_params(gen):
     )
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "string $tableName" in src
+    assert "public function getPhotos(string $tableName): mixed {" in src
     assert "rawurlencode((string)$tableName)" in src
-    assert "$this->client->request" in src
+    assert "$this->ctx->client->request" in src
 
 
 def test_auth_method_query_params(gen):
@@ -130,7 +130,8 @@ def test_unauth_method_no_body_get(gen):
     ep = _unauth_ep("get_public_status", "/api/v1/status")
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "public function getPublicStatus(string $baseUrl)" in src
+    assert "public function getPublicStatus(): mixed {" in src
+    assert "$baseUrl = $this->ctx->baseUrl;" in src
     assert "curl_init($baseUrl . $path)" in src
     assert "CURLOPT_CUSTOMREQUEST, 'GET'" in src
     assert "handleResponse($body, $statusCode, $headers)" in src
@@ -146,7 +147,10 @@ def test_unauth_method_dynamic_body(gen):
     )
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
-    assert "public function updateUsers(string $baseUrl, int $userId, array $body = [])" in src
+    assert "public function updateUsers(" in src
+    assert "int $userId," in src
+    assert "array $body = []" in src
+    assert "$baseUrl = $this->ctx->baseUrl;" in src
     assert "CURLOPT_CUSTOMREQUEST, 'PUT'" in src
 
 
@@ -192,7 +196,7 @@ def test_generate_photos_controller(gen, tmp_path):
     assert "declare(strict_types=1);" in src
     assert "namespace MediaVizSdk;" in src
     assert "class Photos {" in src
-    assert r"private \OAuthSdk\OAuthClient $client;" in src
+    assert "private object $ctx;" in src
     assert "public function getPhotos(" in src
     assert "public function getPhotosSort(" in src
 

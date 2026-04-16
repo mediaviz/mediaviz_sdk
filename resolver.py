@@ -6,8 +6,143 @@ from datetime import datetime, timezone
 
 import yaml
 
+from naming import snake_to_camel
+
 # Matches {param_name:converter} in URL paths (e.g. FastAPI's {directory:path})
 _PATH_CONVERTER_RE = re.compile(r"\{(\w+):\w+\}")
+
+# Matches List[T] / list[t] in schema field types
+_LIST_TYPE_RE = re.compile(r"^[Ll]ist\[(.+)\]$")
+
+
+def load_schemas(schemas_path: str) -> dict:
+    """Load api_schemas.yaml and return the `schemas` mapping (name -> schema def)."""
+    if not os.path.isfile(schemas_path):
+        return {}
+    with open(schemas_path) as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("schemas", {}) or {}
+
+
+def _resolved_fields(schema_name: str, schemas: dict, _seen: frozenset = frozenset()) -> dict:
+    """Return effective fields map for a schema, merging `extends` parent first.
+
+    Returned dict preserves parent-field order; child keys that collide overwrite
+    parent entries in place; new child keys are appended last.
+    """
+    if schema_name in _seen:
+        raise ValueError(f"Circular schema extends detected: {schema_name}")
+    schema = schemas.get(schema_name)
+    if not schema or not isinstance(schema, dict):
+        return {}
+    fields = {}
+    parent = schema.get("extends")
+    if parent:
+        fields = dict(_resolved_fields(parent, schemas, _seen | {schema_name}))
+    for k, v in (schema.get("fields") or {}).items():
+        fields[k] = v
+    return fields
+
+
+def _expand_fields_to_list(
+    fields_map: dict,
+    schemas: dict,
+    prefix_parts: tuple[str, ...],
+    orig_path_parts: tuple[str, ...],
+) -> list[dict]:
+    """Flatten a fields map into a list of leaf field descriptors.
+
+    Each leaf carries `name` (camel, prefixed), `snake`, `type`, `required`, `kind`
+    (primitive | list | nested_leaf), `orig_path` (list of snake keys from root body),
+    and optional `items_type` for list fields.
+    """
+    out: list[dict] = []
+    for field_name, spec in fields_map.items():
+        spec = spec or {}
+        ftype = spec.get("type", "Any")
+        required = bool(spec.get("required", False))
+        this_orig = orig_path_parts + (field_name,)
+        list_match = _LIST_TYPE_RE.match(str(ftype)) if ftype else None
+
+        if list_match:
+            # List field — stays a single array param, never flattened
+            items_type = list_match.group(1)
+            camel = snake_to_camel("_".join(prefix_parts + (field_name,)))
+            out.append({
+                "name": camel,
+                "snake": field_name,
+                "type": ftype,
+                "items_type": items_type,
+                "required": required,
+                "kind": "list",
+                "orig_path": list(this_orig),
+            })
+        elif isinstance(ftype, str) and ftype in schemas:
+            # Nested schema — recursively expand, prefixing with this field name
+            nested_map = _resolved_fields(ftype, schemas)
+            out.extend(_expand_fields_to_list(
+                nested_map, schemas,
+                prefix_parts + (field_name,),
+                this_orig,
+            ))
+        else:
+            # Primitive (or unknown type alias, e.g. EmailStr) — one scalar param
+            camel = snake_to_camel("_".join(prefix_parts + (field_name,)))
+            out.append({
+                "name": camel,
+                "snake": field_name,
+                "type": ftype,
+                "required": required,
+                "kind": "primitive",
+                "orig_path": list(this_orig),
+            })
+    return out
+
+
+def _schema_ref_type(request_body: dict) -> str | None:
+    """Extract the schema type name from a request_body ref.
+
+    Supports current convention: `{"$ref": "api_schemas.yaml#TypeName"}`.
+    Also supports legacy: `{"_model": {"type": "TypeName"}}`.
+    Returns None if the shape is neither.
+    """
+    if "$ref" in request_body and len(request_body) == 1:
+        ref = request_body["$ref"]
+        if isinstance(ref, str) and "#" in ref:
+            return ref.split("#", 1)[1].lstrip("/").strip() or None
+        return None
+    if list(request_body.keys()) == ["_model"]:
+        model = request_body["_model"] or {}
+        return model.get("type")
+    return None
+
+
+def expand_model_body(request_body: dict | None, schemas: dict) -> dict | None:
+    """Expand a schema-ref request body into a flat field list (or scalar).
+
+    Accepts `{"$ref": "api_schemas.yaml#TypeName"}` or the legacy
+    `{"_model": {"type": "TypeName"}}` form.
+
+    Returns:
+      - None if `request_body` is None or not a schema-ref shape.
+      - `{"_shape": "scalar", "param_name": str, "type": str}` when the type
+        is not defined in `schemas` (e.g. Pydantic aliases like EmailStr).
+      - `{"_shape": "expanded", "fields": [...leaf descriptors...]}` otherwise.
+    """
+    if not isinstance(request_body, dict):
+        return None
+    model_type = _schema_ref_type(request_body)
+    if not model_type:
+        return None
+    if model_type not in schemas:
+        return {
+            "_shape": "scalar",
+            "param_name": snake_to_camel(model_type[0].lower() + model_type[1:]),
+            "type": model_type,
+        }
+    fields_map = _resolved_fields(model_type, schemas)
+    leaves = _expand_fields_to_list(fields_map, schemas, (), ())
+    return {"_shape": "expanded", "fields": leaves}
 
 
 def parse_ref(ref: str) -> tuple[str, str]:
@@ -18,12 +153,17 @@ def parse_ref(ref: str) -> tuple[str, str]:
     return file_part.strip(), endpoint_id.strip()
 
 
-def resolve_refs(ref_list_path: str, controllers_dir: str | None = None) -> tuple[list[dict], list[str]]:
+def resolve_refs(
+    ref_list_path: str,
+    controllers_dir: str | None = None,
+    schemas: dict | None = None,
+) -> tuple[list[dict], list[str]]:
     """Read ref-list YAML, follow each ref into controller YAMLs, return flattened endpoints and composite file paths.
 
     Endpoint refs contain '#' (e.g. controllers/photos.yaml#get_photos).
     Composite refs have no '#' (e.g. composites/upload_photos.yaml).
     """
+    schemas = schemas or {}
     with open(ref_list_path) as f:
         ref_list = yaml.safe_load(f)
 
@@ -52,7 +192,7 @@ def resolve_refs(ref_list_path: str, controllers_dir: str | None = None) -> tupl
         if not matching:
             raise ValueError(f"Endpoint '{endpoint_id}' not found in {controller_path}")
 
-        endpoints.append(_flatten(matching[0], ctrl["controller"], ctrl.get("base_path", "")))
+        endpoints.append(_flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas))
 
     return endpoints, composite_paths
 
@@ -78,9 +218,13 @@ def _normalize_path(path: str, params: list[dict]) -> tuple[str, list[dict]]:
     return normalized, params
 
 
-def _flatten(ep: dict, controller: str, base_path: str) -> dict:
+def _flatten(ep: dict, controller: str, base_path: str, schemas: dict | None = None) -> dict:
     params = list(ep.get("params") or [])
     path, params = _normalize_path(ep["path"], params)
+    request_body = ep.get("request_body")
+    expanded = expand_model_body(request_body, schemas or {})
+    if expanded is not None:
+        request_body = expanded
     return {
         "id": ep["id"],
         "function_name": ep.get("function_name", ep["id"]),
@@ -91,7 +235,7 @@ def _flatten(ep: dict, controller: str, base_path: str) -> dict:
         "summary": ep.get("summary"),
         "auth": ep.get("auth"),
         "params": params,
-        "request_body": ep.get("request_body"),
+        "request_body": request_body,
         "response": ep.get("response"),
         "content_type": ep.get("content_type"),
         "tags": ep.get("tags", []),
@@ -100,8 +244,13 @@ def _flatten(ep: dict, controller: str, base_path: str) -> dict:
     }
 
 
-def resolve_composites(composites_path: str, controllers_dir: str | None = None) -> list[dict]:
+def resolve_composites(
+    composites_path: str,
+    controllers_dir: str | None = None,
+    schemas: dict | None = None,
+) -> list[dict]:
     """Read composites ref-list YAML, resolve each step's endpoint ref, return composites with embedded endpoints."""
+    schemas = schemas or {}
     with open(composites_path) as f:
         ref_list = yaml.safe_load(f)
 
@@ -127,7 +276,7 @@ def resolve_composites(composites_path: str, controllers_dir: str | None = None)
             matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
             if not matching:
                 raise ValueError(f"Endpoint '{endpoint_id}' not found in {controller_path}")
-            flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""))
+            flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
             resolved_step = {k: v for k, v in step.items() if k != "ref"}
             resolved_step["endpoint"] = flat_ep
             resolved_steps.append(resolved_step)
@@ -146,8 +295,13 @@ def resolve_composites(composites_path: str, controllers_dir: str | None = None)
     return result
 
 
-def resolve_composite_files(composite_paths: list[str], controllers_dir: str | None = None) -> list[dict]:
+def resolve_composite_files(
+    composite_paths: list[str],
+    controllers_dir: str | None = None,
+    schemas: dict | None = None,
+) -> list[dict]:
     """Resolve individual composite YAML files (not a ref-list). Each path points directly to a composite definition."""
+    schemas = schemas or {}
     controller_cache: dict[str, dict] = {}
     result = []
 
@@ -169,7 +323,7 @@ def resolve_composite_files(composite_paths: list[str], controllers_dir: str | N
             matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
             if not matching:
                 raise ValueError(f"Endpoint '{endpoint_id}' not found in {controller_path}")
-            flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""))
+            flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
             resolved_step = {k: v for k, v in step.items() if k != "ref"}
             resolved_step["endpoint"] = flat_ep
             resolved_steps.append(resolved_step)

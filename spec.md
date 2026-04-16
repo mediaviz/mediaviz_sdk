@@ -18,15 +18,15 @@ mediaviz_sdk/
     php.py                  # PHP generator
   resolver.py              # Reads ref-list YAML, resolves refs, outputs flattened YAML
   versioning.py            # Version auto-increment logic
-  sdk_files/               # Static output directory
-    v{N}/                  # Current version (only one active at a time)
+  sdk/                     # Static output directory
+    v{major}.{minor}.{iteration}/  # Current version (only one active at a time)
       resolved_*.yaml      # Flattened endpoint snapshot
       javascript/
       php/
       tests/
     archive/               # Previous versions moved here on new generation
-      v1/
-      v2/
+      v1.0.0/
+      v1.0.1/
       ...
 ```
 
@@ -38,7 +38,7 @@ Reads a ref-list YAML file (e.g., `top_endpoints.yaml`), follows each `$ref` int
 
 **Input:** Path to a ref-list YAML. Optionally, a controllers base directory for resolving `$ref` file paths (when refs point to files outside the ref-list YAML's directory).
 
-**Output:** A flattened YAML file written to `sdk_files/v{N}/resolved_{ref_list_name}.yaml`, packaged alongside the generated SDK files.
+**Output:** A flattened YAML file written to `sdk/v{major}.{minor}.{iteration}/resolved_{ref_list_name}.yaml`, packaged alongside the generated SDK files.
 
 **Flattened YAML structure:**
 ```yaml
@@ -79,13 +79,20 @@ endpoints:
 
 ### 2. Versioning (`versioning.py`)
 
-Scans `sdk_files/` for existing `v{N}` directories to determine the next version.
+Scans `sdk/` for existing `v{major}.{minor}.{iteration}` directories to determine the next version.
 
 **Logic:**
-- Look at `sdk_files/` for existing `v{N}` directories (ignores `archive/`).
-- If no version directories exist, start at `v1`.
-- Otherwise, increment the highest existing version number by 1.
+- Look at `sdk/` for existing `v{major}.{minor}.{iteration}` directories (ignores `archive/`).
+- If no version directories exist, start at `v1.0.0`.
+- Otherwise, determine the bump type (`iteration`, `minor`, or `major`) from CLI flags and increment accordingly:
+  - `iteration` (default): increment the iteration number (e.g., `1.0.2` → `1.0.3`)
+  - `minor` (`--minor-version`): increment the minor number, reset iteration to 0 (e.g., `1.2.5` → `1.3.0`)
+  - `major` (`--major-version`): increment the major number, reset minor and iteration to 0 (e.g., `2.1.3` → `3.0.0`)
 - The same version number is used for the resolved YAML and all framework outputs in a single run.
+
+**Functions:**
+- `get_next_version(output_dir, bump="iteration")` — returns `(major, minor, iteration)` tuple
+- `version_str(major, minor, iteration)` — returns `"major.minor.iteration"` string
 
 ### 3. Base Generator (`generators/base.py`)
 
@@ -111,12 +118,22 @@ class BaseGenerator(ABC):
 Each generator is responsible for:
 - Grouping endpoints by controller into separate output files
 - Converting endpoint `id` (snake_case) to the framework's naming convention
-- Generating function signatures with path params as required args, query params as optional args, request_body fields as individual args
+- Generating function signatures with path params as required args, query params as optional args, and schema-expanded request_body fields as individual unary params (required first, then optional)
 - Interpolating path parameters into the URL string
 - Routing `auth: required` endpoints through the OAuth client's `request()` method
 - Routing `auth: none` endpoints through a simple unauthenticated HTTP call
+- Reassembling expanded body fields back into the original nested object shape on the wire (stripping undefined/null), driven by the `orig_path` carried on each leaf
 - Generating a barrel/index file that re-exports all controller modules
 - Copying the OAuth auth wrapper source files into the output directory
+- Implementing `_optional_check_expr(expr)` — returns a framework-idiomatic boolean expression for "this optional field is present and non-null." Used by the base emission logic whenever generated code must guard against absent keys/properties on composite parameter objects (e.g. PHP: `($expr ?? null) !== null`, JS: `expr !== undefined`)
+
+**Request-body expansion** (`resolver.expand_model_body`):
+Schema-ref request bodies (`$ref: "api_schemas.yaml#TypeName"`) are resolved against `api_schemas.yaml` at generate time:
+- `extends` chains are merged parent-first, child keys overlaying on collision
+- Nested schema fields are flattened recursively with camelCase prefixing (`user.name` → `userName`)
+- `List[X]` / `list[x]` fields stay a single array param — never flattened
+- Types not defined in `schemas:` (e.g. `EmailStr`) fall back to a single scalar param named after the model type
+JS reserved keywords used as param names (e.g. `private`) are escaped with a trailing underscore (`private_`); the body reassembly preserves the original snake_case key.
 
 ### 4. Framework Registry (`generators/__init__.py`)
 
@@ -132,11 +149,12 @@ Encapsulates source path resolution. Currently resolves against local sibling di
 | Source | Local path | GitHub target (future) |
 |--------|-----------|----------------------|
 | Controllers | `../mediaviz_intelligence_hub/api_docs/` | `imaige/mediaviz_intelligence_hub` → `api_docs/` |
+| Schemas | `../mediaviz_intelligence_hub/api_docs/api_schemas.yaml` | same repo, same path |
 | Flow YAML files | `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` | `imaige/mediaviz_intelligence_hub` → `common_flows/sdk_endpoints/` |
 | OAuth SDK | `../oauth_library/sdk/` | `imaige/oauth_library` → `sdk/` |
 
 **Key functions:**
-- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir)`
+- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir, schemas_path)`
 - `resolve_flow_path(flow_name, flows_dir)` — returns path to `{flow_name}.yaml`, exits with available flows if not found
 
 ### 6. CLI Entrypoint (`generate.py`)
@@ -152,20 +170,22 @@ python generate.py --endpoints getting_started_sdk_endpoints --branch feature/ne
 | `--endpoints` | yes | Flow name in `common_flows/sdk_endpoints/` (e.g., `basic_sdk_flow_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
 | `--branch` | no | Git branch to use for all source repos. Falls back to `main` if branch not found. Currently accepted but unused in local mode. |
 | `--frameworks` | no | Comma-separated list of frameworks to generate. Default: all registered. |
-| `--destination-dir` | no | Output folder name in package root. Created if it doesn't exist. Default: `sdk_files`. |
+| `--destination-dir` | no | Output folder name in package root. Created if it doesn't exist. Default: `sdk`. |
+| `--minor-version` | no | Increment the minor version number and reset iteration to 0. Mutually exclusive with `--major-version`. |
+| `--major-version` | no | Increment the major version number and reset minor + iteration to 0. Mutually exclusive with `--minor-version`. |
 
-Output is written to the folder specified by `--destination-dir` (default `./sdk_files/`). Versioning and archiving behavior is identical regardless of destination.
+Output is written to the folder specified by `--destination-dir` (default `./sdk/`). Versioning and archiving behavior is identical regardless of destination.
 
 **Run sequence:**
 1. Resolve source paths via `fetch_sources(branch)` — yields controllers dir, OAuth SDK root, and flows dir
 2. Resolve flow name to YAML path via `resolve_flow_path()` — fails with available flows if not found
-3. Determine next version number by scanning `sdk_files/` for `v{N}` directories
-4. Archive all existing `sdk_files/v{N}` directories to `sdk_files/archive/v{N}`
+3. Determine next version number by scanning `sdk/` for `v{major}.{minor}.{iteration}` directories, applying the requested bump type
+4. Archive all existing `sdk/v*` directories to `sdk/archive/`
 5. Resolve refs: endpoint refs (contain `#`) are resolved into flattened endpoints; composite refs (no `#`) are collected as file paths
 6. If composites are present, resolve composite files and validate that every composite step endpoint exists in the endpoint list (fail if not)
 7. For each requested framework:
    a. Instantiate generator
-   b. Create `sdk_files/v{N}/{framework}/`
+   b. Create `sdk/v{ver}/{framework}/`
    c. Call `copy_auth_wrapper()` to bundle OAuth SDK source
    d. Call `generate()` to emit SDK files
 5. Print summary: version number, frameworks generated, file counts
@@ -299,7 +319,7 @@ export * from './projects.js';
 
 ### Bundled Auth Wrapper
 
-Copied into `sdk_files/v{N}/{framework}/oauth/` directly from the source OAuth SDK for that framework.
+Copied into `sdk/v{ver}/{framework}/oauth/` directly from the source OAuth SDK for that framework.
 
 **PHP PSR-4 normalization:** After copying, the PHP generator splits any multi-class `Types.php` into individual files (one class per file, e.g. `OAuthClientConfig.php`, `TokenResponse.php`) to match PSR-4 autoloading conventions. The `files` autoload entry for `Types.php` is removed from `composer.json` since PSR-4 handles discovery.
 
@@ -448,7 +468,7 @@ Every endpoint referenced by a composite's steps must also be present in the sam
 ## Constraints
 
 - All generated code is read-only by convention. Manual edits go into a separate layer (not covered by this spec).
-- Previous version directories are archived to `sdk_files/archive/` when a new version is generated. Archived versions are never modified or deleted.
+- Previous version directories are archived to `sdk/archive/` when a new version is generated. Archived versions are never modified or deleted.
 - When adding a new framework generator, the project `.gitignore` must be updated to ignore that framework's dependency/install directories (e.g., `node_modules/` for JS, `vendor/` for PHP). This prevents committed generated SDKs from including third-party dependency trees.
 - The resolved YAML is the source of truth for what was generated in a given version — it is an immutable snapshot, packaged inside the version directory.
 - No runtime dependencies beyond the bundled OAuth SDK and the language's standard HTTP primitives (`fetch` for JS, `curl` for PHP).

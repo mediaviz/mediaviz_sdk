@@ -63,6 +63,57 @@ class BaseGenerator(ABC):
             groups.setdefault(controller, []).append(comp)
         return groups
 
+    # ── expanded request_body helpers ──────────────────────────────────────
+
+    @staticmethod
+    def _body_shape(request_body) -> str | None:
+        """Classify a resolved request_body.
+
+        Returns one of:
+          - None                : no body
+          - "scalar"           : {"_shape": "scalar", ...}   (model type not in schemas)
+          - "expanded"         : {"_shape": "expanded", ...} (flattened from _model)
+          - "flat_dict"        : plain dict of fields (legacy non-_model)
+          - "generic"          : truthy non-dict sentinel (legacy opaque body)
+        """
+        if request_body is None:
+            return None
+        if isinstance(request_body, dict):
+            shape = request_body.get("_shape")
+            if shape in ("scalar", "expanded"):
+                return shape
+            return "flat_dict"
+        return "generic"
+
+    @staticmethod
+    def _expanded_fields(request_body: dict) -> list[dict]:
+        return request_body.get("fields", [])
+
+    @staticmethod
+    def _order_expanded_fields(fields: list[dict]) -> list[dict]:
+        """Required fields first (declaration order), then optional (declaration order)."""
+        required = [f for f in fields if f.get("required")]
+        optional = [f for f in fields if not f.get("required")]
+        return required + optional
+
+    @staticmethod
+    def _group_fields_by_path(fields: list[dict]) -> dict:
+        """Build a nested tree keyed by snake-case path for body reassembly.
+
+        Leaves are the field dicts themselves; branches are dicts mapping
+        snake key -> subtree. Preserves input field order at each level.
+        """
+        root: dict = {}
+        for f in fields:
+            path = f.get("orig_path") or [f["snake"]]
+            cursor = root
+            for key in path[:-1]:
+                if key not in cursor or not isinstance(cursor[key], dict) or "_leaf" in cursor[key]:
+                    cursor[key] = {}
+                cursor = cursor[key]
+            cursor[path[-1]] = {"_leaf": f}
+        return root
+
     @staticmethod
     def snake_to_camel(name: str) -> str:
         return _snake_to_camel(name)
@@ -86,6 +137,14 @@ class BaseGenerator(ABC):
                 if step.get("endpoint", {}).get("api_host"):
                     hosts.add(step["endpoint"]["api_host"])
         return hosts
+
+    @abstractmethod
+    def _optional_check_expr(self, expr: str) -> str:
+        """Return a boolean expression that is true when *expr* is present and non-null.
+
+        Each framework must handle the case where the underlying key/property
+        does not exist at all (not just null/undefined).
+        """
 
     @abstractmethod
     def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str) -> None:

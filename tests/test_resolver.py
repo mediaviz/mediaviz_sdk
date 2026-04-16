@@ -1,11 +1,74 @@
 import os
-import yaml
+import textwrap
+from types import SimpleNamespace
+
 import pytest
+import yaml
 
 from resolver import parse_ref, resolve_refs, write_flattened_yaml
 
-DOCS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "../../mediaviz_docs/api_docs"))
-TOP_ENDPOINTS = os.path.join(DOCS_DIR, "top_endpoints.yaml")
+
+@pytest.fixture
+def docs(tmp_path):
+    """Minimal ref-list + controllers tree to exercise the resolver."""
+    ctrl_dir = tmp_path / "controllers"
+    ctrl_dir.mkdir()
+    (ctrl_dir / "photos.yaml").write_text(textwrap.dedent("""\
+        controller: Photos
+        base_path: /api/v1
+        endpoints:
+          - id: get_photos_sort
+            method: GET
+            path: /api/v1/photos/{table_name}/sort/{sort_order}/
+            summary: List photos sorted
+            auth: required
+            params:
+              - name: table_name
+                in: path
+                type: string
+                required: true
+              - name: sort_order
+                in: path
+                type: string
+                required: true
+              - name: limit
+                in: query
+                type: integer
+                required: false
+              - name: last_id
+                in: query
+                type: integer
+                required: false
+            request_body: null
+            response: null
+            content_type: null
+            tags: []
+    """))
+    (ctrl_dir / "users.yaml").write_text(textwrap.dedent("""\
+        controller: Users
+        base_path: /api/v1
+        endpoints:
+          - id: create_users_new_company
+            method: POST
+            path: /api/v1/users/new_company
+            summary: Create a new company user
+            auth: none
+            params: []
+            request_body:
+              name:
+                type: string
+                required: true
+            response: null
+            content_type: application/json
+            tags: []
+    """))
+    top = tmp_path / "top_endpoints.yaml"
+    top.write_text(textwrap.dedent("""\
+        refs:
+          - ref: "controllers/photos.yaml#get_photos_sort"
+          - ref: "controllers/users.yaml#create_users_new_company"
+    """))
+    return SimpleNamespace(top=str(top), ctrl_dir=str(ctrl_dir))
 
 
 # --- parse_ref ---
@@ -29,45 +92,48 @@ def test_parse_ref_preserves_subpath():
 
 # --- resolve_refs ---
 
-def test_resolve_top_endpoints_count():
+def test_resolve_top_endpoints_count(docs):
     """All refs in top_endpoints.yaml must resolve."""
-    with open(TOP_ENDPOINTS) as f:
+    with open(docs.top) as f:
         ref_list = yaml.safe_load(f)
     expected_count = len(ref_list["refs"])
 
-    endpoints = resolve_refs(TOP_ENDPOINTS)
+    endpoints, _ = resolve_refs(docs.top)
     assert len(endpoints) == expected_count
 
 
-def test_resolve_preserves_required_fields():
-    endpoints = resolve_refs(TOP_ENDPOINTS)
-    required_keys = {"id", "controller", "base_path", "method", "path", "summary",
-                     "auth", "params", "request_body", "response", "content_type", "tags",
-                     "hidden"}
+def test_resolve_preserves_required_fields(docs):
+    endpoints, _ = resolve_refs(docs.top)
+    # _flatten() always emits these keys (resolver.py:228-244)
+    required_keys = {
+        "id", "function_name", "controller", "base_path", "method", "path",
+        "summary", "auth", "params", "request_body", "response", "content_type",
+        "tags", "hidden", "api_host",
+    }
     for ep in endpoints:
-        assert required_keys == set(ep.keys()), f"Missing keys in endpoint: {ep['id']}"
+        assert required_keys == set(ep.keys()), f"Mismatched keys in endpoint: {ep['id']}"
 
 
-def test_resolve_photos_sort_fields():
-    endpoints = resolve_refs(TOP_ENDPOINTS)
-    ep = next(e for e in endpoints if e["id"] == "get_photos_by_month_year_sort")
+def test_resolve_photos_sort_fields(docs):
+    endpoints, _ = resolve_refs(docs.top)
+    ep = next(e for e in endpoints if e["id"] == "get_photos_sort")
 
     assert ep["controller"] == "Photos"
     assert ep["base_path"] == "/api/v1"
     assert ep["method"] == "GET"
-    assert ep["path"] == "/api/v1/photos/{projectTable}/month/{month}/year/{year}/"
+    assert ep["path"] == "/api/v1/photos/{table_name}/sort/{sort_order}/"
     assert ep["auth"] == "required"
     assert isinstance(ep["params"], list)
-    assert len(ep["params"]) == 6
+    assert len(ep["params"]) == 4
 
     path_params = [p for p in ep["params"] if p["in"] == "path"]
     query_params = [p for p in ep["params"] if p["in"] == "query"]
-    assert {p["name"] for p in path_params} == {"projectTable", "month", "year"}
-    assert {p["name"] for p in query_params} == {"asc_or_desc", "last_id", "limit"}
+    assert {p["name"] for p in path_params} == {"table_name", "sort_order"}
+    assert {p["name"] for p in query_params} == {"limit", "last_id"}
 
 
-def test_resolve_unauth_endpoint():
-    endpoints = resolve_refs(TOP_ENDPOINTS)
+def test_resolve_unauth_endpoint(docs):
+    endpoints, _ = resolve_refs(docs.top)
     ep = next(e for e in endpoints if e["id"] == "create_users_new_company")
     assert ep["auth"] == "none"
     assert ep["content_type"] == "application/json"
@@ -77,15 +143,21 @@ def test_resolve_unauth_endpoint():
 def test_resolve_unknown_endpoint_raises(tmp_path):
     ref_list = {"refs": [{"ref": "controllers/photos.yaml#nonexistent_id"}]}
     ref_list_path = str(tmp_path / "refs.yaml")
-    import yaml as _yaml
     with open(ref_list_path, "w") as f:
-        _yaml.dump(ref_list, f)
+        yaml.dump(ref_list, f)
 
-    # Copy photos.yaml so the path resolves
-    import shutil
     ctrl_dir = tmp_path / "controllers"
     ctrl_dir.mkdir()
-    shutil.copy(os.path.join(DOCS_DIR, "controllers/photos.yaml"), ctrl_dir / "photos.yaml")
+    (ctrl_dir / "photos.yaml").write_text(textwrap.dedent("""\
+        controller: Photos
+        base_path: /api/v1
+        endpoints:
+          - id: get_photos
+            method: GET
+            path: /api/v1/photos/
+            auth: required
+            params: []
+    """))
 
     with pytest.raises(ValueError, match="not found"):
         resolve_refs(ref_list_path)
@@ -93,10 +165,10 @@ def test_resolve_unknown_endpoint_raises(tmp_path):
 
 # --- write_flattened_yaml ---
 
-def test_write_flattened_yaml_structure(tmp_path):
-    endpoints = resolve_refs(TOP_ENDPOINTS)
+def test_write_flattened_yaml_structure(docs, tmp_path):
+    endpoints, _ = resolve_refs(docs.top)
     version_dir = str(tmp_path / "v3")
-    out_path = write_flattened_yaml(endpoints, TOP_ENDPOINTS, version_dir)
+    out_path = write_flattened_yaml(endpoints, docs.top, version_dir)
 
     assert os.path.isfile(out_path)
     assert os.path.basename(out_path) == "resolved_top_endpoints.yaml"
@@ -110,8 +182,8 @@ def test_write_flattened_yaml_structure(tmp_path):
     assert len(data["endpoints"]) == len(endpoints)
 
 
-def test_write_flattened_yaml_creates_version_dir(tmp_path):
-    endpoints = resolve_refs(TOP_ENDPOINTS)
+def test_write_flattened_yaml_creates_version_dir(docs, tmp_path):
+    endpoints, _ = resolve_refs(docs.top)
     version_dir = str(tmp_path / "v1")
-    write_flattened_yaml(endpoints, TOP_ENDPOINTS, version_dir)
+    write_flattened_yaml(endpoints, docs.top, version_dir)
     assert os.path.isdir(tmp_path / "v1")
