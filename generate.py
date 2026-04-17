@@ -100,17 +100,19 @@ def main() -> None:
         version_dir = os.path.join(output_dir, f"v{ver}")
 
         schemas = load_schemas(sources.schemas_path)
-        endpoints, composite_paths = resolve_refs(
+        endpoints, composite_paths, resolve_warnings = resolve_refs(
             endpoints_path, controllers_dir=controllers_dir, schemas=schemas,
         )
+        all_warnings = list(resolve_warnings)
         resolved_path = write_flattened_yaml(endpoints, endpoints_path, version_dir)
         print(f"Resolved {len(endpoints)} endpoints → {resolved_path}")
 
         composites = None
         if composite_paths:
-            composites = resolve_composite_files(
+            composites, comp_warnings = resolve_composite_files(
                 composite_paths, controllers_dir=controllers_dir, schemas=schemas,
             )
+            all_warnings.extend(comp_warnings)
             try:
                 validate_composite_endpoints(composites, endpoints)
             except ValueError as e:
@@ -145,6 +147,11 @@ def main() -> None:
 
         if test_results:
             print_test_summary(test_results)
+
+        if all_warnings:
+            print(f"\n── Warnings ({len(all_warnings)}) ────────────────────────────────")
+            for w in all_warnings:
+                print(f"  {w}")
 
 
 if __name__ == "__main__":

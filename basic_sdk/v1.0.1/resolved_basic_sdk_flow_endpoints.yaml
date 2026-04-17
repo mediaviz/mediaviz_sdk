@@ -1,5 +1,5 @@
 source: basic_sdk_flow_endpoints.yaml
-resolved_at: '2026-04-16T16:41:09Z'
+resolved_at: '2026-04-17T11:59:40Z'
 endpoints:
 - id: get_get_all_project_photo_ids
   function_name: get_all_project_photo_ids
@@ -53,38 +53,6 @@ endpoints:
   - name: keyword_list_id
     in: query
     type: int
-    required: false
-  request_body: null
-  response: null
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
-- id: get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
-  function_name: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
-  controller: Photos
-  base_path: /api/v1
-  method: GET
-  path: /api/v1/photos/{table_name}/month/{month}/year/{year}/ranked
-  summary: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
-  auth: required
-  params:
-  - name: table_name
-    in: path
-    type: str
-    required: true
-  - name: month
-    in: path
-    type: int
-    required: true
-  - name: year
-    in: path
-    type: int
-    required: true
-  - name: asc_or_desc
-    in: query
-    type: str
     required: false
   request_body: null
   response: null
@@ -258,13 +226,34 @@ endpoints:
       kind: primitive
       orig_path:
       - name
-    - name: credits
-      snake: credits
+    - name: email
+      snake: email
+      type: EmailStr
+      required: true
+      kind: primitive
+      orig_path:
+      - email
+    - name: companyId
+      snake: company_id
       type: int
       required: false
       kind: primitive
       orig_path:
-      - credits
+      - company_id
+    - name: accountType
+      snake: account_type
+      type: int
+      required: true
+      kind: primitive
+      orig_path:
+      - account_type
+    - name: profilePicture
+      snake: profile_picture
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - profile_picture
     - name: paymentPlanType
       snake: payment_plan_type
       type: str
@@ -272,6 +261,27 @@ endpoints:
       kind: primitive
       orig_path:
       - payment_plan_type
+    - name: password
+      snake: password
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - password
+    - name: companyName
+      snake: company_name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - company_name
+    - name: credits
+      snake: credits
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - credits
   response: null
   content_type: null
   tags:

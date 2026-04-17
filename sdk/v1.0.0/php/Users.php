@@ -70,15 +70,27 @@ class Users {
 
     public function createUserAndCompany(
         string $name,
-        ?int $credits = null,
-        ?string $paymentPlanType = null
+        string $email,
+        int $accountType,
+        string $password,
+        ?int $companyId = null,
+        ?string $profilePicture = null,
+        ?string $paymentPlanType = null,
+        ?string $companyName = null,
+        ?int $credits = null
     ): mixed {
         $baseUrl = $this->ctx->baseUrl;
         $path = "/api/v1/users/new_company";
         $body = array_filter([
             'name' => $name,
-            'credits' => $credits,
+            'email' => $email,
+            'company_id' => $companyId,
+            'account_type' => $accountType,
+            'profile_picture' => $profilePicture,
             'payment_plan_type' => $paymentPlanType,
+            'password' => $password,
+            'company_name' => $companyName,
+            'credits' => $credits,
         ], fn($v) => $v !== null);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $baseUrl . $path);

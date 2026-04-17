@@ -157,8 +157,8 @@ def resolve_refs(
     ref_list_path: str,
     controllers_dir: str | None = None,
     schemas: dict | None = None,
-) -> tuple[list[dict], list[str]]:
-    """Read ref-list YAML, follow each ref into controller YAMLs, return flattened endpoints and composite file paths.
+) -> tuple[list[dict], list[str], list[str]]:
+    """Read ref-list YAML, follow each ref into controller YAMLs, return flattened endpoints, composite file paths, and warnings.
 
     Endpoint refs contain '#' (e.g. controllers/photos.yaml#get_photos).
     Composite refs have no '#' (e.g. composites/upload_photos.yaml).
@@ -173,6 +173,7 @@ def resolve_refs(
     controller_cache: dict[str, dict] = {}
     endpoints = []
     composite_paths = []
+    warnings: list[str] = []
 
     for item in refs:
         ref = item["ref"]
@@ -190,11 +191,12 @@ def resolve_refs(
         ctrl = controller_cache[controller_path]
         matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
         if not matching:
-            raise ValueError(f"Endpoint '{endpoint_id}' not found in {controller_path}")
+            warnings.append(f"Endpoint '{endpoint_id}' not found in {controller_path} — skipped")
+            continue
 
         endpoints.append(_flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas))
 
-    return endpoints, composite_paths
+    return endpoints, composite_paths, warnings
 
 
 def _normalize_path(path: str, params: list[dict]) -> tuple[str, list[dict]]:
@@ -248,8 +250,8 @@ def resolve_composites(
     composites_path: str,
     controllers_dir: str | None = None,
     schemas: dict | None = None,
-) -> list[dict]:
-    """Read composites ref-list YAML, resolve each step's endpoint ref, return composites with embedded endpoints."""
+) -> tuple[list[dict], list[str]]:
+    """Read composites ref-list YAML, resolve each step's endpoint ref, return composites with embedded endpoints and warnings."""
     schemas = schemas or {}
     with open(composites_path) as f:
         ref_list = yaml.safe_load(f)
@@ -259,6 +261,7 @@ def resolve_composites(
     resolve_base = controllers_dir if controllers_dir else base_dir
     controller_cache: dict[str, dict] = {}
     result = []
+    warnings: list[str] = []
 
     for item in composites_list:
         composite_file = os.path.normpath(os.path.join(resolve_base, item["ref"]))
@@ -275,7 +278,8 @@ def resolve_composites(
             ctrl = controller_cache[controller_path]
             matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
             if not matching:
-                raise ValueError(f"Endpoint '{endpoint_id}' not found in {controller_path}")
+                warnings.append(f"Composite '{composite['id']}' step endpoint '{endpoint_id}' not found in {controller_path} — skipped")
+                continue
             flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
             resolved_step = {k: v for k, v in step.items() if k != "ref"}
             resolved_step["endpoint"] = flat_ep
@@ -292,18 +296,19 @@ def resolve_composites(
             "returns": composite.get("returns"),
         })
 
-    return result
+    return result, warnings
 
 
 def resolve_composite_files(
     composite_paths: list[str],
     controllers_dir: str | None = None,
     schemas: dict | None = None,
-) -> list[dict]:
-    """Resolve individual composite YAML files (not a ref-list). Each path points directly to a composite definition."""
+) -> tuple[list[dict], list[str]]:
+    """Resolve individual composite YAML files (not a ref-list). Each path points directly to a composite definition and warnings."""
     schemas = schemas or {}
     controller_cache: dict[str, dict] = {}
     result = []
+    warnings: list[str] = []
 
     for comp_path in composite_paths:
         abs_path = os.path.abspath(comp_path)
@@ -322,7 +327,8 @@ def resolve_composite_files(
             ctrl = controller_cache[controller_path]
             matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
             if not matching:
-                raise ValueError(f"Endpoint '{endpoint_id}' not found in {controller_path}")
+                warnings.append(f"Composite '{composite['id']}' step endpoint '{endpoint_id}' not found in {controller_path} — skipped")
+                continue
             flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
             resolved_step = {k: v for k, v in step.items() if k != "ref"}
             resolved_step["endpoint"] = flat_ep
@@ -339,7 +345,7 @@ def resolve_composite_files(
             "returns": composite.get("returns"),
         })
 
-    return result
+    return result, warnings
 
 
 def validate_composite_endpoints(composites: list[dict], endpoints: list[dict]) -> None:

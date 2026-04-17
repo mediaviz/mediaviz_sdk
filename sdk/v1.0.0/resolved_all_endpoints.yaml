@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-04-16T16:40:52Z'
+resolved_at: '2026-04-17T11:58:41Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -2205,62 +2205,6 @@ endpoints:
   - all
   hidden: false
   api_host: null
-- id: get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked
-  function_name: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked
-  controller: Photos
-  base_path: /api/v1
-  method: GET
-  path: /api/v1/photos_ranked/{table_name}
-  summary: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked
-  auth: required
-  params:
-  - name: table_name
-    in: path
-    type: str
-    required: true
-  - name: asc_or_desc
-    in: query
-    type: str
-    required: false
-  request_body: null
-  response: null
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
-- id: get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked_keyset_paginated
-  function_name: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked_keyset_paginated
-  controller: Photos
-  base_path: /api/v1
-  method: GET
-  path: /api/v1/photos_ranked/{table_name}/
-  summary: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_new_ranked_keyset_paginated
-  auth: required
-  params:
-  - name: table_name
-    in: path
-    type: str
-    required: true
-  - name: asc_or_desc
-    in: query
-    type: str
-    required: false
-  - name: last_id
-    in: query
-    type: Optional[int]
-    required: false
-  - name: limit
-    in: query
-    type: Optional[int]
-    required: false
-  request_body: null
-  response: null
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
 - id: get_get_project_month_years_with_photos
   function_name: get_project_month_years_with_photos
   controller: Photos
@@ -2377,78 +2321,6 @@ endpoints:
   - name: asc_or_desc
     in: query
     type: str
-    required: false
-  request_body: null
-  response: null
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
-- id: get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
-  function_name: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
-  controller: Photos
-  base_path: /api/v1
-  method: GET
-  path: /api/v1/photos/{table_name}/month/{month}/year/{year}/ranked
-  summary: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked
-  auth: required
-  params:
-  - name: table_name
-    in: path
-    type: str
-    required: true
-  - name: month
-    in: path
-    type: int
-    required: true
-  - name: year
-    in: path
-    type: int
-    required: true
-  - name: asc_or_desc
-    in: query
-    type: str
-    required: false
-  request_body: null
-  response: null
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
-- id: get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked_keyset_paginated
-  function_name: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked_keyset_paginated
-  controller: Photos
-  base_path: /api/v1
-  method: GET
-  path: /api/v1/photos/{table_name}/month/{month}/year/{year}/ranked/
-  summary: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_new_ranked_keyset_paginated
-  auth: required
-  params:
-  - name: table_name
-    in: path
-    type: str
-    required: true
-  - name: month
-    in: path
-    type: int
-    required: true
-  - name: year
-    in: path
-    type: int
-    required: true
-  - name: asc_or_desc
-    in: query
-    type: str
-    required: false
-  - name: last_id
-    in: query
-    type: Optional[int]
-    required: false
-  - name: limit
-    in: query
-    type: Optional[int]
     required: false
   request_body: null
   response: null
@@ -3980,13 +3852,34 @@ endpoints:
       kind: primitive
       orig_path:
       - name
-    - name: credits
-      snake: credits
+    - name: email
+      snake: email
+      type: EmailStr
+      required: true
+      kind: primitive
+      orig_path:
+      - email
+    - name: companyId
+      snake: company_id
       type: int
       required: false
       kind: primitive
       orig_path:
-      - credits
+      - company_id
+    - name: accountType
+      snake: account_type
+      type: int
+      required: true
+      kind: primitive
+      orig_path:
+      - account_type
+    - name: profilePicture
+      snake: profile_picture
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - profile_picture
     - name: paymentPlanType
       snake: payment_plan_type
       type: str
@@ -3994,6 +3887,27 @@ endpoints:
       kind: primitive
       orig_path:
       - payment_plan_type
+    - name: password
+      snake: password
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - password
+    - name: companyName
+      snake: company_name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - company_name
+    - name: credits
+      snake: credits
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - credits
   response: null
   content_type: null
   tags:

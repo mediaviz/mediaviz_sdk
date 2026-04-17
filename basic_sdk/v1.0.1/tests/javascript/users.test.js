@@ -13,7 +13,7 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 42, 'test_value');
+    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     expect(spy.last_call().method).toBe('POST');
   });
 
@@ -22,7 +22,7 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 42, 'test_value');
+    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     expect(spy.last_call().url).toContain('/api/v1/users/new_company');
   });
 
@@ -31,11 +31,17 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 42, 'test_value');
+    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     const body = JSON.parse(spy.last_call().body);
     expect(body).toHaveProperty('name');
-    expect(body).toHaveProperty('credits');
+    expect(body).toHaveProperty('email');
+    expect(body).toHaveProperty('company_id');
+    expect(body).toHaveProperty('account_type');
+    expect(body).toHaveProperty('profile_picture');
     expect(body).toHaveProperty('payment_plan_type');
+    expect(body).toHaveProperty('password');
+    expect(body).toHaveProperty('company_name');
+    expect(body).toHaveProperty('credits');
   });
 
   it('createUserAndCompany — auth routing', async () => {
@@ -43,7 +49,7 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 42, 'test_value');
+    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     expect(spy.calls.length).toBe(1);
   });
 

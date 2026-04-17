@@ -81,42 +81,4 @@ describe('Photos', () => {
     expect(spy.calls.length).toBe(1);
   });
 
-  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked — exists', () => {
-    const photos = new Photos({});
-    expect(typeof photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked).toBe('function');
-  });
-
-  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked — HTTP method is GET', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const photos = new Photos(ctx);
-    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked('test_value', 42, 42, { ascOrDesc: 'test_value' });
-    expect(spy.last_call().method).toBe('GET');
-  });
-
-  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked — path construction', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const photos = new Photos(ctx);
-    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked('hello world', 42, 42, { ascOrDesc: 'test_value' });
-    expect(spy.last_call().path).toContain('/api/v1/photos/hello%20world/month/42/year/42/ranked');
-  });
-
-  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked — query params', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const photos = new Photos(ctx);
-    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked('test_value', 42, 42, { ascOrDesc: 'test_value' });
-    const path = spy.last_call().path;
-    expect(path).toContain('asc_or_desc=');
-  });
-
-  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked — auth routing', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const photos = new Photos(ctx);
-    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked('test_value', 42, 42, { ascOrDesc: 'test_value' });
-    expect(spy.calls.length).toBe(1);
-  });
-
 });

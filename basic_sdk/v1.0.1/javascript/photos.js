@@ -24,15 +24,4 @@ export class Photos {
     const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
     return data;
   }
-
-  async getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateNewRanked(tableName, month, year, { ascOrDesc } = {}) {
-    this._ctx.requireTokens();
-    let path = `/api/v1/photos/${encodeURIComponent(tableName)}/month/${encodeURIComponent(month)}/year/${encodeURIComponent(year)}/ranked`;
-    const query = new URLSearchParams();
-    if (ascOrDesc !== undefined) query.set('asc_or_desc', ascOrDesc);
-    const qs = query.toString();
-    if (qs) path += '?' + qs;
-    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
-    return data;
-  }
 }
