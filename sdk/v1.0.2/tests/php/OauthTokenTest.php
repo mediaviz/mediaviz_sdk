@@ -28,6 +28,31 @@ class OauthTokenTest extends TestCase {
         $this->assertTrue(method_exists(OauthToken::class, 'token'));
     }
 
+    public function test_delete_admin_revoke_user_tokens_exists(): void {
+        $this->assertTrue(method_exists(OauthToken::class, 'adminRevokeUserTokens'));
+    }
+
+    public function test_delete_admin_revoke_user_tokens_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new OauthToken($ctx);
+        $obj->adminRevokeUserTokens(42);
+        $this->assertSame('DELETE', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_delete_admin_revoke_user_tokens_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new OauthToken($ctx);
+        $obj->adminRevokeUserTokens(42);
+        $this->assertStringContainsString('/oauth/admin/users/42/revoke-tokens', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_delete_admin_revoke_user_tokens_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new OauthToken($ctx);
+        $obj->adminRevokeUserTokens(42);
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
     public function test_post_revoke_exists(): void {
         $this->assertTrue(method_exists(OauthToken::class, 'revoke'));
     }

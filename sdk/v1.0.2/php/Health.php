@@ -4,39 +4,19 @@ namespace MediaVizSdk;
 
 require_once __DIR__ . '/Exceptions.php';
 
-class OauthToken {
+class Health {
     private object $ctx;
 
     public function __construct(object $ctx) {
         $this->ctx = $ctx;
     }
 
-    public function token(
-        mixed $grantType,
-        mixed $code,
-        mixed $redirectUri,
-        mixed $clientId,
-        mixed $codeVerifier,
-        mixed $refreshToken,
-        mixed $clientSecret
-    ): mixed {
+    public function healthCheck(): mixed {
         $baseUrl = $this->ctx->baseUrl;
-        $path = "/oauth/token";
-        $body = [
-            'grant_type' => $grantType,
-            'code' => $code,
-            'redirect_uri' => $redirectUri,
-            'client_id' => $clientId,
-            'code_verifier' => $codeVerifier,
-            'refresh_token' => $refreshToken,
-            'client_secret' => $clientSecret,
-        ];
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $baseUrl . $path);
+        $path = "/api/v1/health/";
+        $ch = curl_init($baseUrl . $path);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($body));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
         curl_setopt($ch, CURLOPT_HEADER, true);
         $raw = curl_exec($ch);
         $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -47,24 +27,28 @@ class OauthToken {
         return handleResponse($body, $statusCode, $headers);
     }
 
-    public function revoke(
-        mixed $token,
-        mixed $tokenTypeHint,
-        mixed $clientId
-    ): mixed {
+    public function livenessCheck(): mixed {
         $baseUrl = $this->ctx->baseUrl;
-        $path = "/oauth/revoke";
-        $body = [
-            'token' => $token,
-            'token_type_hint' => $tokenTypeHint,
-            'client_id' => $clientId,
-        ];
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $baseUrl . $path);
+        $path = "/api/v1/health/live/";
+        $ch = curl_init($baseUrl . $path);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($body));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        $raw = curl_exec($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+        $headers = self::parseHeaders(substr($raw, 0, $headerSize));
+        $body = substr($raw, $headerSize);
+        return handleResponse($body, $statusCode, $headers);
+    }
+
+    public function readinessCheck(): mixed {
+        $baseUrl = $this->ctx->baseUrl;
+        $path = "/api/v1/health/ready";
+        $ch = curl_init($baseUrl . $path);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
         curl_setopt($ch, CURLOPT_HEADER, true);
         $raw = curl_exec($ch);
         $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

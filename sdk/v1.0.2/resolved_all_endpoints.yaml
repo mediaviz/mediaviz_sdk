@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-04-17T13:32:21Z'
+resolved_at: '2026-04-17T14:53:32Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -892,6 +892,38 @@ endpoints:
   - all
   hidden: false
   api_host: null
+- id: get_liveness_check
+  function_name: liveness_check
+  controller: Health
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/health/live/
+  summary: liveness_check
+  auth: none
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_readiness_check
+  function_name: readiness_check
+  controller: Health
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/health/ready
+  summary: readiness_check
+  auth: none
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
 - id: post_create_keyword_filtering_list
   function_name: create_keyword_filtering_list
   controller: Keywords
@@ -1449,6 +1481,26 @@ endpoints:
   - all
   hidden: false
   api_host: null
+- id: delete_admin_revoke_user_tokens
+  function_name: admin_revoke_user_tokens
+  controller: OAuth Token
+  base_path: /
+  method: DELETE
+  path: /oauth/admin/users/{user_id}/revoke-tokens
+  summary: admin_revoke_user_tokens
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
 - id: post_revoke
   function_name: revoke
   controller: OAuth Token
@@ -1780,6 +1832,38 @@ endpoints:
   - all
   hidden: false
   api_host: null
+- id: get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated
+  function_name: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos_ranked/{table_name}/
+  summary: get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
 - id: get_get_project_month_years_with_photos
   function_name: get_project_month_years_with_photos
   controller: Photos
@@ -1896,6 +1980,46 @@ endpoints:
   - name: asc_or_desc
     in: query
     type: str
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated
+  function_name: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/month/{month}/year/{year}/ranked/
+  summary: get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: month
+    in: path
+    type: int
+    required: true
+  - name: year
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
     required: false
   request_body: null
   response: null
@@ -3344,3 +3468,104 @@ endpoints:
   - all
   hidden: false
   api_host: null
+- id: post_upload_photo
+  function_name: upload_photo_to_mediaviz
+  controller: PhotoUpload
+  base_path: /
+  method: POST
+  path: /photo_upload
+  summary: Upload a preprocessed photo with metadata via headers
+  auth: required
+  params:
+  - name: x-bucket-name
+    in: header
+    type: string
+    required: true
+  - name: x-photo-index
+    in: header
+    type: string
+    required: true
+  - name: x-company-id
+    in: header
+    type: string
+    required: true
+  - name: x-user-id
+    in: header
+    type: string
+    required: true
+  - name: x-project-table-name
+    in: header
+    type: string
+    required: true
+  - name: x-client-side-id
+    in: header
+    type: string
+    required: false
+  - name: x-title
+    in: header
+    type: string (original filename)
+    required: true
+  - name: x-blur
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-colors
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-face-recognition
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-classification
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-comparison
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-size
+    in: header
+    type: string (WxH original dimensions)
+    required: false
+  - name: x-source-resolution-x
+    in: header
+    type: string (EXIF x resolution)
+    required: false
+  - name: x-source-resolution-y
+    in: header
+    type: string (EXIF y resolution)
+    required: false
+  - name: x-date-taken
+    in: header
+    type: string (EXIF DateTimeOriginal)
+    required: false
+  - name: x-latitude
+    in: header
+    type: string (EXIF GPS latitude)
+    required: false
+  - name: x-longitude
+    in: header
+    type: string (EXIF GPS longitude)
+    required: false
+  - name: x-resized-dimensions
+    in: header
+    type: string (WxH resized dimensions, present only if image was resized)
+    required: false
+  request_body:
+    file_content:
+      type: string (base64-encoded image)
+      required: true
+    mimetype:
+      type: string (e.g. image/jpeg)
+      required: true
+    file_path:
+      type: string (original filesystem path)
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: photo_upload

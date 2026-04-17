@@ -79,6 +79,7 @@ class MediaVizClient {
     public readonly OauthToken $oAuthToken;
     public readonly OauthLogin $oauthLogin;
     public readonly Person $person;
+    public readonly Photoupload $photoUpload;
     public readonly Photos $photos;
     public readonly Projects $projects;
     public readonly Search $search;
@@ -92,6 +93,7 @@ class MediaVizClient {
             'redirectUri' => $config['redirectUri'] ?? (getenv('MEDIAVIZ_REDIRECT_URI') ?: null),
         ];
         $this->hosts = [
+            'photoUpload' => $config['hosts']['photoUpload'] ?? (getenv('MEDIAVIZ_PHOTO_UPLOAD_URL') ?: null),
         ] + ($config['hosts'] ?? []);
         $this->accessToken = $config['accessToken'] ?? null;
         $this->refreshToken = $config['refreshToken'] ?? null;
@@ -121,6 +123,7 @@ class MediaVizClient {
         $this->oAuthToken = new OauthToken($ctx);
         $this->oauthLogin = new OauthLogin($ctx);
         $this->person = new Person($ctx);
+        $this->photoUpload = new Photoupload($ctx);
         $this->photos = new Photos($ctx);
         $this->projects = new Projects($ctx);
         $this->search = new Search($ctx);

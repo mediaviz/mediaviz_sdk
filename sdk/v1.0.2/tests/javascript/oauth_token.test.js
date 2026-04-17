@@ -51,6 +51,35 @@ describe('OAuth_Token', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('adminRevokeUserTokens — exists', () => {
+    const oauthToken = new OauthToken({});
+    expect(typeof oauthToken.adminRevokeUserTokens).toBe('function');
+  });
+
+  it('adminRevokeUserTokens — HTTP method is DELETE', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const oauthToken = new OauthToken(ctx);
+    await oauthToken.adminRevokeUserTokens(42);
+    expect(spy.last_call().method).toBe('DELETE');
+  });
+
+  it('adminRevokeUserTokens — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const oauthToken = new OauthToken(ctx);
+    await oauthToken.adminRevokeUserTokens(42);
+    expect(spy.last_call().path).toContain('/oauth/admin/users/42/revoke-tokens');
+  });
+
+  it('adminRevokeUserTokens — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const oauthToken = new OauthToken(ctx);
+    await oauthToken.adminRevokeUserTokens(42);
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('revoke — exists', () => {
     const oauthToken = new OauthToken({});
     expect(typeof oauthToken.revoke).toBe('function');

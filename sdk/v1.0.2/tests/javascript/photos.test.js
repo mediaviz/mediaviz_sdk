@@ -195,6 +195,46 @@ describe('Photos', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated — exists', () => {
+    const photos = new Photos({});
+    expect(typeof photos.getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated).toBe('function');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated — HTTP method is GET', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    expect(spy.last_call().method).toBe('GET');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('hello world', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    expect(spy.last_call().path).toContain('/api/v1/photos_ranked/hello%20world/');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated — query params', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    const path = spy.last_call().path;
+    expect(path).toContain('asc_or_desc=');
+    expect(path).toContain('last_id=');
+    expect(path).toContain('limit=');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('getProjectMonthYearsWithPhotos — exists', () => {
     const photos = new Photos({});
     expect(typeof photos.getProjectMonthYearsWithPhotos).toBe('function');
@@ -337,6 +377,46 @@ describe('Photos', () => {
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const photos = new Photos(ctx);
     await photos.getTopProjectPhotosByTableNameByMonth('test_value', 42, 42, { ascOrDesc: 'test_value' });
+    expect(spy.calls.length).toBe(1);
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated — exists', () => {
+    const photos = new Photos({});
+    expect(typeof photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated).toBe('function');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated — HTTP method is GET', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('test_value', 42, 42, { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    expect(spy.last_call().method).toBe('GET');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('hello world', 42, 42, { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    expect(spy.last_call().path).toContain('/api/v1/photos/hello%20world/month/42/year/42/ranked/');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated — query params', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('test_value', 42, 42, { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    const path = spy.last_call().path;
+    expect(path).toContain('asc_or_desc=');
+    expect(path).toContain('last_id=');
+    expect(path).toContain('limit=');
+  });
+
+  it('getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const photos = new Photos(ctx);
+    await photos.getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('test_value', 42, 42, { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
     expect(spy.calls.length).toBe(1);
   });
 

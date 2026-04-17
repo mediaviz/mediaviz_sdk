@@ -176,6 +176,41 @@ class PhotosTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated_exists(): void {
+        $this->assertTrue(method_exists(Photos::class, 'getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated'));
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('test_value', 'test_value', 'test_value', 'test_value');
+        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('hello world', 'test_value', 'test_value', 'test_value');
+        $this->assertStringContainsString('/api/v1/photos_ranked/hello%20world/', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated_query_params(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('test_value', 'test_value', 'test_value', 'test_value');
+        $path = $ctx->client->lastCall()['path'];
+        $this->assertStringContainsString('asc_or_desc=', $path);
+        $this->assertStringContainsString('last_id=', $path);
+        $this->assertStringContainsString('limit=', $path);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_sorted_by_date_ranked_keyset_paginated_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameSortedByDateRankedKeysetPaginated('test_value', 'test_value', 'test_value', 'test_value');
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
     public function test_get_get_project_month_years_with_photos_exists(): void {
         $this->assertTrue(method_exists(Photos::class, 'getProjectMonthYearsWithPhotos'));
     }
@@ -299,6 +334,41 @@ class PhotosTest extends TestCase {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Photos($ctx);
         $obj->getTopProjectPhotosByTableNameByMonth('test_value', 42, 42, 'test_value');
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated_exists(): void {
+        $this->assertTrue(method_exists(Photos::class, 'getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated'));
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('test_value', 42, 42, 'test_value', 'test_value', 'test_value');
+        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('hello world', 42, 42, 'test_value', 'test_value', 'test_value');
+        $this->assertStringContainsString('/api/v1/photos/hello%20world/month/42/year/42/ranked/', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated_query_params(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('test_value', 42, 42, 'test_value', 'test_value', 'test_value');
+        $path = $ctx->client->lastCall()['path'];
+        $this->assertStringContainsString('asc_or_desc=', $path);
+        $this->assertStringContainsString('last_id=', $path);
+        $this->assertStringContainsString('limit=', $path);
+    }
+
+    public function test_get_get_top_middle_bottom_project_photos_by_table_name_by_month_sorted_by_date_ranked_keyset_paginated_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Photos($ctx);
+        $obj->getTopMiddleBottomProjectPhotosByTableNameByMonthSortedByDateRankedKeysetPaginated('test_value', 42, 42, 'test_value', 'test_value', 'test_value');
         $this->assertCount(1, $ctx->client->calls);
     }
 

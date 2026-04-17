@@ -15,6 +15,7 @@ export * from './oauth_login.js';
 export * from './oauth_token.js';
 export * from './person.js';
 export * from './photos.js';
+export * from './photoupload.js';
 export * from './projects.js';
 export * from './search.js';
 export * from './users.js';

@@ -12,6 +12,13 @@ export class OauthToken {
     return handleResponse(resp);
   }
 
+  async adminRevokeUserTokens(userId) {
+    this._ctx.requireTokens();
+    const path = `/oauth/admin/users/${encodeURIComponent(userId)}/revoke-tokens`;
+    const { data } = await this._ctx.client.request(path, 'DELETE', this._ctx.accessToken, this._ctx.refreshToken);
+    return data;
+  }
+
   async revoke({ token, tokenTypeHint, clientId }) {
     const resp = await fetch(this._ctx.baseUrl + `/oauth/revoke`, {
       method: 'POST',

@@ -1271,5 +1271,37 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 55,
+    "description": "Composite once-steps delegate to sibling methods instead of inlining — when a step's endpoint belongs to the same controller, emit this.methodName(...) with input_map mapped to positional args",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_once_step",
+        "status": "complete — same-controller steps delegate to sibling via _build_sibling_call_args; raises ValueError if sibling not found"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_build_sibling_call_args",
+        "status": "complete — maps input_map to positional signature order (path, required headers, body, optional headers for alt-host; path, body, query for auth)"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_composite_method",
+        "status": "complete — accepts and forwards sibling_eps param"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_controller_file",
+        "status": "complete — passes endpoints as sibling_eps to _emit_composite_method"
+      },
+      {
+        "file": "spec.md",
+        "location": "Composite Functions > Generator Behavior",
+        "status": "complete — updated once-step docs to distinguish same-controller delegation vs cross-controller inline"
+      }
+    ],
+    "completion_status": true
   }
 ]

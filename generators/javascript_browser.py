@@ -247,7 +247,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines.extend(self._emit_method(ep))
         for comp in (composites or []):
             lines.append("")
-            lines.extend(self._emit_composite_method(comp))
+            lines.extend(self._emit_composite_method(comp, sibling_eps=endpoints))
         lines.append("}")
         lines.append("")
         with open(filepath, "w") as f:
@@ -630,7 +630,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
     # ── composites ─────────────────────────────────────────────────────────
 
-    def _emit_composite_method(self, comp: dict) -> list[str]:
+    def _emit_composite_method(self, comp: dict, sibling_eps: list[dict] | None = None) -> list[str]:
         func_name = self.snake_to_camel(comp["function_name"])
         params = comp.get("params", [])
         steps = comp.get("steps", [])
@@ -653,7 +653,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             on_error = step.get("on_error", "abort")
 
             if execution == "once":
-                lines.extend(self._emit_composite_once_step(step_id, ep, input_map, output_as, cache, comp))
+                lines.extend(self._emit_composite_once_step(step_id, ep, input_map, output_as, cache, comp, sibling_eps))
             elif execution == "for_each":
                 for_each_over = step["for_each_over"]
                 for_each_as = step["for_each_as"]
@@ -676,7 +676,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("  }")
         return lines
 
-    def _emit_composite_once_step(self, step_id: str, ep: dict, input_map: dict, output_as: str | None, cache: dict, comp: dict) -> list[str]:
+    def _emit_composite_once_step(self, step_id: str, ep: dict, input_map: dict, output_as: str | None, cache: dict, comp: dict, sibling_eps: list[dict] | None = None) -> list[str]:
         lines = []
         var = output_as or step_id
         cache_enabled = cache.get("enabled", False)
@@ -694,7 +694,17 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             indent = "    "
             needs_decl = True
 
-        if ep.get("auth") == "required" and not ep.get("api_host"):
+        step_ctrl = ep.get("controller", "").replace(" ", "_")
+        comp_ctrl = comp.get("controller", "").replace(" ", "_")
+        if step_ctrl == comp_ctrl and sibling_eps:
+            sibling = next((e for e in sibling_eps if e["function_name"] == ep["function_name"]), None)
+            if not sibling:
+                raise ValueError(f"Composite step references '{ep['function_name']}' on {comp_ctrl} but no sibling endpoint found")
+            method_name = self.snake_to_camel(sibling["function_name"])
+            call_args = self._build_sibling_call_args(sibling, input_map, comp)
+            decl = "const " if needs_decl else ""
+            lines.append(f"{indent}{decl}{var} = await this.{method_name}({call_args});")
+        elif ep.get("auth") == "required" and not ep.get("api_host"):
             lines.extend(self._emit_call_auth_endpoint(ep, input_map, var, comp, indent, declare=needs_decl))
         else:
             lines.extend(self._emit_call_alt_host_endpoint(ep, input_map, var, comp, indent, declare=needs_decl))
@@ -704,6 +714,61 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines.append("    }")
 
         return lines
+
+    def _build_sibling_call_args(self, ep: dict, input_map: dict, comp: dict) -> str:
+        """Build argument list for calling a sibling method, matching its signature order."""
+        args: list[str] = []
+        path_params = [p for p in ep["params"] if p["in"] == "path"]
+        query_params = [p for p in ep["params"] if p["in"] == "query"]
+        header_params = [p for p in ep["params"] if p["in"] == "header"]
+        request_body = ep.get("request_body")
+
+        resolve = lambda mapped: self._resolve_js_expr(mapped, comp) if mapped else "undefined"
+
+        if ep.get("api_host"):
+            # alt-host signature: path, required headers, body, optional headers
+            for p in path_params:
+                args.append(resolve(input_map.get(p["name"])))
+            for p in header_params:
+                if p.get("required"):
+                    args.append(resolve(input_map.get(p["name"])))
+            if self._body_shape(request_body) == "flat_dict":
+                fields = self._flatten_body(request_body)
+                parts = []
+                for snake_key, camel_key in fields:
+                    val = resolve(input_map.get(snake_key))
+                    parts.append(f"{_js_safe(camel_key)}: {val}")
+                args.append("{ " + ", ".join(parts) + " }")
+            opt = [p for p in header_params if not p.get("required")]
+            if opt:
+                parts = []
+                for p in opt:
+                    mapped = input_map.get(p["name"])
+                    if mapped:
+                        parts.append(f"{self.header_to_param(p['name'])}: {resolve(mapped)}")
+                if parts:
+                    args.append("{ " + ", ".join(parts) + " }")
+        elif ep.get("auth") == "required":
+            # auth signature: path, body, query
+            for p in path_params:
+                args.append(resolve(input_map.get(p["name"])))
+            if self._body_shape(request_body) == "flat_dict":
+                fields = self._flatten_body(request_body)
+                parts = []
+                for snake_key, camel_key in fields:
+                    val = resolve(input_map.get(snake_key))
+                    parts.append(f"{_js_safe(camel_key)}: {val}")
+                args.append("{ " + ", ".join(parts) + " }")
+            if query_params:
+                parts = []
+                for p in query_params:
+                    mapped = input_map.get(p["name"])
+                    if mapped:
+                        parts.append(f"{self.snake_to_camel(p['name'])}: {resolve(mapped)}")
+                if parts:
+                    args.append("{ " + ", ".join(parts) + " }")
+
+        return ", ".join(args)
 
     def _emit_call_auth_endpoint(self, ep: dict, input_map: dict, var: str, comp: dict, indent: str, declare: bool = False) -> list[str]:
         """Emit a call to an auth endpoint via the context's client."""

@@ -98,12 +98,12 @@ def test_resolve_top_endpoints_count(docs):
         ref_list = yaml.safe_load(f)
     expected_count = len(ref_list["refs"])
 
-    endpoints, _ = resolve_refs(docs.top)
+    endpoints, *_ = resolve_refs(docs.top)
     assert len(endpoints) == expected_count
 
 
 def test_resolve_preserves_required_fields(docs):
-    endpoints, _ = resolve_refs(docs.top)
+    endpoints, *_ = resolve_refs(docs.top)
     # _flatten() always emits these keys (resolver.py:228-244)
     required_keys = {
         "id", "function_name", "controller", "base_path", "method", "path",
@@ -115,7 +115,7 @@ def test_resolve_preserves_required_fields(docs):
 
 
 def test_resolve_photos_sort_fields(docs):
-    endpoints, _ = resolve_refs(docs.top)
+    endpoints, *_ = resolve_refs(docs.top)
     ep = next(e for e in endpoints if e["id"] == "get_photos_sort")
 
     assert ep["controller"] == "Photos"
@@ -133,7 +133,7 @@ def test_resolve_photos_sort_fields(docs):
 
 
 def test_resolve_unauth_endpoint(docs):
-    endpoints, _ = resolve_refs(docs.top)
+    endpoints, *_ = resolve_refs(docs.top)
     ep = next(e for e in endpoints if e["id"] == "create_users_new_company")
     assert ep["auth"] == "none"
     assert ep["content_type"] == "application/json"
@@ -159,14 +159,15 @@ def test_resolve_unknown_endpoint_raises(tmp_path):
             params: []
     """))
 
-    with pytest.raises(ValueError, match="not found"):
-        resolve_refs(ref_list_path)
+    endpoints, _, warnings = resolve_refs(ref_list_path)
+    assert len(endpoints) == 0
+    assert any("not found" in w for w in warnings)
 
 
 # --- write_flattened_yaml ---
 
 def test_write_flattened_yaml_structure(docs, tmp_path):
-    endpoints, _ = resolve_refs(docs.top)
+    endpoints, *_ = resolve_refs(docs.top)
     version_dir = str(tmp_path / "v3")
     out_path = write_flattened_yaml(endpoints, docs.top, version_dir)
 
@@ -183,7 +184,7 @@ def test_write_flattened_yaml_structure(docs, tmp_path):
 
 
 def test_write_flattened_yaml_creates_version_dir(docs, tmp_path):
-    endpoints, _ = resolve_refs(docs.top)
+    endpoints, *_ = resolve_refs(docs.top)
     version_dir = str(tmp_path / "v1")
     write_flattened_yaml(endpoints, docs.top, version_dir)
     assert os.path.isdir(tmp_path / "v1")

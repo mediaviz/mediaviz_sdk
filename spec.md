@@ -442,7 +442,8 @@ returns: "steps.upload_result"
 
 - **Grouping:** Composites declare a `controller` field and are appended to that controller's output file
 - **Cross-controller imports:** If a composite step calls an endpoint from a different controller, the generator adds the necessary import (JS) or inlines the call (PHP)
-- **Once steps:** Call the existing generated function (hybrid approach). If cache is enabled, wrap in a static `Map` (JS) or instance-property array (PHP)
+- **Once steps — same-controller:** When a step's endpoint belongs to the same controller as the composite, the generated code delegates to the sibling method (e.g., `this.uploadPhotoToMediaviz(...)`) with `input_map` values mapped to the method's positional signature. Generation fails if the sibling endpoint is missing from the endpoint list. If cache is enabled, the step is still wrapped in a static `Map` (JS) or instance-property array (PHP)
+- **Once steps — cross-controller:** Inlined via the context's `client.request()` (auth endpoints) or direct `fetch`/`curl` (alt-host endpoints)
 - **For-each steps:** Loop over the array. Inline the HTTP call when intermediate data flow requires it (e.g., passing cached template values as headers). Otherwise call the generated function
 - **On-error modes:** `abort` throws immediately; `collect` wraps in try/catch and returns `{ results, errors }`
 - **Nested param expressions:** `params.<obj>.<prop>` resolves to property access (JS: `obj.prop`, PHP: `$obj['prop']`)

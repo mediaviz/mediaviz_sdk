@@ -13,6 +13,7 @@ import { OauthClients } from './oauth_clients.js';
 import { OauthToken } from './oauth_token.js';
 import { OauthLogin } from './oauth_login.js';
 import { Person } from './person.js';
+import { Photoupload } from './photoupload.js';
 import { Photos } from './photos.js';
 import { Projects } from './projects.js';
 import { Search } from './search.js';
@@ -62,6 +63,7 @@ export class MediaViz {
       redirectUri: config.redirectUri ?? _env('MEDIAVIZ_REDIRECT_URI'),
     };
     this._hosts = {
+      photoUpload: config.hosts?.photoUpload ?? _env('MEDIAVIZ_PHOTO_UPLOAD_URL'),
       ...(config.hosts || {}),
     };
     this._accessToken = config.accessToken ?? null;
@@ -90,6 +92,7 @@ export class MediaViz {
     this.oAuthToken = new OauthToken(_ctx);
     this.oauthLogin = new OauthLogin(_ctx);
     this.person = new Person(_ctx);
+    this.photoUpload = new Photoupload(_ctx);
     this.photos = new Photos(_ctx);
     this.projects = new Projects(_ctx);
     this.search = new Search(_ctx);
