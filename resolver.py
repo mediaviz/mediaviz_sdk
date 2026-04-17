@@ -185,8 +185,14 @@ def resolve_refs(
 
         controller_path = os.path.normpath(os.path.join(resolve_base, file_part))
         if controller_path not in controller_cache:
+            if not os.path.exists(controller_path):
+                warnings.append(f"Controller file not found: {controller_path} — skipped")
+                controller_cache[controller_path] = None
+                continue
             with open(controller_path) as f:
                 controller_cache[controller_path] = yaml.safe_load(f)
+        if controller_cache[controller_path] is None:
+            continue
 
         ctrl = controller_cache[controller_path]
         matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
@@ -265,6 +271,9 @@ def resolve_composites(
 
     for item in composites_list:
         composite_file = os.path.normpath(os.path.join(resolve_base, item["ref"]))
+        if not os.path.exists(composite_file):
+            warnings.append(f"Composite file not found: {composite_file} — skipped")
+            continue
         with open(composite_file) as f:
             composite = yaml.safe_load(f)
 
@@ -273,8 +282,14 @@ def resolve_composites(
             file_part, endpoint_id = parse_ref(step["ref"])
             controller_path = os.path.normpath(os.path.join(resolve_base, file_part))
             if controller_path not in controller_cache:
+                if not os.path.exists(controller_path):
+                    warnings.append(f"Controller file not found: {controller_path} — skipped")
+                    controller_cache[controller_path] = None
+                    continue
                 with open(controller_path) as f:
                     controller_cache[controller_path] = yaml.safe_load(f)
+            if controller_cache[controller_path] is None:
+                continue
             ctrl = controller_cache[controller_path]
             matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
             if not matching:
@@ -314,6 +329,9 @@ def resolve_composite_files(
         abs_path = os.path.abspath(comp_path)
         resolve_base = controllers_dir if controllers_dir else os.path.dirname(abs_path)
 
+        if not os.path.exists(abs_path):
+            warnings.append(f"Composite file not found: {abs_path} — skipped")
+            continue
         with open(abs_path) as f:
             composite = yaml.safe_load(f)
 
@@ -322,8 +340,14 @@ def resolve_composite_files(
             file_part, endpoint_id = parse_ref(step["ref"])
             controller_path = os.path.normpath(os.path.join(resolve_base, file_part))
             if controller_path not in controller_cache:
+                if not os.path.exists(controller_path):
+                    warnings.append(f"Controller file not found: {controller_path} — skipped")
+                    controller_cache[controller_path] = None
+                    continue
                 with open(controller_path) as f:
                     controller_cache[controller_path] = yaml.safe_load(f)
+            if controller_cache[controller_path] is None:
+                continue
             ctrl = controller_cache[controller_path]
             matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
             if not matching:

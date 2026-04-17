@@ -68,17 +68,12 @@ class MediaVizClient {
 
     public readonly AiModelCredits $aiModelCredits;
     public readonly Admin $admin;
-    public readonly Authentication $authentication;
     public readonly Company $company;
     public readonly CuratedAlbums $curatedAlbums;
     public readonly CustomAlbums $customAlbums;
     public readonly EmailTokens $emailTokens;
-    public readonly Evidence $evidence;
-    public readonly Export $export;
-    public readonly Faces $faces;
     public readonly Health $health;
     public readonly Keywords $keywords;
-    public readonly Moments $moments;
     public readonly OauthAuthorization $oAuthAuthorization;
     public readonly OauthClients $oAuthClients;
     public readonly OauthToken $oAuthToken;
@@ -86,13 +81,7 @@ class MediaVizClient {
     public readonly Person $person;
     public readonly Photos $photos;
     public readonly Projects $projects;
-    public readonly Reporting $reporting;
-    public readonly Run $run;
     public readonly Search $search;
-    public readonly Similarity $similarity;
-    public readonly Status $status;
-    public readonly Token $token;
-    public readonly Upload $upload;
     public readonly Users $users;
 
     public function __construct(array $config = []) {
@@ -121,17 +110,12 @@ class MediaVizClient {
         $ctx = new _Context($this);
         $this->aiModelCredits = new AiModelCredits($ctx);
         $this->admin = new Admin($ctx);
-        $this->authentication = new Authentication($ctx);
         $this->company = new Company($ctx);
         $this->curatedAlbums = new CuratedAlbums($ctx);
         $this->customAlbums = new CustomAlbums($ctx);
         $this->emailTokens = new EmailTokens($ctx);
-        $this->evidence = new Evidence($ctx);
-        $this->export = new Export($ctx);
-        $this->faces = new Faces($ctx);
         $this->health = new Health($ctx);
         $this->keywords = new Keywords($ctx);
-        $this->moments = new Moments($ctx);
         $this->oAuthAuthorization = new OauthAuthorization($ctx);
         $this->oAuthClients = new OauthClients($ctx);
         $this->oAuthToken = new OauthToken($ctx);
@@ -139,13 +123,7 @@ class MediaVizClient {
         $this->person = new Person($ctx);
         $this->photos = new Photos($ctx);
         $this->projects = new Projects($ctx);
-        $this->reporting = new Reporting($ctx);
-        $this->run = new Run($ctx);
         $this->search = new Search($ctx);
-        $this->similarity = new Similarity($ctx);
-        $this->status = new Status($ctx);
-        $this->token = new Token($ctx);
-        $this->upload = new Upload($ctx);
         $this->users = new Users($ctx);
     }
 

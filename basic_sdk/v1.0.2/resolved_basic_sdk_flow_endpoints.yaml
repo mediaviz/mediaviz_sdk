@@ -1,5 +1,5 @@
 source: basic_sdk_flow_endpoints.yaml
-resolved_at: '2026-04-17T11:59:40Z'
+resolved_at: '2026-04-17T13:28:41Z'
 endpoints:
 - id: get_get_all_project_photo_ids
   function_name: get_all_project_photo_ids

@@ -2,17 +2,12 @@
 import { OAuthClient } from './_oauth.js';
 import { AiModelCredits } from './ai_model_credits.js';
 import { Admin } from './admin.js';
-import { Authentication } from './authentication.js';
 import { Company } from './company.js';
 import { CuratedAlbums } from './curated_albums.js';
 import { CustomAlbums } from './custom_albums.js';
 import { EmailTokens } from './email_tokens.js';
-import { Evidence } from './evidence.js';
-import { Export } from './export.js';
-import { Faces } from './faces.js';
 import { Health } from './health.js';
 import { Keywords } from './keywords.js';
-import { Moments } from './moments.js';
 import { OauthAuthorization } from './oauth_authorization.js';
 import { OauthClients } from './oauth_clients.js';
 import { OauthToken } from './oauth_token.js';
@@ -20,13 +15,7 @@ import { OauthLogin } from './oauth_login.js';
 import { Person } from './person.js';
 import { Photos } from './photos.js';
 import { Projects } from './projects.js';
-import { Reporting } from './reporting.js';
-import { Run } from './run.js';
 import { Search } from './search.js';
-import { Similarity } from './similarity.js';
-import { Status } from './status.js';
-import { Token } from './token.js';
-import { Upload } from './upload.js';
 import { Users } from './users.js';
 
 function _env(key) {
@@ -90,17 +79,12 @@ export class MediaViz {
     const _ctx = new _Context(this);
     this.aiModelCredits = new AiModelCredits(_ctx);
     this.admin = new Admin(_ctx);
-    this.authentication = new Authentication(_ctx);
     this.company = new Company(_ctx);
     this.curatedAlbums = new CuratedAlbums(_ctx);
     this.customAlbums = new CustomAlbums(_ctx);
     this.emailTokens = new EmailTokens(_ctx);
-    this.evidence = new Evidence(_ctx);
-    this.export = new Export(_ctx);
-    this.faces = new Faces(_ctx);
     this.health = new Health(_ctx);
     this.keywords = new Keywords(_ctx);
-    this.moments = new Moments(_ctx);
     this.oAuthAuthorization = new OauthAuthorization(_ctx);
     this.oAuthClients = new OauthClients(_ctx);
     this.oAuthToken = new OauthToken(_ctx);
@@ -108,13 +92,7 @@ export class MediaViz {
     this.person = new Person(_ctx);
     this.photos = new Photos(_ctx);
     this.projects = new Projects(_ctx);
-    this.reporting = new Reporting(_ctx);
-    this.run = new Run(_ctx);
     this.search = new Search(_ctx);
-    this.similarity = new Similarity(_ctx);
-    this.status = new Status(_ctx);
-    this.token = new Token(_ctx);
-    this.upload = new Upload(_ctx);
     this.users = new Users(_ctx);
   }
 
