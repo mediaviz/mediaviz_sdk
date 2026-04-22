@@ -1,0 +1,322 @@
+{
+  "plan": "python_generator",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Scaffold PythonGenerator class inheriting BaseGenerator with framework_name='python' and stub abstract methods.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 2,
+      "description": "Implement Python type mapping (_TYPE_MAP, _python_type, _python_nullable) mirroring _TYPE_MAP / _php_type / _php_nullable.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "_TYPE_MAP, _python_type, _python_nullable", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 3,
+      "description": "Implement _optional_check_expr returning '<expr> is not None'.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._optional_check_expr", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 4,
+      "description": "Implement copy_module: delegate to _copy_module_files(module_root, 'python', module_name, output_dir), then strip pyproject.toml, setup.py, setup.cfg, tests/, dist/, __pycache__/ from the copied tree.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.copy_module", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 5,
+      "description": "Implement discover_module_exports: parse copied module's __init__.py; return name list from __all__ if present, else parsed `from .X import Y` statements. Each export dict: {name, source_module, kind}.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.discover_module_exports", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 6,
+      "description": "Implement emit_reexports: return None (Python re-exports are written into mediaviz_sdk/__init__.py by generate(), not a standalone barrel file).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.emit_reexports", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 7,
+      "description": "Implement emit_errors_file writing mediaviz_sdk/errors.py with ApiError, ValidationError, NotFoundError, RateLimitError, ServerError, and handle_response(raw, status, headers).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.emit_errors_file", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 8,
+      "description": "Implement _python_body_sig_tokens — body params in required-first order for method signatures across all four shapes (scalar/expanded/flat_dict/generic).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._python_body_sig_tokens", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 9,
+      "description": "Implement _python_body_build returning (preamble_lines, body_expr) for body assembly across shapes. Uses {k:v for k,v in {...}.items() if v is not None} to drop nulls for expanded bodies.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._python_body_build", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 10,
+      "description": "Implement _render_object_tree_python to emit a nested dict literal with null-filtering comprehensions, matching _render_object_tree_php.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._render_object_tree_python", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 11,
+      "description": "Implement _build_path — path param substitution using f-strings with quote(str(<param>), safe='') and conditional query string assembly via httpx.QueryParams or urlencode.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._build_path", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 12,
+      "description": "Implement _emit_auth_method — calls self._ctx.client.request(path, method, access_token, refresh_token, body) and returns result.data.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_auth_method", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 13,
+      "description": "Implement _emit_unauth_method — inline httpx.Client() with-block, calls handle_response(resp.text, resp.status_code, dict(resp.headers)).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_unauth_method", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 14,
+      "description": "Implement _emit_alt_host_method — resolves host via self._ctx.require_host, builds Authorization + custom headers, inline httpx.Client() call, handle_response.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_alt_host_method", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 15,
+      "description": "Implement _emit_method dispatcher routing to auth/unauth/alt-host based on ep['auth'] and ep['api_host'].",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_method", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 16,
+      "description": "Implement emit_controller_file writing one snake_case controller file per group, class named via snake_to_pascal, with __init__(self, ctx) and one method per endpoint + composite.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.emit_controller_file", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 17,
+      "description": "Implement _resolve_python_expr and _resolve_python_expr_loop for composite expression resolution (params.*, steps.*, loop_var.*).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._resolve_python_expr, _resolve_python_expr_loop", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 18,
+      "description": "Implement _emit_python_once_step with optional step-cache guard (self._<step_id>_cache[key]).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_python_once_step", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 19,
+      "description": "Implement _emit_python_call_auth (auth + no alt-host, used inside composites).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_python_call_auth", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 20,
+      "description": "Implement _emit_python_inline_httpx (unauth + alt-host inline httpx call, used inside composites).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_python_inline_httpx", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 21,
+      "description": "Implement _emit_python_foreach_step with on_error ('abort'/'continue'/'collect') handling via try/except.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_python_foreach_step", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 22,
+      "description": "Implement _emit_composite_method: signature, step execution, optional {'results': ..., 'errors': ...} return envelope for collect mode.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator._emit_composite_method", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 23,
+      "description": "Implement emit_client_class writing mediaviz_sdk/client.py with _Context, _TokenTrackingClient, and MediaVizClient (constructor with env-var fallbacks for client_id/secret/base_url/redirect_uri + per-host MEDIAVIZ_<HOST>_URL, authenticate, get_authorization_url, handle_callback, set_tokens).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.emit_client_class", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 24,
+      "description": "Implement emit_init_file writing mediaviz_sdk/__init__.py with re-exports: MediaVizClient, error classes, and all names discovered from copied oauth_sdk module (via self._copied_modules).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.emit_init_file", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 25,
+      "description": "Implement emit_pyproject_toml writing pyproject.toml at output_dir with project metadata, version parsed from trailing vX.Y.Z segment of output_dir, httpx dep, and [tool.setuptools] packages=['mediaviz_sdk', 'oauth_sdk'].",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.emit_pyproject_toml", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 26,
+      "description": "Wire generate() to orchestrate: mkdir mediaviz_sdk/, emit errors.py, iterate groups for controller files, emit client.py, emit pyproject.toml, then emit __init__.py (after reexport_all_modules has populated self._copied_modules).",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "PythonGenerator.generate", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 27,
+      "description": "Smoke-test generator: run `python generate.py --endpoints basic_sdk_flow_endpoints --frameworks python`, then `pip install -e sdk/vX.Y.Z/python` in a scratch venv and import MediaVizClient.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "entire module", "status": "done — fixed copy_module (inner pkg), _pascal_to_snake normalization, OAuthClientConfig instantiation"},
+        {"file": "test_generators/python.py", "location": "run, generate", "status": "done — fixed sys.executable, controller snake normalization"},
+        {"file": "tests/test_python_smoke.py", "location": "all", "status": "done — 9/9 pass, generated suite 37/37 pass"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 28,
+      "description": "Scaffold PythonTestGenerator class inheriting BaseTestGenerator with framework_name='python' and stub generate/run methods.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 29,
+      "description": "Implement emit_helpers writing test_helpers.py with SpyOAuthClient subclass recording calls and returning canned AuthenticatedResponse.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.emit_helpers", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 30,
+      "description": "Implement emit_conftest writing conftest.py with sys.path insertion for the generated SDK + fixtures spy_client and mv_client.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.emit_conftest", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 31,
+      "description": "Implement emit_pytest_config writing pyproject.toml declaring pytest + httpx deps and [tool.pytest.ini_options] testpaths.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.emit_pytest_config", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 32,
+      "description": "Implement emit_errors_test writing test_errors.py asserting 422→ValidationError, 404→NotFoundError, 429→RateLimitError, 5xx→ServerError, other→ApiError.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.emit_errors_test", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 33,
+      "description": "Implement emit_controller_test writing test_<controller>.py with one pytest function per endpoint: builds expected path/query via base helpers, invokes method, asserts spy's recorded call matches for auth endpoints.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.emit_controller_test", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 34,
+      "description": "Implement unauth/alt-host test emission using httpx.MockTransport injected via monkeypatch of httpx.Client, asserting URL, method, headers, body.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.emit_controller_test", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 35,
+      "description": "Implement body fixture builder for each request_body shape using TEST_VALUES (required-first, preserving orig_path nesting for expanded).",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator._build_body_fixture", "status": "done — implemented as _build_call_args"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 36,
+      "description": "Implement generate() wiring: mkdir, emit_helpers, emit_conftest, emit_pytest_config, emit_errors_test, iterate groups emitting controller tests.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.generate", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 37,
+      "description": "Implement run(test_dir) executing `python -m pytest -v` via subprocess, parsing pytest summary line for total/passed/failed counts, returning TestResult.",
+      "touch_points": [
+        {"file": "test_generators/python.py", "location": "PythonTestGenerator.run", "status": "done"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 38,
+      "description": "End-to-end verification: rerun `python generate.py --endpoints basic_sdk_flow_endpoints --frameworks python`, confirm pytest suite executes and reports all-pass via PythonTestGenerator.run.",
+      "touch_points": [
+        {"file": "generators/python.py", "location": "entire module", "status": "done"},
+        {"file": "test_generators/python.py", "location": "entire module", "status": "done"},
+        {"file": "tests/test_python_e2e.py", "location": "all", "status": "done — 8/8 pass; drives generate.main() + PythonTestGenerator.run() with synthetic flow"}
+      ],
+      "completion_status": true
+    },
+    {
+      "id": 39,
+      "description": "Update package spec.md and implementation_plan.md at package root to reference the new python framework.",
+      "touch_points": [
+        {"file": "spec.md", "location": "frameworks section", "status": "done — added python.py to architecture, naming table, error table, constraints"},
+        {"file": "implementation_plan.md", "location": "status section", "status": "done — created; lists all frameworks with python marked complete"}
+      ],
+      "completion_status": true
+    }
+  ]
+}

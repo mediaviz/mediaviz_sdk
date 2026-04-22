@@ -24,7 +24,7 @@ def _js_safe(name: str) -> str:
 class JavaScriptBrowserGenerator(BaseGenerator):
     framework_name = "javascript"
 
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None) -> None:
         os.makedirs(output_dir, exist_ok=True)
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
@@ -47,7 +47,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             controller_files.append(filename)
             all_comp_groups[controller] = comps
         alt_hosts = self.collect_alt_hosts(endpoints, composites)
-        self.emit_client_class(all_groups, all_comp_groups, alt_hosts, output_dir)
+        self.emit_client_class(all_groups, all_comp_groups, alt_hosts, output_dir, utilities=utilities)
         reexport_files = self.reexport_all_modules(output_dir)
         self.emit_barrel_index(controller_files, output_dir, extra_files=reexport_files)
         self.emit_rollup_config(output_dir)
@@ -267,7 +267,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             return camel[:i - 1].lower() + camel[i - 1:]
         return camel[0].lower() + camel[1:]
 
-    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str) -> None:
+    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str, utilities: list[dict] | None = None) -> None:
         """Generate MediaViz.js — the top-level SDK client class."""
         # Build controller info: [(prop_name, class_name, js_filename)]
         controllers = []
@@ -330,6 +330,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("}")
         lines.append("")
 
+        # _Utils class (from utilities/*.yaml)
+        self._emit_utils_class_js(lines, utilities)
+
         # MediaViz class
         lines.append("export class MediaViz {")
         lines.append("  constructor(config = {}) {")
@@ -364,6 +367,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("    const _ctx = new _Context(this);")
         for prop, cls, _ in controllers:
             lines.append(f"    this.{prop} = new {cls}(_ctx);")
+        if self._has_utilities(utilities):
+            lines.append("    this.utils = new _Utils(this);")
         lines.append("  }")
 
         # authenticate (client credentials)
@@ -407,6 +412,37 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
         with open(os.path.join(output_dir, "MediaViz.js"), "w") as f:
             f.write("\n".join(lines))
+
+    @staticmethod
+    def _has_utilities(utilities: list[dict] | None) -> bool:
+        return bool(utilities) and any(m.get("utilities") for m in utilities)
+
+    def _emit_utils_class_js(self, lines: list[str], utilities: list[dict] | None) -> None:
+        if not self._has_utilities(utilities):
+            return
+        lines.append("class _Utils {")
+        lines.append("  constructor(mv) { this._mv = mv; }")
+        for module in utilities:
+            source_module = module["source_module"]
+            inner_expr = self._js_inner_expr(source_module)
+            for util in module["utilities"]:
+                fn_name = util["function_name"]["javascript"]
+                target = util["target"]["javascript"]
+                param_names = [_js_safe(_snake_to_camel(p["name"])) for p in util["params"]]
+                params = ", ".join(param_names)
+                lines.append(f"  {fn_name}({params}) {{")
+                if util.get("requires_tokens"):
+                    lines.append("    if (!this._mv._accessToken) throw new Error('Not authenticated. Call authenticate(), handleCallback(), or setTokens() first.');")
+                lines.append(f"    return {inner_expr}.{target}({params});")
+                lines.append("  }")
+        lines.append("}")
+        lines.append("")
+
+    @staticmethod
+    def _js_inner_expr(source_module: str) -> str:
+        if source_module == "oauth":
+            return "this._mv._oauthClient._inner"
+        raise ValueError(f"Unsupported utilities source_module: {source_module!r}")
 
     def emit_barrel_index(self, controller_files: list[str], output_dir: str, extra_files: list[str] | None = None) -> None:
         lines = ["export { MediaViz } from './MediaViz.js';"]

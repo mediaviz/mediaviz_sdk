@@ -17,12 +17,16 @@ mediaviz_sdk/
     javascript_node.py      # Node.js generator (ESM)
     php.py                  # PHP generator
   resolver.py              # Reads ref-list YAML, resolves refs, outputs flattened YAML
+  utilities_resolver.py    # Reads /utilities YAML, validates, outputs flattened snapshot
+  utilities/               # Config for non-endpoint helpers exposed on the client (e.g. OAuth utils)
+    oauth.yaml
   versioning.py            # Version auto-increment logic
   sdk/                     # Static output directory
     v{major}.{minor}.{iteration}/  # Current version (only one active at a time)
-      resolved_*.yaml      # Flattened endpoint snapshot
+      resolved_*.yaml      # Flattened endpoint / composite / utility snapshots
       javascript/
       php/
+      python/
       tests/
     archive/               # Previous versions moved here on new generation
       v1.0.0/
@@ -301,7 +305,7 @@ async uploadPhotoToMediaviz(bucketName, photoIndex, ...) {
 }
 ```
 
-Alt-host endpoints use direct `fetch` (JS) / `curl` (PHP) with `this._ctx.accessToken` in the `Authorization` header. They do **not** go through the OAuth client's `request()` method, so there is no automatic 401-retry/token-refresh for these calls. This is intentional: alt-host services (e.g., the photo upload service) are separate from the core API and may not support the same token refresh flow.
+Alt-host endpoints use direct `fetch` (JS) / `curl` (PHP) / `httpx` (Python) with `Bearer ${accessToken}` in the `Authorization` header — matching the RFC 7235 scheme used uniformly across the SDK, including the OAuth-client path. They do **not** go through the OAuth client's `request()` method, so there is no automatic 401-retry/token-refresh for these calls. This is intentional: alt-host services (e.g., the photo upload service) are separate from the core API and may not support the same token refresh flow.
 
 **Unauthenticated endpoints** use `this._ctx.baseUrl` and do not call `requireTokens()`.
 
@@ -465,6 +469,51 @@ No separate CLI flag is needed — composites are included by adding them to the
 ### Endpoint Validation
 
 Every endpoint referenced by a composite's steps must also be present in the same ref-list as an endpoint ref. If any step references an endpoint not in the list, generation aborts with an error listing each missing endpoint by composite ID, step ID, and endpoint ID. This prevents silent inconsistencies where the SDK contains composite functions that call endpoints not included in the build.
+
+## Utilities
+
+Utilities are non-endpoint helper functions that live on a bundled module (e.g. the OAuth SDK's `decodeAccessToken`) and should be callable directly from the user-facing client without reaching into private internals. They are defined in YAML under the package-root `utilities/` folder — one file per source module — and exposed on the generated client under a `utils` namespace (`mv.utils.<name>(...)` in JS/Python, `$mv->utils-><name>(...)` in PHP).
+
+### Config Format (`utilities/*.yaml`)
+
+```yaml
+source_module: oauth          # must match a module bundled via copy_module() (e.g. 'oauth')
+utilities:
+  - id: decode_access_token
+    description: "Decode a JWT access token payload without verifying signature."
+    target:                    # method name on the underlying module client, per framework
+      javascript: decodeAccessToken
+      php: decodeAccessToken
+      python: decode_access_token
+    function_name:             # method name exposed on mv.utils, per framework
+      javascript: decodeAccessToken
+      php: decodeAccessToken
+      python: decode_access_token
+    params:
+      - name: access_token
+        type: str              # canonical type; generators map to framework type
+        required: true
+    returns: TokenPayload      # informational
+    requires_tokens: false     # if true, emit require_tokens() guard
+```
+
+### Key Schema Fields
+
+| Field | Purpose |
+|---|---|
+| `source_module` | Bundled module name (matches `copy_module` key). Only `oauth` is supported today; other modules raise `ValueError` in the generator. |
+| `target.<fw>` | Method name on the underlying module client, per framework. |
+| `function_name.<fw>` | Public method name on `mv.utils` — typically equal to `target.<fw>`. |
+| `params[].name/type/required` | Same `{name, type, required}` shape as endpoint params. |
+| `requires_tokens` | Prepend the standard "not authenticated" guard used by controllers. |
+
+### Resolver (`utilities_resolver.py`)
+
+`load_utilities(utilities_dir)` walks `utilities/*.yaml`, validates each module and utility (required fields, all frameworks present on `target` / `function_name`), and returns a flat list of module dicts. `write_flattened_utilities_yaml(modules, version_dir)` writes a `resolved_utilities.yaml` snapshot alongside the generated SDK. Validation failures raise `ValueError` so generation aborts before emitting a broken SDK.
+
+### Generator Behavior
+
+Each generator receives the utilities list as a kwarg on `generate()` / `emit_client_class()` and emits a small `_Utils` class next to the existing `_Context` / `_TokenTrackingClient` helpers. The `_Utils` class holds a back-reference to the client and forwards each method to the underlying module client (for `source_module: oauth`: `this._oauthClient._inner.<target>(...)` in JS, `$this->_mv->getOAuthClient()-><target>(...)` in PHP, `self._mv._tracking_client._inner.<target>(...)` in Python). Constructor wiring adds `this.utils = new _Utils(this)` (or the equivalent); field declaration is added in PHP (`public readonly _Utils $utils;`). When the utilities list is empty, no `_Utils` class is emitted.
 
 ## Constraints
 

@@ -6,12 +6,12 @@
       {
         "file": "mediaviz_sdk/versioning.py",
         "location": "get_next_version",
-        "status": "complete — returns (major, minor, iteration) tuple with bump param"
+        "status": "complete \u2014 returns (major, minor, iteration) tuple with bump param"
       },
       {
         "file": "mediaviz_sdk/versioning.py",
         "location": "version_str",
-        "status": "complete — formats tuple as dotted string"
+        "status": "complete \u2014 formats tuple as dotted string"
       }
     ],
     "completion_status": true
@@ -170,12 +170,12 @@
       {
         "file": "mediaviz_sdk/generate.py",
         "location": "main",
-        "status": "complete — uses semver version_str, passes bump to get_next_version"
+        "status": "complete \u2014 uses semver version_str, passes bump to get_next_version"
       },
       {
         "file": "mediaviz_sdk/generate.py",
         "location": "parse_args",
-        "status": "complete — --minor-version/--major-version mutually exclusive group, default sdk/"
+        "status": "complete \u2014 --minor-version/--major-version mutually exclusive group, default sdk/"
       }
     ],
     "completion_status": true
@@ -1274,32 +1274,190 @@
   },
   {
     "id": 55,
-    "description": "Composite once-steps delegate to sibling methods instead of inlining — when a step's endpoint belongs to the same controller, emit this.methodName(...) with input_map mapped to positional args",
+    "description": "Composite once-steps delegate to sibling methods instead of inlining \u2014 when a step's endpoint belongs to the same controller, emit this.methodName(...) with input_map mapped to positional args",
     "touch_points": [
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_composite_once_step",
-        "status": "complete — same-controller steps delegate to sibling via _build_sibling_call_args; raises ValueError if sibling not found"
+        "status": "complete \u2014 same-controller steps delegate to sibling via _build_sibling_call_args; raises ValueError if sibling not found"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_build_sibling_call_args",
-        "status": "complete — maps input_map to positional signature order (path, required headers, body, optional headers for alt-host; path, body, query for auth)"
+        "status": "complete \u2014 maps input_map to positional signature order (path, required headers, body, optional headers for alt-host; path, body, query for auth)"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "_emit_composite_method",
-        "status": "complete — accepts and forwards sibling_eps param"
+        "status": "complete \u2014 accepts and forwards sibling_eps param"
       },
       {
         "file": "generators/javascript_browser.py",
         "location": "emit_controller_file",
-        "status": "complete — passes endpoints as sibling_eps to _emit_composite_method"
+        "status": "complete \u2014 passes endpoints as sibling_eps to _emit_composite_method"
       },
       {
         "file": "spec.md",
         "location": "Composite Functions > Generator Behavior",
-        "status": "complete — updated once-step docs to distinguish same-controller delegation vs cross-controller inline"
+        "status": "complete \u2014 updated once-step docs to distinguish same-controller delegation vs cross-controller inline"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 56,
+    "description": "Alt-host Authorization header uses RFC 7235 Bearer scheme \u2014 match the rest of the SDK and avoid drift if the upload lambda's tolerant token parser is ever tightened",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "alt-host endpoint header emit (lines ~594, ~831, ~932)",
+        "status": "complete \u2014 emits 'Authorization': `Bearer ${this._ctx.accessToken}`"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "alt-host endpoint header emit (lines ~540, ~728)",
+        "status": "complete \u2014 emits 'Authorization': f'Bearer {self._ctx.access_token}'"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "alt-host endpoint header emit (lines ~598, ~795)",
+        "status": "complete \u2014 emits 'Authorization: Bearer ' . $accessToken"
+      },
+      {
+        "file": "spec.md",
+        "location": "Alt-host Endpoints section (line ~304)",
+        "status": "complete \u2014 updated to describe Bearer-prefixed header across JS/PHP/Python"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 57,
+    "description": "Add utilities/oauth.yaml defining decode_access_token as the first config-driven utility method exposed on mv.utils",
+    "touch_points": [
+      {
+        "file": "utilities/oauth.yaml",
+        "location": "new file",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 58,
+    "description": "Create utilities_resolver.py \u2014 walks utilities/*.yaml, validates required fields (id, target.<fw>, function_name.<fw>, params) for all three frameworks, writes resolved_utilities.yaml snapshot to the version dir",
+    "touch_points": [
+      {
+        "file": "utilities_resolver.py",
+        "location": "load_utilities",
+        "status": "complete"
+      },
+      {
+        "file": "utilities_resolver.py",
+        "location": "_validate_module / _validate_utility",
+        "status": "complete"
+      },
+      {
+        "file": "utilities_resolver.py",
+        "location": "write_flattened_utilities_yaml",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 59,
+    "description": "Thread utilities kwarg through BaseGenerator.generate and BaseGenerator.emit_client_class abstract signatures",
+    "touch_points": [
+      {
+        "file": "generators/base.py",
+        "location": "generate / emit_client_class",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 60,
+    "description": "JavaScript generator: emit _Utils class between _TokenTrackingClient and MediaViz; wire this.utils = new _Utils(this) in constructor; each utility forwards to this._mv._oauthClient._inner.<target>(...)",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "generate / emit_client_class",
+        "status": "complete \u2014 utilities kwarg threaded"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_utils_class_js / _js_inner_expr / _has_utilities",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 61,
+    "description": "PHP generator: emit _Utils class before _TokenTrackingClient; add public readonly _Utils $utils field; wire $this->utils = new _Utils($this); add getOAuthClient() getter; each utility forwards to $this->_mv->getOAuthClient()-><target>(...)",
+    "touch_points": [
+      {
+        "file": "generators/php.py",
+        "location": "generate / emit_client_class",
+        "status": "complete \u2014 utilities kwarg threaded"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_utils_class_php / _php_inner_expr",
+        "status": "complete"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "getOAuthClient()",
+        "status": "complete \u2014 public getter emitted when utilities present"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 62,
+    "description": "Python generator: emit _Utils class between _TokenTrackingClient and MediaVizClient; wire self.utils = _Utils(self) in __init__; each utility forwards to self._mv._tracking_client._inner.<target>(...)",
+    "touch_points": [
+      {
+        "file": "generators/python.py",
+        "location": "generate / emit_client_class",
+        "status": "complete \u2014 utilities kwarg threaded"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "_emit_utils_class_py / _py_inner_expr",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 63,
+    "description": "Wire utilities into generate.py: load via utilities_resolver.load_utilities, write resolved_utilities.yaml snapshot, pass as utilities= kwarg into each generator.generate() call",
+    "touch_points": [
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 64,
+    "description": "Document /utilities config mechanism in spec.md \u2014 architecture tree entry, new Utilities section with config format, schema fields, resolver behavior, and generator behavior",
+    "touch_points": [
+      {
+        "file": "spec.md",
+        "location": "Architecture",
+        "status": "complete"
+      },
+      {
+        "file": "spec.md",
+        "location": "Utilities section",
+        "status": "complete"
       }
     ],
     "completion_status": true

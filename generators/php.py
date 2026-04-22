@@ -23,7 +23,7 @@ def _php_nullable(t: str) -> str:
 class PhpGenerator(BaseGenerator):
     framework_name = "php"
 
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None) -> None:
         os.makedirs(output_dir, exist_ok=True)
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
@@ -44,7 +44,7 @@ class PhpGenerator(BaseGenerator):
             self.emit_controller_file(class_name, [], os.path.join(output_dir, filename), composites=comps)
             all_comp_groups[controller] = comps
         alt_hosts = self.collect_alt_hosts(endpoints, composites)
-        self.emit_client_class(all_groups, all_comp_groups, alt_hosts, output_dir)
+        self.emit_client_class(all_groups, all_comp_groups, alt_hosts, output_dir, utilities=utilities)
         reexport_files = self.reexport_all_modules(output_dir)
         self.emit_autoload_config(output_dir, reexport_files=reexport_files)
 
@@ -257,7 +257,7 @@ class PhpGenerator(BaseGenerator):
             return camel[:i - 1].lower() + camel[i - 1:]
         return camel[0].lower() + camel[1:]
 
-    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str) -> None:
+    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str, utilities: list[dict] | None = None) -> None:
         """Generate MediaVizClient.php — the top-level SDK client class."""
         controllers = []
         for controller in sorted(set(list(groups.keys()) + list(comp_groups.keys()))):
@@ -308,6 +308,10 @@ class PhpGenerator(BaseGenerator):
         lines.append("}")
         lines.append("")
 
+        # _Utils class (from utilities/*.yaml) — emitted before _TokenTrackingClient so the
+        # MediaVizClient field declaration references a known class.
+        utils_emitted = self._emit_utils_class_php(lines, utilities)
+
         # _TokenTrackingClient
         lines.append("class _TokenTrackingClient {")
         lines.append("    private MediaVizClient $mv;")
@@ -346,6 +350,8 @@ class PhpGenerator(BaseGenerator):
         lines.append("")
         for prop, cls in controllers:
             lines.append(f"    public readonly {cls} ${prop};")
+        if utils_emitted:
+            lines.append("    public readonly _Utils $utils;")
         lines.append("")
 
         # Constructor
@@ -378,6 +384,8 @@ class PhpGenerator(BaseGenerator):
         lines.append("        $ctx = new _Context($this);")
         for prop, cls in controllers:
             lines.append(f"        $this->{prop} = new {cls}($ctx);")
+        if utils_emitted:
+            lines.append("        $this->utils = new _Utils($this);")
         lines.append("    }")
 
         # authenticate
@@ -419,11 +427,51 @@ class PhpGenerator(BaseGenerator):
         lines.append("    public function getHost(string $key): ?string { return $this->hosts[$key] ?? null; }")
         lines.append("    public function getTrackingClient(): _TokenTrackingClient { return $this->trackingClient; }")
         lines.append("    public function getOnTokenRefresh(): ?\\Closure { return $this->onTokenRefresh; }")
+        if utils_emitted:
+            lines.append("    public function getOAuthClient(): object { return $this->oauthClient; }")
         lines.append("}")
         lines.append("")
 
         with open(os.path.join(output_dir, "MediaVizClient.php"), "w") as f:
             f.write("\n".join(lines))
+
+    def _emit_utils_class_php(self, lines: list[str], utilities: list[dict] | None) -> bool:
+        """Emit a `_Utils` class; returns True if utilities were present and emitted."""
+        if not utilities or not any(m.get("utilities") for m in utilities):
+            return False
+        lines.append("class _Utils {")
+        lines.append("    private MediaVizClient $_mv;")
+        lines.append("    public function __construct(MediaVizClient $mv) { $this->_mv = $mv; }")
+        for module in utilities:
+            source_module = module["source_module"]
+            inner_expr = self._php_inner_expr(source_module)
+            for util in module["utilities"]:
+                fn_name = util["function_name"]["php"]
+                target = util["target"]["php"]
+                sig_parts = []
+                call_parts = []
+                for p in util["params"]:
+                    var = "$" + self.snake_to_camel(p["name"])
+                    sig_parts.append(f"{_php_type(p.get('type'))} {var}")
+                    call_parts.append(var)
+                sig = ", ".join(sig_parts)
+                call = ", ".join(call_parts)
+                lines.append(f"    public function {fn_name}({sig}): mixed {{")
+                if util.get("requires_tokens"):
+                    lines.append("        if ($this->_mv->getAccessToken() === null) {")
+                    lines.append("            throw new \\RuntimeException('Not authenticated. Call authenticate(), handleCallback(), or setTokens() first.');")
+                    lines.append("        }")
+                lines.append(f"        return {inner_expr}->{target}({call});")
+                lines.append("    }")
+        lines.append("}")
+        lines.append("")
+        return True
+
+    @staticmethod
+    def _php_inner_expr(source_module: str) -> str:
+        if source_module == "oauth":
+            return "$this->_mv->getOAuthClient()"
+        raise ValueError(f"Unsupported utilities source_module: {source_module!r}")
 
     def emit_autoload_config(self, output_dir: str, reexport_files: list[str] | None = None) -> None:
         config = {

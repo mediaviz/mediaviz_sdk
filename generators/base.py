@@ -14,8 +14,12 @@ class BaseGenerator(ABC):
         self._copied_modules: list[dict] = []
 
     @abstractmethod
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None) -> None:
-        """Generate SDK files from resolved endpoints into output_dir."""
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None) -> None:
+        """Generate SDK files from resolved endpoints into output_dir.
+
+        *utilities* is a list of utility-module dicts (see utilities_resolver.load_utilities);
+        each generator decides how to expose them (e.g. as a `utils` namespace on the client).
+        """
 
     @abstractmethod
     def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
@@ -147,7 +151,7 @@ class BaseGenerator(ABC):
         """
 
     @abstractmethod
-    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str) -> None:
+    def emit_client_class(self, groups: dict, comp_groups: dict, alt_hosts: set[str], output_dir: str, utilities: list[dict] | None = None) -> None:
         """Generate the top-level SDK client class file."""
 
     def _copy_module_files(self, module_root: str, framework_subdir: str, module_name: str, output_dir: str) -> str:

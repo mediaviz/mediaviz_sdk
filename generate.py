@@ -11,9 +11,11 @@ from resolver import (
 )
 from test_generators import discover_test_generators
 from test_generators.base import TestResult
+from utilities_resolver import load_utilities, write_flattened_utilities_yaml
 from versioning import get_next_version, version_str
 
 SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk")
+UTILITIES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "utilities")
 
 
 def parse_args() -> argparse.Namespace:
@@ -121,13 +123,19 @@ def main() -> None:
             resolved_comp_path = write_flattened_composites_yaml(composites, composite_paths[0], version_dir)
             print(f"Resolved {len(composites)} composite(s) → {resolved_comp_path}")
 
+        utilities = load_utilities(UTILITIES_DIR)
+        if utilities:
+            resolved_util_path = write_flattened_utilities_yaml(utilities, version_dir)
+            total_utils = sum(len(m.get("utilities", [])) for m in utilities)
+            print(f"Resolved {total_utils} utility method(s) across {len(utilities)} module(s) → {resolved_util_path}")
+
         file_counts: dict[str, int] = {}
         for framework in requested:
             gen = registry[framework]()
             fw_dir = os.path.join(version_dir, framework)
             os.makedirs(fw_dir, exist_ok=True)
             gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)
-            gen.generate(endpoints, fw_dir, composites=composites)
+            gen.generate(endpoints, fw_dir, composites=composites, utilities=utilities)
             file_counts[framework] = sum(len(files) for _, _, files in os.walk(fw_dir))
 
         print(f"\nSDK v{ver} generated:")
