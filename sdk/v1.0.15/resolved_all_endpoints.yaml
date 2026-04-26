@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-04-22T13:16:15Z'
+resolved_at: '2026-04-23T20:51:25Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -2999,13 +2999,6 @@ endpoints:
       kind: primitive
       orig_path:
       - company_id
-    - name: accountType
-      snake: account_type
-      type: int
-      required: true
-      kind: primitive
-      orig_path:
-      - account_type
     - name: profilePicture
       snake: profile_picture
       type: str
@@ -3020,6 +3013,13 @@ endpoints:
       kind: primitive
       orig_path:
       - payment_plan_type
+    - name: accountType
+      snake: account_type
+      type: int
+      required: true
+      kind: primitive
+      orig_path:
+      - account_type
   response: null
   content_type: null
   tags:
@@ -3059,13 +3059,6 @@ endpoints:
       kind: primitive
       orig_path:
       - company_id
-    - name: accountType
-      snake: account_type
-      type: int
-      required: true
-      kind: primitive
-      orig_path:
-      - account_type
     - name: profilePicture
       snake: profile_picture
       type: str
@@ -3080,6 +3073,13 @@ endpoints:
       kind: primitive
       orig_path:
       - payment_plan_type
+    - name: accountType
+      snake: account_type
+      type: int
+      required: true
+      kind: primitive
+      orig_path:
+      - account_type
     - name: password
       snake: password
       type: str
@@ -3126,13 +3126,6 @@ endpoints:
       kind: primitive
       orig_path:
       - company_id
-    - name: accountType
-      snake: account_type
-      type: int
-      required: true
-      kind: primitive
-      orig_path:
-      - account_type
     - name: profilePicture
       snake: profile_picture
       type: str
@@ -3200,6 +3193,22 @@ endpoints:
       kind: primitive
       orig_path:
       - new_password
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user_id
+  function_name: get_user_id
+  controller: Users
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/users
+  summary: get_user_id
+  auth: required
+  params: []
+  request_body: null
   response: null
   content_type: null
   tags:

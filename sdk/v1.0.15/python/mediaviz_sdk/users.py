@@ -25,9 +25,9 @@ class Users:
             'name': name,
             'email': email,
             'company_id': companyId,
-            'account_type': accountType,
             'profile_picture': profilePicture,
             'payment_plan_type': paymentPlanType,
+            'account_type': accountType,
         }.items() if v is not None}
         return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
 
@@ -46,9 +46,9 @@ class Users:
             'name': name,
             'email': email,
             'company_id': companyId,
-            'account_type': accountType,
             'profile_picture': profilePicture,
             'payment_plan_type': paymentPlanType,
+            'account_type': accountType,
             'password': password,
         }.items() if v is not None}
         with httpx.Client() as _client:
@@ -59,7 +59,6 @@ class Users:
         self,
         name: str,
         email: str,
-        accountType: int,
         password: str,
         companyId: int | None = None,
         profilePicture: str | None = None,
@@ -72,7 +71,6 @@ class Users:
             'name': name,
             'email': email,
             'company_id': companyId,
-            'account_type': accountType,
             'profile_picture': profilePicture,
             'payment_plan_type': paymentPlanType,
             'password': password,
@@ -91,6 +89,11 @@ class Users:
             'new_password': newPassword,
         }.items() if v is not None}
         return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
+
+    def get_user_id(self) -> dict[str, Any]:
+        self._ctx.require_tokens()
+        path = '/api/v1/users'
+        return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
 
     def get_user(self, user_id: int) -> dict[str, Any]:
         self._ctx.require_tokens()

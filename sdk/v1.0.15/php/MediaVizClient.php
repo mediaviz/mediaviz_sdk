@@ -33,14 +33,6 @@ class _Context {
     }
 }
 
-class _Utils {
-    private MediaVizClient $_mv;
-    public function __construct(MediaVizClient $mv) { $this->_mv = $mv; }
-    public function decodeAccessToken(string $accessToken): mixed {
-        return $this->_mv->getOAuthClient()->decodeAccessToken($accessToken);
-    }
-}
-
 class _TokenTrackingClient {
     private MediaVizClient $mv;
     private object $inner;
@@ -92,7 +84,6 @@ class MediaVizClient {
     public readonly Projects $projects;
     public readonly Search $search;
     public readonly Users $users;
-    public readonly _Utils $utils;
 
     public function __construct(array $config = []) {
         $this->config = [
@@ -137,7 +128,6 @@ class MediaVizClient {
         $this->projects = new Projects($ctx);
         $this->search = new Search($ctx);
         $this->users = new Users($ctx);
-        $this->utils = new _Utils($this);
     }
 
     public function authenticate(): mixed {
@@ -169,5 +159,4 @@ class MediaVizClient {
     public function getHost(string $key): ?string { return $this->hosts[$key] ?? null; }
     public function getTrackingClient(): _TokenTrackingClient { return $this->trackingClient; }
     public function getOnTokenRefresh(): ?\Closure { return $this->onTokenRefresh; }
-    public function getOAuthClient(): object { return $this->oauthClient; }
 }

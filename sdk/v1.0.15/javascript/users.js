@@ -12,9 +12,9 @@ export class Users {
       name: name,
       email: email,
       company_id: companyId,
-      account_type: accountType,
       profile_picture: profilePicture,
       payment_plan_type: paymentPlanType,
+      account_type: accountType,
     });
     const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body));
     return data;
@@ -25,9 +25,9 @@ export class Users {
       name: name,
       email: email,
       company_id: companyId,
-      account_type: accountType,
       profile_picture: profilePicture,
       payment_plan_type: paymentPlanType,
+      account_type: accountType,
       password: password,
     });
     const resp = await fetch(this._ctx.baseUrl + `/api/v1/users/new_internal_admin`, {
@@ -38,12 +38,11 @@ export class Users {
     return handleResponse(resp);
   }
 
-  async createUserAndCompany(name, email, accountType, password, companyId = undefined, profilePicture = undefined, paymentPlanType = undefined, companyName = undefined, credits = undefined) {
+  async createUserAndCompany(name, email, password, companyId = undefined, profilePicture = undefined, paymentPlanType = undefined, companyName = undefined, credits = undefined) {
     const body = stripUndef({
       name: name,
       email: email,
       company_id: companyId,
-      account_type: accountType,
       profile_picture: profilePicture,
       payment_plan_type: paymentPlanType,
       password: password,
@@ -66,6 +65,13 @@ export class Users {
       new_password: newPassword,
     });
     const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body));
+    return data;
+  }
+
+  async getUserId() {
+    this._ctx.requireTokens();
+    const path = `/api/v1/users`;
+    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
     return data;
   }
 

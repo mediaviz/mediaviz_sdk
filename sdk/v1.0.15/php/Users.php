@@ -25,9 +25,9 @@ class Users {
             'name' => $name,
             'email' => $email,
             'company_id' => $companyId,
-            'account_type' => $accountType,
             'profile_picture' => $profilePicture,
             'payment_plan_type' => $paymentPlanType,
+            'account_type' => $accountType,
         ], fn($v) => $v !== null);
         return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
     }
@@ -47,9 +47,9 @@ class Users {
             'name' => $name,
             'email' => $email,
             'company_id' => $companyId,
-            'account_type' => $accountType,
             'profile_picture' => $profilePicture,
             'payment_plan_type' => $paymentPlanType,
+            'account_type' => $accountType,
             'password' => $password,
         ], fn($v) => $v !== null);
         $ch = curl_init();
@@ -71,7 +71,6 @@ class Users {
     public function createUserAndCompany(
         string $name,
         string $email,
-        int $accountType,
         string $password,
         ?int $companyId = null,
         ?string $profilePicture = null,
@@ -85,7 +84,6 @@ class Users {
             'name' => $name,
             'email' => $email,
             'company_id' => $companyId,
-            'account_type' => $accountType,
             'profile_picture' => $profilePicture,
             'payment_plan_type' => $paymentPlanType,
             'password' => $password,
@@ -116,6 +114,12 @@ class Users {
             'new_password' => $newPassword,
         ], fn($v) => $v !== null);
         return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
+    }
+
+    public function getUserId(): mixed {
+        $this->ctx->requireTokens();
+        $path = "/api/v1/users";
+        return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
     }
 
     public function getUser(int $userId): mixed {

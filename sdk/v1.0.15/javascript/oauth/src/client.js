@@ -160,7 +160,9 @@ class OAuthClient {
   decodeAccessToken(accessToken) {
     const segment = accessToken.split('.')[1];
     if (!segment) throw new OAuthError('invalid_token', 'Malformed JWT', 400);
-    const payload = JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+    const b64 = segment.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(segment.length / 4) * 4, '=');
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
     return payload;
   }
 }

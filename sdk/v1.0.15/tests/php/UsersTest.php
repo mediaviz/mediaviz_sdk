@@ -34,9 +34,9 @@ class UsersTest extends TestCase {
         $this->assertArrayHasKey('name', $body);
         $this->assertArrayHasKey('email', $body);
         $this->assertArrayHasKey('company_id', $body);
-        $this->assertArrayHasKey('account_type', $body);
         $this->assertArrayHasKey('profile_picture', $body);
         $this->assertArrayHasKey('payment_plan_type', $body);
+        $this->assertArrayHasKey('account_type', $body);
     }
 
     public function test_post_create_user_auth_routing(): void {
@@ -117,6 +117,31 @@ class UsersTest extends TestCase {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Users($ctx);
         $obj->changePassword('test_value', 'test_value');
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
+    public function test_get_get_user_id_exists(): void {
+        $this->assertTrue(method_exists(Users::class, 'getUserId'));
+    }
+
+    public function test_get_get_user_id_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Users($ctx);
+        $obj->getUserId();
+        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_get_get_user_id_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Users($ctx);
+        $obj->getUserId();
+        $this->assertStringContainsString('/api/v1/users', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_get_get_user_id_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Users($ctx);
+        $obj->getUserId();
         $this->assertCount(1, $ctx->client->calls);
     }
 

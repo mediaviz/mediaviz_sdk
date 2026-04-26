@@ -54,13 +54,6 @@ class _TokenTrackingClient {
   }
 }
 
-class _Utils {
-  constructor(mv) { this._mv = mv; }
-  decodeAccessToken(accessToken) {
-    return this._mv._oauthClient._inner.decodeAccessToken(accessToken);
-  }
-}
-
 export class MediaViz {
   constructor(config = {}) {
     this._config = {
@@ -104,7 +97,6 @@ export class MediaViz {
     this.projects = new Projects(_ctx);
     this.search = new Search(_ctx);
     this.users = new Users(_ctx);
-    this.utils = new _Utils(this);
   }
 
   async authenticate() {

@@ -33,9 +33,9 @@ describe('Users', () => {
     expect(body).toHaveProperty('name');
     expect(body).toHaveProperty('email');
     expect(body).toHaveProperty('company_id');
-    expect(body).toHaveProperty('account_type');
     expect(body).toHaveProperty('profile_picture');
     expect(body).toHaveProperty('payment_plan_type');
+    expect(body).toHaveProperty('account_type');
   });
 
   it('createUser — auth routing', async () => {
@@ -79,9 +79,9 @@ describe('Users', () => {
     expect(body).toHaveProperty('name');
     expect(body).toHaveProperty('email');
     expect(body).toHaveProperty('company_id');
-    expect(body).toHaveProperty('account_type');
     expect(body).toHaveProperty('profile_picture');
     expect(body).toHaveProperty('payment_plan_type');
+    expect(body).toHaveProperty('account_type');
     expect(body).toHaveProperty('password');
   });
 
@@ -104,7 +104,7 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
+    await users.createUserAndCompany('test_value', 'user@example.com', 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     expect(spy.last_call().method).toBe('POST');
   });
 
@@ -113,7 +113,7 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
+    await users.createUserAndCompany('test_value', 'user@example.com', 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     expect(spy.last_call().url).toContain('/api/v1/users/new_company');
   });
 
@@ -122,12 +122,11 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
+    await users.createUserAndCompany('test_value', 'user@example.com', 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     const body = JSON.parse(spy.last_call().body);
     expect(body).toHaveProperty('name');
     expect(body).toHaveProperty('email');
     expect(body).toHaveProperty('company_id');
-    expect(body).toHaveProperty('account_type');
     expect(body).toHaveProperty('profile_picture');
     expect(body).toHaveProperty('payment_plan_type');
     expect(body).toHaveProperty('password');
@@ -140,7 +139,7 @@ describe('Users', () => {
     globalThis.fetch = spy;
     const ctx = { baseUrl: 'https://api.example.com' };
     const users = new Users(ctx);
-    await users.createUserAndCompany('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
+    await users.createUserAndCompany('test_value', 'user@example.com', 'test_value', 42, 'test_value', 'test_value', 'test_value', 42);
     expect(spy.calls.length).toBe(1);
   });
 
@@ -180,6 +179,35 @@ describe('Users', () => {
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const users = new Users(ctx);
     await users.changePassword('test_value', 'test_value');
+    expect(spy.calls.length).toBe(1);
+  });
+
+  it('getUserId — exists', () => {
+    const users = new Users({});
+    expect(typeof users.getUserId).toBe('function');
+  });
+
+  it('getUserId — HTTP method is GET', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const users = new Users(ctx);
+    await users.getUserId();
+    expect(spy.last_call().method).toBe('GET');
+  });
+
+  it('getUserId — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const users = new Users(ctx);
+    await users.getUserId();
+    expect(spy.last_call().path).toContain('/api/v1/users');
+  });
+
+  it('getUserId — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const users = new Users(ctx);
+    await users.getUserId();
     expect(spy.calls.length).toBe(1);
   });
 

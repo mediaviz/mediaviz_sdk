@@ -37,9 +37,9 @@ def test_post_create_user_request_body(mv_client, spy_client):
     assert 'name' in body
     assert 'email' in body
     assert 'company_id' in body
-    assert 'account_type' in body
     assert 'profile_picture' in body
     assert 'payment_plan_type' in body
+    assert 'account_type' in body
 
 def test_post_create_mediaviz_internal_admin_exists(mv_client):
     assert callable(getattr(mv_client.users, 'create_mediaviz_internal_admin', None))
@@ -62,13 +62,13 @@ def test_post_create_user_and_company_exists(mv_client):
 def test_post_create_user_and_company_http_method(mv_client, monkeypatch):
     _mc = _MockClient()
     monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)
-    mv_client.users.create_user_and_company('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42)
+    mv_client.users.create_user_and_company('test_value', 'user@example.com', 'test_value', 42, 'test_value', 'test_value', 'test_value', 42)
     assert _mc.recorded[0]['method'] == 'POST'
 
 def test_post_create_user_and_company_path(mv_client, monkeypatch):
     _mc = _MockClient()
     monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)
-    mv_client.users.create_user_and_company('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value', 'test_value', 42)
+    mv_client.users.create_user_and_company('test_value', 'user@example.com', 'test_value', 42, 'test_value', 'test_value', 'test_value', 42)
     assert '/api/v1/users/new_company' in _mc.recorded[0]['url']
 
 def test_post_change_password_exists(mv_client):
@@ -90,6 +90,19 @@ def test_post_change_password_request_body(mv_client, spy_client):
     body = spy_client.last_call()['body']
     assert 'old_password' in body
     assert 'new_password' in body
+
+def test_get_get_user_id_exists(mv_client):
+    assert callable(getattr(mv_client.users, 'get_user_id', None))
+
+def test_get_get_user_id_http_method(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.users.get_user_id()
+    assert spy_client.last_call()['method'] == 'GET'
+
+def test_get_get_user_id_path(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.users.get_user_id()
+    assert '/api/v1/users' in spy_client.last_call()['url']
 
 def test_get_get_user_exists(mv_client):
     assert callable(getattr(mv_client.users, 'get_user', None))

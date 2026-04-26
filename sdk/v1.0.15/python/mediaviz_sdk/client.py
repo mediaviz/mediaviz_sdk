@@ -65,15 +65,6 @@ class _TokenTrackingClient:
         return getattr(self._inner, name)
 
 
-class _Utils:
-    def __init__(self, mv: "MediaVizClient") -> None:
-        self._mv = mv
-
-    def decode_access_token(self, access_token: str) -> Any:
-        return self._mv._tracking_client._inner.decode_access_token(access_token)
-
-
-
 class MediaVizClient:
     def __init__(
         self,
@@ -129,7 +120,6 @@ class MediaVizClient:
         self.projects = Projects(_ctx)
         self.search = Search(_ctx)
         self.users = Users(_ctx)
-        self.utils = _Utils(self)
 
     def authenticate(self) -> Any:
         tokens = self._tracking_client._inner.get_client_credentials_token()

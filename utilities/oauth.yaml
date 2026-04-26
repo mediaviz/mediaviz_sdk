@@ -1,18 +1,2 @@
 source_module: oauth
 utilities:
-  - id: decode_access_token
-    description: "Decode a JWT access token payload without verifying signature."
-    target:
-      javascript: decodeAccessToken
-      php: decodeAccessToken
-      python: decode_access_token
-    function_name:
-      javascript: decodeAccessToken
-      php: decodeAccessToken
-      python: decode_access_token
-    params:
-      - name: access_token
-        type: str
-        required: true
-    returns: TokenPayload
-    requires_tokens: false
