@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-sys.path.insert(0, '/Users/calebbalbera/Documents/_code/mediaviz_sdk/sdk/v1.0.19/python')
+sys.path.insert(0, '/Users/calebbalbera/Documents/_code/mediaviz_sdk/sdk/v1.0.20/python')
 
 from oauth_sdk import OAuthClient
 

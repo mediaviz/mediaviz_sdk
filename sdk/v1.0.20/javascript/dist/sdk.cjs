@@ -1,3 +1,5 @@
+'use strict';
+
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -1452,13 +1454,14 @@ class Photos {
     return data;
   }
 
-  async getAllProjectPhotoIds(tableName, { ascOrDesc, lastId, limit } = {}) {
+  async getAllProjectPhotoIds(tableName, { ascOrDesc, lastId, limit, includeAll } = {}) {
     this._ctx.requireTokens();
     let path = `/api/v1/photos/${encodeURIComponent(tableName)}/`;
     const query = new URLSearchParams();
     if (ascOrDesc !== undefined) (Array.isArray(ascOrDesc) ? ascOrDesc : [ascOrDesc]).forEach(v => query.append('asc_or_desc', v));
     if (lastId !== undefined) (Array.isArray(lastId) ? lastId : [lastId]).forEach(v => query.append('last_id', v));
     if (limit !== undefined) (Array.isArray(limit) ? limit : [limit]).forEach(v => query.append('limit', v));
+    if (includeAll !== undefined) (Array.isArray(includeAll) ? includeAll : [includeAll]).forEach(v => query.append('include_all', v));
     const qs = query.toString();
     if (qs) path += '?' + qs;
     const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
@@ -1526,7 +1529,7 @@ class Photos {
 
   async getRankedProjectPhotosByTableNameNoDateTaken(tableName, { ascOrDesc, lastId, limit } = {}) {
     this._ctx.requireTokens();
-    let path = `/api/v1/photos/${encodeURIComponent(tableName)}/date_taken/none/ranked`;
+    let path = `/api/v1/photos/${encodeURIComponent(tableName)}/date_taken/none/ranked/`;
     const query = new URLSearchParams();
     if (ascOrDesc !== undefined) (Array.isArray(ascOrDesc) ? ascOrDesc : [ascOrDesc]).forEach(v => query.append('asc_or_desc', v));
     if (lastId !== undefined) (Array.isArray(lastId) ? lastId : [lastId]).forEach(v => query.append('last_id', v));
@@ -1910,4 +1913,31 @@ class MediaViz {
   get refreshToken() { return this._refreshToken; }
 }
 
-export { Admin, AiModelCredits, ApiError, Company, CuratedAlbums, CustomAlbums, EmailTokens, Health, Keywords, MediaViz, NotFoundError, OAuthClient, OAuthError, OAuthErrorCode, OauthAuthorization, OauthClients, OauthLogin, OauthToken, Person, Photos, Photoupload, Projects, RateLimitError, Search, ServerError, Users, ValidationError, handleResponse };
+exports.Admin = Admin;
+exports.AiModelCredits = AiModelCredits;
+exports.ApiError = ApiError;
+exports.Company = Company;
+exports.CuratedAlbums = CuratedAlbums;
+exports.CustomAlbums = CustomAlbums;
+exports.EmailTokens = EmailTokens;
+exports.Health = Health;
+exports.Keywords = Keywords;
+exports.MediaViz = MediaViz;
+exports.NotFoundError = NotFoundError;
+exports.OAuthClient = OAuthClient;
+exports.OAuthError = OAuthError;
+exports.OAuthErrorCode = OAuthErrorCode;
+exports.OauthAuthorization = OauthAuthorization;
+exports.OauthClients = OauthClients;
+exports.OauthLogin = OauthLogin;
+exports.OauthToken = OauthToken;
+exports.Person = Person;
+exports.Photos = Photos;
+exports.Photoupload = Photoupload;
+exports.Projects = Projects;
+exports.RateLimitError = RateLimitError;
+exports.Search = Search;
+exports.ServerError = ServerError;
+exports.Users = Users;
+exports.ValidationError = ValidationError;
+exports.handleResponse = handleResponse;

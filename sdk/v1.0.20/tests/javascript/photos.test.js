@@ -126,7 +126,7 @@ describe('Photos', () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const photos = new Photos(ctx);
-    await photos.getAllProjectPhotoIds('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    await photos.getAllProjectPhotoIds('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value', includeAll: 'test_value' });
     expect(spy.last_call().method).toBe('GET');
   });
 
@@ -134,7 +134,7 @@ describe('Photos', () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const photos = new Photos(ctx);
-    await photos.getAllProjectPhotoIds('hello world', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    await photos.getAllProjectPhotoIds('hello world', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value', includeAll: 'test_value' });
     expect(spy.last_call().path).toContain('/api/v1/photos/hello%20world/');
   });
 
@@ -142,18 +142,19 @@ describe('Photos', () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const photos = new Photos(ctx);
-    await photos.getAllProjectPhotoIds('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    await photos.getAllProjectPhotoIds('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value', includeAll: 'test_value' });
     const path = spy.last_call().path;
     expect(path).toContain('asc_or_desc=');
     expect(path).toContain('last_id=');
     expect(path).toContain('limit=');
+    expect(path).toContain('include_all=');
   });
 
   it('getAllProjectPhotoIds — auth routing', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const photos = new Photos(ctx);
-    await photos.getAllProjectPhotoIds('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
+    await photos.getAllProjectPhotoIds('test_value', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value', includeAll: 'test_value' });
     expect(spy.calls.length).toBe(1);
   });
 
@@ -364,7 +365,7 @@ describe('Photos', () => {
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const photos = new Photos(ctx);
     await photos.getRankedProjectPhotosByTableNameNoDateTaken('hello world', { ascOrDesc: 'test_value', lastId: 'test_value', limit: 'test_value' });
-    expect(spy.last_call().path).toContain('/api/v1/photos/hello%20world/date_taken/none/ranked');
+    expect(spy.last_call().path).toContain('/api/v1/photos/hello%20world/date_taken/none/ranked/');
   });
 
   it('getRankedProjectPhotosByTableNameNoDateTaken — query params', async () => {

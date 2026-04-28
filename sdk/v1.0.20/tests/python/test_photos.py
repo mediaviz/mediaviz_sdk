@@ -67,21 +67,22 @@ def test_get_get_all_project_photo_ids_exists(mv_client):
 
 def test_get_get_all_project_photo_ids_http_method(mv_client, spy_client):
     spy_client.reset()
-    mv_client.photos.get_all_project_photo_ids('test_value', 'test_value', 'test_value', 'test_value')
+    mv_client.photos.get_all_project_photo_ids('test_value', 'test_value', 'test_value', 'test_value', 'test_value')
     assert spy_client.last_call()['method'] == 'GET'
 
 def test_get_get_all_project_photo_ids_path(mv_client, spy_client):
     spy_client.reset()
-    mv_client.photos.get_all_project_photo_ids('hello world', 'test_value', 'test_value', 'test_value')
+    mv_client.photos.get_all_project_photo_ids('hello world', 'test_value', 'test_value', 'test_value', 'test_value')
     assert '/api/v1/photos/hello%20world/' in spy_client.last_call()['url']
 
 def test_get_get_all_project_photo_ids_query_params(mv_client, spy_client):
     spy_client.reset()
-    mv_client.photos.get_all_project_photo_ids('test_value', 'test_value', 'test_value', 'test_value')
+    mv_client.photos.get_all_project_photo_ids('test_value', 'test_value', 'test_value', 'test_value', 'test_value')
     url = spy_client.last_call()['url']
     assert 'asc_or_desc=' in url
     assert 'last_id=' in url
     assert 'limit=' in url
+    assert 'include_all=' in url
 
 def test_get_get_ranked_project_photos_by_table_name_exists(mv_client):
     assert callable(getattr(mv_client.photos, 'get_ranked_project_photos_by_table_name', None))
@@ -191,7 +192,7 @@ def test_get_get_ranked_project_photos_by_table_name_no_date_taken_http_method(m
 def test_get_get_ranked_project_photos_by_table_name_no_date_taken_path(mv_client, spy_client):
     spy_client.reset()
     mv_client.photos.get_ranked_project_photos_by_table_name_no_date_taken('hello world', 'test_value', 'test_value', 'test_value')
-    assert '/api/v1/photos/hello%20world/date_taken/none/ranked' in spy_client.last_call()['url']
+    assert '/api/v1/photos/hello%20world/date_taken/none/ranked/' in spy_client.last_call()['url']
 
 def test_get_get_ranked_project_photos_by_table_name_no_date_taken_query_params(mv_client, spy_client):
     spy_client.reset()

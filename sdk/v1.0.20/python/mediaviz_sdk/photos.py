@@ -65,6 +65,7 @@ class Photos:
         asc_or_desc: str | None = None,
         last_id: Any | None = None,
         limit: Any | None = None,
+        include_all: Any | None = None,
     ) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/photos/' + quote(str(table_name), safe='') + '/'
@@ -75,6 +76,8 @@ class Photos:
             _q['last_id'] = last_id
         if limit is not None:
             _q['limit'] = limit
+        if include_all is not None:
+            _q['include_all'] = include_all
         if _q:
             path += '?' + urlencode(_q, doseq=True)
         return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
@@ -176,7 +179,7 @@ class Photos:
         limit: Any | None = None,
     ) -> dict[str, Any]:
         self._ctx.require_tokens()
-        path = '/api/v1/photos/' + quote(str(table_name), safe='') + '/date_taken/none/ranked'
+        path = '/api/v1/photos/' + quote(str(table_name), safe='') + '/date_taken/none/ranked/'
         _q: dict[str, Any] = {}
         if asc_or_desc is not None:
             _q['asc_or_desc'] = asc_or_desc

@@ -26,13 +26,14 @@ export class Photos {
     return data;
   }
 
-  async getAllProjectPhotoIds(tableName, { ascOrDesc, lastId, limit } = {}) {
+  async getAllProjectPhotoIds(tableName, { ascOrDesc, lastId, limit, includeAll } = {}) {
     this._ctx.requireTokens();
     let path = `/api/v1/photos/${encodeURIComponent(tableName)}/`;
     const query = new URLSearchParams();
     if (ascOrDesc !== undefined) (Array.isArray(ascOrDesc) ? ascOrDesc : [ascOrDesc]).forEach(v => query.append('asc_or_desc', v));
     if (lastId !== undefined) (Array.isArray(lastId) ? lastId : [lastId]).forEach(v => query.append('last_id', v));
     if (limit !== undefined) (Array.isArray(limit) ? limit : [limit]).forEach(v => query.append('limit', v));
+    if (includeAll !== undefined) (Array.isArray(includeAll) ? includeAll : [includeAll]).forEach(v => query.append('include_all', v));
     const qs = query.toString();
     if (qs) path += '?' + qs;
     const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
@@ -100,7 +101,7 @@ export class Photos {
 
   async getRankedProjectPhotosByTableNameNoDateTaken(tableName, { ascOrDesc, lastId, limit } = {}) {
     this._ctx.requireTokens();
-    let path = `/api/v1/photos/${encodeURIComponent(tableName)}/date_taken/none/ranked`;
+    let path = `/api/v1/photos/${encodeURIComponent(tableName)}/date_taken/none/ranked/`;
     const query = new URLSearchParams();
     if (ascOrDesc !== undefined) (Array.isArray(ascOrDesc) ? ascOrDesc : [ascOrDesc]).forEach(v => query.append('asc_or_desc', v));
     if (lastId !== undefined) (Array.isArray(lastId) ? lastId : [lastId]).forEach(v => query.append('last_id', v));

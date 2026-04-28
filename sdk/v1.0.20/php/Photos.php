@@ -67,7 +67,8 @@ class Photos {
         string $tableName,
         ?string $ascOrDesc = null,
         mixed $lastId = null,
-        mixed $limit = null
+        mixed $limit = null,
+        mixed $includeAll = null
     ): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/photos/" . rawurlencode((string)$tableName) . "/";
@@ -75,6 +76,7 @@ class Photos {
         if ($ascOrDesc !== null) $query['asc_or_desc'] = $ascOrDesc;
         if ($lastId !== null) $query['last_id'] = $lastId;
         if ($limit !== null) $query['limit'] = $limit;
+        if ($includeAll !== null) $query['include_all'] = $includeAll;
         if ($query) {
             $pairs = [];
             foreach ($query as $k => $v) {
@@ -190,7 +192,7 @@ class Photos {
         mixed $limit = null
     ): mixed {
         $this->ctx->requireTokens();
-        $path = "/api/v1/photos/" . rawurlencode((string)$tableName) . "/date_taken/none/ranked";
+        $path = "/api/v1/photos/" . rawurlencode((string)$tableName) . "/date_taken/none/ranked/";
         $query = [];
         if ($ascOrDesc !== null) $query['asc_or_desc'] = $ascOrDesc;
         if ($lastId !== null) $query['last_id'] = $lastId;

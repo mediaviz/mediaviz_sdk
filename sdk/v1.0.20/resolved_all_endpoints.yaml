@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-04-28T12:13:45Z'
+resolved_at: '2026-04-28T19:40:08Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -2028,6 +2028,10 @@ endpoints:
     in: query
     type: Optional[int]
     required: false
+  - name: include_all
+    in: query
+    type: Optional[bool]
+    required: false
   request_body: null
   response: null
   content_type: null
@@ -2210,7 +2214,7 @@ endpoints:
   controller: Photos
   base_path: /api/v1
   method: GET
-  path: /api/v1/photos/{table_name}/date_taken/none/ranked
+  path: /api/v1/photos/{table_name}/date_taken/none/ranked/
   summary: get_ranked_project_photos_by_table_name_no_date_taken
   auth: required
   params:
