@@ -2,6 +2,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import subprocess
 from .base import BaseGenerator
 from naming import snake_to_camel as _snake_to_camel
 
@@ -52,6 +54,20 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         self.emit_barrel_index(controller_files, output_dir, extra_files=reexport_files)
         self.emit_rollup_config(output_dir)
         self.emit_package_json(output_dir)
+        self.build_dist(output_dir)
+
+    def build_dist(self, output_dir: str) -> None:
+        npm = shutil.which("npm")
+        if not npm:
+            print(f"  [javascript] npm not found on PATH — skipping dist build for {output_dir}")
+            return
+        for cmd in (["npm", "install", "--no-audit", "--no-fund"], ["npm", "run", "build"]):
+            result = subprocess.run(cmd, cwd=output_dir, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"  [javascript] {' '.join(cmd)} failed in {output_dir}:")
+                print(result.stdout + result.stderr)
+                return
+        print(f"  [javascript] dist built → {os.path.join(output_dir, 'dist')}")
 
     def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
         self._copy_module_files(module_root, "javascript", module_name, output_dir)
@@ -538,13 +554,13 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines.append("    const query = new URLSearchParams();")
             for p in query_params:
                 camel = self.snake_to_camel(p["name"])
-                lines.append(f"    if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+                lines.append(f"    if ({camel} !== undefined) (Array.isArray({camel}) ? {camel} : [{camel}]).forEach(v => query.append('{p['name']}', v));")
             lines.append("    const qs = query.toString();")
             lines.append("    if (qs) path += '?' + qs;")
         else:
             lines.append(f"    const path = {tmpl};")
 
-        preamble, body_expr = self._js_body_build(request_body, "application/json", "    ")
+        preamble, body_expr = self._js_body_build(request_body, "application/json", "    ", serialize=False)
         lines.extend(preamble)
         if body_expr is None:
             lines.append(f"    const {{ data }} = await this._ctx.client.request(path, '{ep['method']}', this._ctx.accessToken, this._ctx.refreshToken);")
@@ -585,7 +601,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 lines.append("    const query = new URLSearchParams();")
                 for p in query_params:
                     camel = self.snake_to_camel(p["name"])
-                    lines.append(f"    if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+                    lines.append(f"    if ({camel} !== undefined) (Array.isArray({camel}) ? {camel} : [{camel}]).forEach(v => query.append('{p['name']}', v));")
                 lines.append("    const qs = query.toString();")
                 lines.append("    if (qs) path += '?' + qs;")
                 lines.append(f"    const resp = await fetch(this._ctx.baseUrl + path, {{ method: '{method}' }});")
@@ -643,7 +659,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines.append("    const query = new URLSearchParams();")
             for p in query_params:
                 camel = self.snake_to_camel(p["name"])
-                lines.append(f"    if ({camel} !== undefined) query.set('{p['name']}', {camel});")
+                lines.append(f"    if ({camel} !== undefined) (Array.isArray({camel}) ? {camel} : [{camel}]).forEach(v => query.append('{p['name']}', v));")
             lines.append("    const qs = query.toString();")
             lines.append("    if (qs) path += '?' + qs;")
             fetch_url = "baseUrl + path"
@@ -828,7 +844,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 mapped = input_map.get(p["name"])
                 if mapped:
                     val = self._resolve_js_expr(mapped, comp)
-                    lines.append(f"{indent}if ({self._optional_check_expr(val)}) _q.set('{p['name']}', {val});")
+                    lines.append(f"{indent}if ({self._optional_check_expr(val)}) (Array.isArray({val}) ? {val} : [{val}]).forEach(v => _q.append('{p['name']}', v));")
             lines.append(f"{indent}const _qs = _q.toString();")
             lines.append(f"{indent}if (_qs) _path += '?' + _qs;")
             path_ref = "_path"
@@ -1076,22 +1092,31 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             return ["body = {}"]
         return []
 
-    def _js_body_build(self, request_body, content_type: str, indent: str) -> tuple[list[str], str | None]:
+    def _js_body_build(self, request_body, content_type: str, indent: str, *, serialize: bool = True) -> tuple[list[str], str | None]:
         """Return (preamble_lines, body_expr) for emitting the HTTP request body.
 
         body_expr is the JS expression to assign to fetch's `body:` field (or pass as
         the request payload); None if there is no body.
-        For form-encoded content, wraps the assembled object in URLSearchParams().
+
+        When serialize=True (default, for native fetch call sites): JSON content is
+        wrapped in JSON.stringify(...), form content in new URLSearchParams(...).toString().
+        When serialize=False (for OAuth client.request call sites — auth path): returns
+        the raw object/identifier expression, since the OAuth client serializes once
+        on its own. Pass serialize=False at any auth-path call site that adds body
+        support in the future, or the OAuth layer will double-encode.
         """
         shape = self._body_shape(request_body)
         if shape is None:
             return [], None
         is_form = content_type == "application/x-www-form-urlencoded"
+        assert not (is_form and not serialize), "form-encoded body cannot flow through client.request"
 
         if shape == "scalar":
             name = _js_safe(request_body["param_name"])
             if is_form:
                 return [], f"new URLSearchParams({name}).toString()"
+            if not serialize:
+                return [], name
             return [], f"JSON.stringify({name})"
 
         if shape == "expanded":
@@ -1101,6 +1126,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             lines[-1] = lines[-1] + ";"
             if is_form:
                 return lines, "new URLSearchParams(body).toString()"
+            if not serialize:
+                return lines, "body"
             return lines, "JSON.stringify(body)"
 
         if shape == "flat_dict":
@@ -1115,11 +1142,15 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             obj = "{ " + ", ".join(parts) + " }"
             if is_form:
                 return [], f"new URLSearchParams({obj}).toString()"
+            if not serialize:
+                return [], obj
             return [], f"JSON.stringify({obj})"
 
         if shape == "generic":
             if is_form:
                 return [], "new URLSearchParams(body).toString()"
+            if not serialize:
+                return [], "body"
             return [], "JSON.stringify(body)"
 
         return [], None

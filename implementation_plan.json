@@ -1461,5 +1461,123 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 65,
+    "description": "Handle intelligence-hub layout move \u2014 all_endpoints.yaml relocated from common_flows/sdk_endpoints/ to api_docs/endpoint_list/. Add ENDPOINT_LIST_SUBPATH and endpoint_list_dir to SourcePaths; teach resolve_flow_path to search both flows_dir and endpoint_list_dir (flows_dir wins on collision). Update conftest fake_sources fixture, README, and spec accordingly. (docs_flows top-level move noted but not consumed by SDK code.)",
+    "touch_points": [
+      {
+        "file": "github_sources.py",
+        "location": "ENDPOINT_LIST_SUBPATH, SourcePaths, fetch_sources, resolve_flow_path",
+        "status": "complete"
+      },
+      {
+        "file": "generate.py",
+        "location": "parse_args --endpoints help, main() resolve_flow_path call",
+        "status": "complete"
+      },
+      {
+        "file": "tests/conftest.py",
+        "location": "fake_sources fixture",
+        "status": "complete"
+      },
+      {
+        "file": "README.md",
+        "location": "Prerequisites, Flags",
+        "status": "complete"
+      },
+      {
+        "file": "spec.md",
+        "location": "Source Resolution table, Key functions, Flags, Run sequence",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 66,
+    "description": "Fix double JSON.stringify on auth request bodies in JS generator (OAuth client already serializes)",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_js_body_build",
+        "status": "complete — added serialize kwarg; returns raw object/identifier when serialize=False"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_auth_method",
+        "status": "complete — calls _js_body_build with serialize=False"
+      },
+      {
+        "file": "tests/test_javascript_browser.py",
+        "location": "test_auth_method_dynamic_body, test_auth_method_structured_body",
+        "status": "complete — assertions updated to expect raw expression at client.request call site"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "_emit_body_test",
+        "status": "complete — auth-client branch reads spy.last_call().body directly (raw object); JSON.parse only on fetch branch"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 67,
+    "description": "Serialize array query params as repeated keys (?k=a&k=b) instead of single set/comma-joined values across all frameworks; backend (FastAPI Query) requires repeated keys for outcomes/models, and_params/or_params/not_params, etc.",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_auth_method",
+        "status": "complete — emits (Array.isArray(x) ? x : [x]).forEach(v => query.append(name, v))"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_unauth_method",
+        "status": "complete — same array-aware append"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_alt_host_method",
+        "status": "complete — same array-aware append"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_call_auth_endpoint (composite)",
+        "status": "complete — _q.append per element"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "_build_path",
+        "status": "complete — _q typed dict[str, Any], values stored as-is, urlencode(_q, doseq=True)"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_build_path",
+        "status": "complete — manual foreach over $query flattening arrays via rawurlencode pairs joined by &"
+      },
+      {
+        "file": "spec.md",
+        "location": "Generator responsibilities + JS example",
+        "status": "complete — documented array-param serialization rule and updated example"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 68,
+    "description": "JS generator runs npm install + npm run build after emitting source so dist/ artifacts (sdk.cjs, sdk.esm.js, sdk.umd.js) are produced as part of generation",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "build_dist",
+        "status": "complete — new method, runs npm install --no-audit --no-fund then npm run build via subprocess; warns and skips if npm missing or any step fails"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "generate",
+        "status": "complete — calls self.build_dist(output_dir) after emit_rollup_config / emit_package_json"
+      }
+    ],
+    "completion_status": true
   }
 ]

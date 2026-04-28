@@ -692,7 +692,13 @@ class PhpGenerator(BaseGenerator):
             for p in query_params:
                 camel = self.snake_to_camel(p["name"])
                 lines.append(f"        if (${camel} !== null) $query['{p['name']}'] = ${camel};")
-            lines.append("        if ($query) $path .= '?' . http_build_query($query);")
+            lines.append("        if ($query) {")
+            lines.append("            $pairs = [];")
+            lines.append("            foreach ($query as $k => $v) {")
+            lines.append("                foreach ((is_array($v) ? $v : [$v]) as $vv) $pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);")
+            lines.append("            }")
+            lines.append("            $path .= '?' . implode('&', $pairs);")
+            lines.append("        }")
         else:
             lines = [f"        $path = {php_path};"]
         return lines

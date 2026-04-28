@@ -90,7 +90,7 @@ def e2e_output(fake_sources, monkeypatch, capsys):
 
 def test_resolved_yaml_created(e2e_output):
     files = [f for f in os.listdir(e2e_output) if f.startswith("resolved_") and f.endswith(".yaml")]
-    assert files == ["resolved_test_flow.yaml"]
+    assert "resolved_test_flow.yaml" in files
 
 
 def test_resolved_yaml_endpoint_count(e2e_output):

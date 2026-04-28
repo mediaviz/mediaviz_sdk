@@ -6,12 +6,27 @@ import subprocess
 import sys
 
 
-SDK_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "sdk", "v1.0.4", "python"
-)
-TEST_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "sdk", "v1.0.4", "tests", "python"
-)
+_SDK_ROOT = os.path.join(os.path.dirname(__file__), "..", "sdk")
+_VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+
+def _latest_version_dir() -> str:
+    versions: list[tuple[tuple[int, int, int], str]] = []
+    if os.path.isdir(_SDK_ROOT):
+        for entry in os.listdir(_SDK_ROOT):
+            m = _VERSION_RE.match(entry)
+            full = os.path.join(_SDK_ROOT, entry)
+            if m and os.path.isdir(full):
+                versions.append(((int(m.group(1)), int(m.group(2)), int(m.group(3))), full))
+    if not versions:
+        raise RuntimeError(f"no sdk/v*.*.* directories found under {_SDK_ROOT}")
+    return max(versions)[1]
+
+
+_LATEST_DIR = _latest_version_dir()
+SDK_DIR = os.path.join(_LATEST_DIR, "python")
+TEST_DIR = os.path.join(_LATEST_DIR, "tests", "python")
+_VERSION = os.path.basename(_LATEST_DIR).lstrip("v")
 
 
 def test_generated_file_layout():
@@ -105,4 +120,4 @@ def test_pyproject_version():
     content = open(os.path.join(SDK_DIR, "pyproject.toml")).read()
     m = re.search(r'version\s*=\s*"([\d.]+)"', content)
     assert m, "no version in pyproject.toml"
-    assert m.group(1) == "1.0.4"
+    assert m.group(1) == _VERSION

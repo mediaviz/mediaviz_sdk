@@ -109,8 +109,8 @@ def test_auth_method_dynamic_body(gen):
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
     assert "async updateProjects(projectId, body = {})" in src
-    assert "JSON.stringify(body)" in src
-    assert "await this._ctx.client.request(path, 'PUT', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify(body))" in src
+    assert "JSON.stringify" not in src
+    assert "await this._ctx.client.request(path, 'PUT', this._ctx.accessToken, this._ctx.refreshToken, body)" in src
 
 
 def test_auth_method_structured_body(gen):
@@ -127,8 +127,8 @@ def test_auth_method_structured_body(gen):
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
     assert "async createProjectsEvent(projectTableName, { event, detail })" in src
-    assert "JSON.stringify({ event, detail })" in src
-    assert "await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, JSON.stringify({ event, detail }))" in src
+    assert "JSON.stringify" not in src
+    assert "await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, { event, detail })" in src
 
 
 # ── unauthenticated method emission ───────────────────────────────────────────

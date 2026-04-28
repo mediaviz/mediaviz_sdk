@@ -20,7 +20,7 @@ UTILITIES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "utilit
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate MediaViz SDK libraries from endpoint specs.")
-    p.add_argument("--endpoints", required=True, help="Flow name in common_flows/sdk_endpoints (e.g. 'basic_sdk_flow_endpoints')")
+    p.add_argument("--endpoints", required=True, help="Flow name resolved against common_flows/sdk_endpoints/ then api_docs/endpoint_list/ (e.g. 'basic_sdk_flow_endpoints', 'all_endpoints')")
     p.add_argument("--branch", default=None, help="Git branch to use for all source repos. Falls back to main if not found.")
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
     p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk.")
@@ -90,7 +90,7 @@ def main() -> None:
         requested = list(registry.keys())
 
     with fetch_sources(args.branch) as sources:
-        endpoints_path = resolve_flow_path(args.endpoints, sources.flows_dir)
+        endpoints_path = resolve_flow_path(args.endpoints, sources.flows_dir, sources.endpoint_list_dir)
         oauth_sdk_root = sources.oauth_sdk_root
         controllers_dir = sources.controllers_dir
 

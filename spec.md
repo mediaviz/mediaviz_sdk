@@ -124,6 +124,7 @@ Each generator is responsible for:
 - Converting endpoint `id` (snake_case) to the framework's naming convention
 - Generating function signatures with path params as required args, query params as optional args, and schema-expanded request_body fields as individual unary params (required first, then optional)
 - Interpolating path parameters into the URL string
+- Serializing query params with array values as repeated keys (`?k=a&k=b`), not comma-joined or bracket-indexed: JS uses `URLSearchParams.append` per element; Python uses `urlencode(_q, doseq=True)` and stores list values as-is in `_q`; PHP iterates manually with `rawurlencode($k) . '=' . rawurlencode($v)` per element since `http_build_query` would emit `k[0]=...`
 - Routing `auth: required` endpoints through the OAuth client's `request()` method
 - Routing `auth: none` endpoints through a simple unauthenticated HTTP call
 - Reassembling expanded body fields back into the original nested object shape on the wire (stripping undefined/null), driven by the `orig_path` carried on each leaf
@@ -154,12 +155,13 @@ Encapsulates source path resolution. Currently resolves against local sibling di
 |--------|-----------|----------------------|
 | Controllers | `../mediaviz_intelligence_hub/api_docs/` | `imaige/mediaviz_intelligence_hub` → `api_docs/` |
 | Schemas | `../mediaviz_intelligence_hub/api_docs/api_schemas.yaml` | same repo, same path |
-| Flow YAML files | `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` | `imaige/mediaviz_intelligence_hub` → `common_flows/sdk_endpoints/` |
+| Hand-authored flow YAMLs | `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` | `imaige/mediaviz_intelligence_hub` → `common_flows/sdk_endpoints/` |
+| Generated endpoint registries | `../mediaviz_intelligence_hub/api_docs/endpoint_list/` | `imaige/mediaviz_intelligence_hub` → `api_docs/endpoint_list/` |
 | OAuth SDK | `../oauth_library/sdk/` | `imaige/oauth_library` → `sdk/` |
 
 **Key functions:**
-- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir, schemas_path)`
-- `resolve_flow_path(flow_name, flows_dir)` — returns path to `{flow_name}.yaml`, exits with available flows if not found
+- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir, endpoint_list_dir, schemas_path)`
+- `resolve_flow_path(flow_name, flows_dir, endpoint_list_dir)` — returns path to `{flow_name}.yaml` from the first directory containing it (flows_dir wins on collision); exits with the union of available flow names if not found
 
 ### 6. CLI Entrypoint (`generate.py`)
 
@@ -171,7 +173,7 @@ python generate.py --endpoints getting_started_sdk_endpoints --branch feature/ne
 **Flags:**
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--endpoints` | yes | Flow name in `common_flows/sdk_endpoints/` (e.g., `basic_sdk_flow_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
+| `--endpoints` | yes | Flow name resolved against `common_flows/sdk_endpoints/` first, then `api_docs/endpoint_list/` (e.g., `basic_sdk_flow_endpoints`, `all_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
 | `--branch` | no | Git branch to use for all source repos. Falls back to `main` if branch not found. Currently accepted but unused in local mode. |
 | `--frameworks` | no | Comma-separated list of frameworks to generate. Default: all registered. |
 | `--destination-dir` | no | Output folder name in package root. Created if it doesn't exist. Default: `sdk`. |
@@ -181,8 +183,8 @@ python generate.py --endpoints getting_started_sdk_endpoints --branch feature/ne
 Output is written to the folder specified by `--destination-dir` (default `./sdk/`). Versioning and archiving behavior is identical regardless of destination.
 
 **Run sequence:**
-1. Resolve source paths via `fetch_sources(branch)` — yields controllers dir, OAuth SDK root, and flows dir
-2. Resolve flow name to YAML path via `resolve_flow_path()` — fails with available flows if not found
+1. Resolve source paths via `fetch_sources(branch)` — yields controllers dir, OAuth SDK root, flows dir, and endpoint-list dir
+2. Resolve flow name to YAML path via `resolve_flow_path()` — searches flows dir then endpoint-list dir; fails with available flows if not found
 3. Determine next version number by scanning `sdk/` for `v{major}.{minor}.{iteration}` directories, applying the requested bump type
 4. Archive all existing `sdk/v*` directories to `sdk/archive/`
 5. Resolve refs: endpoint refs (contain `#`) are resolved into flattened endpoints; composite refs (no `#`) are collected as file paths
@@ -263,9 +265,9 @@ export class Photos {
     this._ctx.requireTokens();
     let path = `/api/v1/photos/${encodeURIComponent(tableName)}/`;
     const query = new URLSearchParams();
-    if (ascOrDesc !== undefined) query.set('asc_or_desc', ascOrDesc);
-    if (lastId !== undefined) query.set('last_id', lastId);
-    if (limit !== undefined) query.set('limit', limit);
+    if (ascOrDesc !== undefined) (Array.isArray(ascOrDesc) ? ascOrDesc : [ascOrDesc]).forEach(v => query.append('asc_or_desc', v));
+    if (lastId !== undefined) (Array.isArray(lastId) ? lastId : [lastId]).forEach(v => query.append('last_id', v));
+    if (limit !== undefined) (Array.isArray(limit) ? limit : [limit]).forEach(v => query.append('limit', v));
     const qs = query.toString();
     if (qs) path += '?' + qs;
     const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);

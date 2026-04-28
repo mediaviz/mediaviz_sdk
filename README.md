@@ -11,14 +11,15 @@ See `spec.md` for full architectural detail and `implementation_plan.json` for t
 The generator resolves source files from local sibling directories:
 
 - `../mediaviz_intelligence_hub/api_docs/` — controllers and endpoint refs
-- `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` — flow YAML files
+- `../mediaviz_intelligence_hub/api_docs/endpoint_list/` — generated registries (e.g. `all_endpoints.yaml`)
+- `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` — hand-authored SDK flow YAML files
 - `../oauth_library/sdk/` — OAuth SDK (javascript/, php/ subdirectories)
 
 ## Flags
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--endpoints` | yes | Flow name in `common_flows/sdk_endpoints/` (e.g. `basic_sdk_flow_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
+| `--endpoints` | yes | Flow name resolved against `common_flows/sdk_endpoints/` first, then `api_docs/endpoint_list/` (e.g. `basic_sdk_flow_endpoints`, `all_endpoints`). Refs containing `#` are resolved as endpoints; refs without `#` are resolved as composite files. |
 | `--branch` | no | Git branch for source repos. Currently accepted but unused in local mode; will be used when GitHub-clone support is added. |
 | `--frameworks` | no | Comma-separated frameworks to generate. Default: all registered. |
 | `--destination-dir` | no | Output folder name in the package root. Created if missing. Default: `sdk`. |

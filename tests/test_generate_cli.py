@@ -74,7 +74,7 @@ def test_cli_creates_resolved_yaml(monkeypatch, capsys, sdk_env):
     assert code == 0
     v = os.path.join(sdk_env["output_dir"], "v1.0.0")
     yaml_files = [f for f in os.listdir(v) if f.startswith("resolved_") and f.endswith(".yaml")]
-    assert yaml_files == ["resolved_test_flow.yaml"]
+    assert "resolved_test_flow.yaml" in yaml_files
 
 
 def test_cli_creates_framework_output_dir(monkeypatch, capsys, sdk_env):

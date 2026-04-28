@@ -15,9 +15,10 @@ def fake_sources(tmp_path, monkeypatch):
     api_docs = hub / "api_docs"
     controllers = api_docs / "controllers"
     flows = hub / "common_flows" / "sdk_endpoints"
+    endpoint_list = api_docs / "endpoint_list"
     js_oauth = oauth / "sdk" / "javascript"
     php_oauth = oauth / "sdk" / "php"
-    for d in (controllers, flows, js_oauth, php_oauth):
+    for d in (controllers, flows, endpoint_list, js_oauth, php_oauth):
         d.mkdir(parents=True)
     (api_docs / "api_schemas.yaml").write_text("schemas: {}\n")
     (js_oauth / "index.js").write_text("// oauth js stub\n")
@@ -33,4 +34,5 @@ def fake_sources(tmp_path, monkeypatch):
         api_docs=api_docs,
         controllers=controllers,
         flows=flows,
+        endpoint_list=endpoint_list,
     )

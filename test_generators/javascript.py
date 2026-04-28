@@ -320,7 +320,7 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         lines += setup_lines
         lines.append(f"    await {inst}.{func_name}({call_args});")
         if uses_client:
-            lines.append("    const body = JSON.parse(spy.last_call().body);")
+            lines.append("    const body = spy.last_call().body;")
         elif is_form:
             lines.append("    const body = Object.fromEntries(new URLSearchParams(spy.last_call().body));")
         else:

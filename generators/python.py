@@ -97,6 +97,9 @@ class PythonGenerator(BaseGenerator):
             p = os.path.join(dst, fname)
             if os.path.isfile(p):
                 os.remove(p)
+        tests_dir = os.path.join(dst, "tests")
+        if os.path.isdir(tests_dir):
+            shutil.rmtree(tests_dir)
 
     def discover_module_exports(self, module_name: str, module_path: str) -> list[dict]:
         init_path = os.path.join(module_path, "__init__.py")
@@ -836,12 +839,12 @@ class PythonGenerator(BaseGenerator):
         py_path = self._py_path_expr(path, [p["name"] for p in path_params])
         if query_params:
             lines = [f"        path = {py_path}"]
-            lines.append("        _q: dict[str, str] = {}")
+            lines.append("        _q: dict[str, Any] = {}")
             for p in query_params:
                 lines.append(f"        if {p['name']} is not None:")
-                lines.append(f"            _q['{p['name']}'] = str({p['name']})")
+                lines.append(f"            _q['{p['name']}'] = {p['name']}")
             lines.append("        if _q:")
-            lines.append("            path += '?' + urlencode(_q)")
+            lines.append("            path += '?' + urlencode(_q, doseq=True)")
         else:
             lines = [f"        path = {py_path}"]
         return lines
