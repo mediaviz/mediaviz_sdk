@@ -1,5 +1,5 @@
 source: upload_photos.yaml
-resolved_at: '2026-04-28T19:40:08Z'
+resolved_at: '2026-04-30T13:57:46Z'
 composites:
 - id: composite_upload_photo
   function_name: upload_photo
@@ -23,9 +23,9 @@ composites:
     type: object
     required: true
     description: 'Photo object. Must have: file_content (base64), mimetype, file_path,
-      title. Optional: client_side_id, blur, colors, face_recognition, image_classification,
-      image_comparison, size, source_resolution_x, source_resolution_y, date_taken,
-      latitude, longitude, resized_dimensions.
+      title. Optional: client_side_id, blur, colors, face_recognition, image_describe,
+      image_classification, image_comparison,  size, source_resolution_x, source_resolution_y,
+      date_taken, latitude, longitude, resized_dimensions.
 
       '
   steps:
@@ -75,6 +75,7 @@ composites:
       x-blur: params.photo.blur
       x-colors: params.photo.colors
       x-face-recognition: params.photo.face_recognition
+      x-image-describe: params.photo.image_describe
       x-image-classification: params.photo.image_classification
       x-image-comparison: params.photo.image_comparison
       x-size: params.photo.size
@@ -134,6 +135,10 @@ composites:
         type: string (bool)
         required: false
       - name: x-face-recognition
+        in: header
+        type: string (bool)
+        required: false
+      - name: x-image-describe
         in: header
         type: string (bool)
         required: false

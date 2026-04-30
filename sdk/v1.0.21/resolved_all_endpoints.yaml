@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-04-28T19:40:08Z'
+resolved_at: '2026-04-30T13:57:45Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -3814,6 +3814,10 @@ endpoints:
     type: string (bool)
     required: false
   - name: x-face-recognition
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-describe
     in: header
     type: string (bool)
     required: false

@@ -26,6 +26,7 @@ class Photoupload {
         ?string $blur = null,
         ?string $colors = null,
         ?string $faceRecognition = null,
+        ?string $imageDescribe = null,
         ?string $imageClassification = null,
         ?string $imageComparison = null,
         ?string $size = null,
@@ -54,6 +55,7 @@ class Photoupload {
         if ($blur !== null) $headers[] = 'x-blur: ' . $blur;
         if ($colors !== null) $headers[] = 'x-colors: ' . $colors;
         if ($faceRecognition !== null) $headers[] = 'x-face-recognition: ' . $faceRecognition;
+        if ($imageDescribe !== null) $headers[] = 'x-image-describe: ' . $imageDescribe;
         if ($imageClassification !== null) $headers[] = 'x-image-classification: ' . $imageClassification;
         if ($imageComparison !== null) $headers[] = 'x-image-comparison: ' . $imageComparison;
         if ($size !== null) $headers[] = 'x-size: ' . $size;
@@ -117,6 +119,7 @@ class Photoupload {
         if (($photo['blur'] ?? null) !== null) $_headers[] = 'x-blur: ' . $photo['blur'];
         if (($photo['colors'] ?? null) !== null) $_headers[] = 'x-colors: ' . $photo['colors'];
         if (($photo['face_recognition'] ?? null) !== null) $_headers[] = 'x-face-recognition: ' . $photo['face_recognition'];
+        if (($photo['image_describe'] ?? null) !== null) $_headers[] = 'x-image-describe: ' . $photo['image_describe'];
         if (($photo['image_classification'] ?? null) !== null) $_headers[] = 'x-image-classification: ' . $photo['image_classification'];
         if (($photo['image_comparison'] ?? null) !== null) $_headers[] = 'x-image-comparison: ' . $photo['image_comparison'];
         if (($photo['size'] ?? null) !== null) $_headers[] = 'x-size: ' . $photo['size'];

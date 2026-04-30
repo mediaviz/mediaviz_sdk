@@ -23,12 +23,12 @@ def test_post_upload_photo_exists(mv_client):
 def test_post_upload_photo_http_method(mv_client, monkeypatch):
     _mc = _MockClient()
     monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)
-    mv_client.photo_upload.upload_photo_to_mediaviz('test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value')
+    mv_client.photo_upload.upload_photo_to_mediaviz('test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value')
     assert _mc.recorded[0]['method'] == 'POST'
 
 def test_post_upload_photo_path(mv_client, monkeypatch):
     _mc = _MockClient()
     monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)
-    mv_client.photo_upload.upload_photo_to_mediaviz('test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value')
+    mv_client.photo_upload.upload_photo_to_mediaviz('test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value', 'test_value')
     assert '/photo_upload' in _mc.recorded[0]['url']
 

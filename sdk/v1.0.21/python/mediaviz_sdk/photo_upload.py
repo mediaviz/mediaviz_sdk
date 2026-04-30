@@ -26,6 +26,7 @@ class PhotoUpload:
         blur: str | None = None,
         colors: str | None = None,
         faceRecognition: str | None = None,
+        imageDescribe: str | None = None,
         imageClassification: str | None = None,
         imageComparison: str | None = None,
         size: str | None = None,
@@ -57,6 +58,8 @@ class PhotoUpload:
             _headers['x-colors'] = colors
         if faceRecognition is not None:
             _headers['x-face-recognition'] = faceRecognition
+        if imageDescribe is not None:
+            _headers['x-image-describe'] = imageDescribe
         if imageClassification is not None:
             _headers['x-image-classification'] = imageClassification
         if imageComparison is not None:
@@ -121,6 +124,8 @@ class PhotoUpload:
             _headers['x-colors'] = photo['colors']
         if photo['face_recognition'] is not None:
             _headers['x-face-recognition'] = photo['face_recognition']
+        if photo['image_describe'] is not None:
+            _headers['x-image-describe'] = photo['image_describe']
         if photo['image_classification'] is not None:
             _headers['x-image-classification'] = photo['image_classification']
         if photo['image_comparison'] is not None:

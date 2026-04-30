@@ -1,3 +1,5 @@
+'use strict';
+
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -1373,7 +1375,7 @@ class Projects {
 class Photoupload {
   constructor(ctx) { this._ctx = ctx; this._caches = {}; }
 
-  async uploadPhotoToMediaviz(bucketName, photoIndex, companyId, userId, projectTableName, title, { fileContent, mimetype, filePath }, { clientSideId, blur, colors, faceRecognition, imageClassification, imageComparison, size, sourceResolutionX, sourceResolutionY, dateTaken, latitude, longitude, resizedDimensions } = {}) {
+  async uploadPhotoToMediaviz(bucketName, photoIndex, companyId, userId, projectTableName, title, { fileContent, mimetype, filePath }, { clientSideId, blur, colors, faceRecognition, imageDescribe, imageClassification, imageComparison, size, sourceResolutionX, sourceResolutionY, dateTaken, latitude, longitude, resizedDimensions } = {}) {
     this._ctx.requireTokens();
     const baseUrl = this._ctx.requireHost('photoUpload');
     const headers = {
@@ -1390,6 +1392,7 @@ class Photoupload {
     if (blur !== undefined) headers['x-blur'] = blur;
     if (colors !== undefined) headers['x-colors'] = colors;
     if (faceRecognition !== undefined) headers['x-face-recognition'] = faceRecognition;
+    if (imageDescribe !== undefined) headers['x-image-describe'] = imageDescribe;
     if (imageClassification !== undefined) headers['x-image-classification'] = imageClassification;
     if (imageComparison !== undefined) headers['x-image-comparison'] = imageComparison;
     if (size !== undefined) headers['x-size'] = size;
@@ -1418,7 +1421,7 @@ class Photoupload {
       this._caches['_get_template'].set(_cacheKey_get_template, template);
     }
 
-    const upload_result = await this.uploadPhotoToMediaviz(template.bucket_name, photoIndex, companyId, userId, projectTableName, photo.title, { fileContent: photo.fileContent, mimetype: photo.mimetype, filePath: photo.filePath }, { clientSideId: photo.clientSideId, blur: photo.blur, colors: photo.colors, faceRecognition: photo.faceRecognition, imageClassification: photo.imageClassification, imageComparison: photo.imageComparison, size: photo.size, sourceResolutionX: photo.sourceResolutionX, sourceResolutionY: photo.sourceResolutionY, dateTaken: photo.dateTaken, latitude: photo.latitude, longitude: photo.longitude, resizedDimensions: photo.resizedDimensions });
+    const upload_result = await this.uploadPhotoToMediaviz(template.bucket_name, photoIndex, companyId, userId, projectTableName, photo.title, { fileContent: photo.fileContent, mimetype: photo.mimetype, filePath: photo.filePath }, { clientSideId: photo.clientSideId, blur: photo.blur, colors: photo.colors, faceRecognition: photo.faceRecognition, imageDescribe: photo.imageDescribe, imageClassification: photo.imageClassification, imageComparison: photo.imageComparison, size: photo.size, sourceResolutionX: photo.sourceResolutionX, sourceResolutionY: photo.sourceResolutionY, dateTaken: photo.dateTaken, latitude: photo.latitude, longitude: photo.longitude, resizedDimensions: photo.resizedDimensions });
 
     return upload_result;
   }
@@ -1911,4 +1914,31 @@ class MediaViz {
   get refreshToken() { return this._refreshToken; }
 }
 
-export { Admin, AiModelCredits, ApiError, Company, CuratedAlbums, CustomAlbums, EmailTokens, Health, Keywords, MediaViz, NotFoundError, OAuthClient, OAuthError, OAuthErrorCode, OauthAuthorization, OauthClients, OauthLogin, OauthToken, Person, Photos, Photoupload, Projects, RateLimitError, Search, ServerError, Users, ValidationError, handleResponse };
+exports.Admin = Admin;
+exports.AiModelCredits = AiModelCredits;
+exports.ApiError = ApiError;
+exports.Company = Company;
+exports.CuratedAlbums = CuratedAlbums;
+exports.CustomAlbums = CustomAlbums;
+exports.EmailTokens = EmailTokens;
+exports.Health = Health;
+exports.Keywords = Keywords;
+exports.MediaViz = MediaViz;
+exports.NotFoundError = NotFoundError;
+exports.OAuthClient = OAuthClient;
+exports.OAuthError = OAuthError;
+exports.OAuthErrorCode = OAuthErrorCode;
+exports.OauthAuthorization = OauthAuthorization;
+exports.OauthClients = OauthClients;
+exports.OauthLogin = OauthLogin;
+exports.OauthToken = OauthToken;
+exports.Person = Person;
+exports.Photos = Photos;
+exports.Photoupload = Photoupload;
+exports.Projects = Projects;
+exports.RateLimitError = RateLimitError;
+exports.Search = Search;
+exports.ServerError = ServerError;
+exports.Users = Users;
+exports.ValidationError = ValidationError;
+exports.handleResponse = handleResponse;
