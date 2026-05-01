@@ -355,7 +355,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("    this._config = {")
         lines.append("      clientId: config.clientId ?? _env('MEDIAVIZ_CLIENT_ID'),")
         lines.append("      clientSecret: config.clientSecret ?? _env('MEDIAVIZ_CLIENT_SECRET'),")
-        lines.append("      baseUrl: config.baseUrl ?? _env('MEDIAVIZ_BASE_URL') ?? 'https://api.mediaviz.com',")
+        lines.append("      baseUrl: config.baseUrl ?? _env('MEDIAVIZ_BASE_URL') ?? 'https://api.mediaviz.ai',")
         lines.append("      redirectUri: config.redirectUri ?? _env('MEDIAVIZ_REDIRECT_URI'),")
         lines.append("    };")
 

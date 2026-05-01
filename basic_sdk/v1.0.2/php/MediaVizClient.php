@@ -75,7 +75,7 @@ class MediaVizClient {
         $this->config = [
             'clientId' => $config['clientId'] ?? (getenv('MEDIAVIZ_CLIENT_ID') ?: null),
             'clientSecret' => $config['clientSecret'] ?? (getenv('MEDIAVIZ_CLIENT_SECRET') ?: null),
-            'baseUrl' => $config['baseUrl'] ?? (getenv('MEDIAVIZ_BASE_URL') ?: 'https://api.mediaviz.com'),
+            'baseUrl' => $config['baseUrl'] ?? (getenv('MEDIAVIZ_BASE_URL') ?: 'https://api.mediaviz.ai'),
             'redirectUri' => $config['redirectUri'] ?? (getenv('MEDIAVIZ_REDIRECT_URI') ?: null),
         ];
         $this->hosts = [

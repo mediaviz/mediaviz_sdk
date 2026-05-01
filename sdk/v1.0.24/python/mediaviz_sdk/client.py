@@ -81,7 +81,7 @@ class MediaVizClient:
         self._config = {
             'client_id': client_id or os.environ.get('MEDIAVIZ_CLIENT_ID'),
             'client_secret': client_secret or os.environ.get('MEDIAVIZ_CLIENT_SECRET'),
-            'base_url': base_url or os.environ.get('MEDIAVIZ_BASE_URL') or 'https://api.mediaviz.com',
+            'base_url': base_url or os.environ.get('MEDIAVIZ_BASE_URL') or 'https://api.mediaviz.ai',
             'redirect_uri': redirect_uri or os.environ.get('MEDIAVIZ_REDIRECT_URI'),
         }
         _h = hosts or {}

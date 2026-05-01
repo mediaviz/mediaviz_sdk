@@ -235,7 +235,7 @@ $photos = $mv->photos->getAllProjectPhotoIds($tableName, limit: 10);
 |-----|------------------|-------------|
 | `clientId` | `MEDIAVIZ_CLIENT_ID` | OAuth client ID |
 | `clientSecret` | `MEDIAVIZ_CLIENT_SECRET` | OAuth client secret |
-| `baseUrl` | `MEDIAVIZ_BASE_URL` | API base URL (default: `https://api.mediaviz.com`) |
+| `baseUrl` | `MEDIAVIZ_BASE_URL` | API base URL (default: `https://api.mediaviz.ai`) |
 | `redirectUri` | `MEDIAVIZ_REDIRECT_URI` | PKCE redirect URI |
 | `hosts.photoUpload` | `MEDIAVIZ_PHOTO_UPLOAD_URL` | Alt-host URL for photo upload service |
 | `accessToken` | — | Seed access token |

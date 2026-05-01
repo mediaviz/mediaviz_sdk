@@ -1852,7 +1852,7 @@ class MediaViz {
     this._config = {
       clientId: config.clientId ?? _env('MEDIAVIZ_CLIENT_ID'),
       clientSecret: config.clientSecret ?? _env('MEDIAVIZ_CLIENT_SECRET'),
-      baseUrl: config.baseUrl ?? _env('MEDIAVIZ_BASE_URL') ?? 'https://api.mediaviz.com',
+      baseUrl: config.baseUrl ?? _env('MEDIAVIZ_BASE_URL') ?? 'https://api.mediaviz.ai',
       redirectUri: config.redirectUri ?? _env('MEDIAVIZ_REDIRECT_URI'),
     };
     this._hosts = {

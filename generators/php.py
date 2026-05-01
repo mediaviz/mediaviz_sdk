@@ -359,7 +359,7 @@ class PhpGenerator(BaseGenerator):
         lines.append("        $this->config = [")
         lines.append("            'clientId' => $config['clientId'] ?? (getenv('MEDIAVIZ_CLIENT_ID') ?: null),")
         lines.append("            'clientSecret' => $config['clientSecret'] ?? (getenv('MEDIAVIZ_CLIENT_SECRET') ?: null),")
-        lines.append("            'baseUrl' => $config['baseUrl'] ?? (getenv('MEDIAVIZ_BASE_URL') ?: 'https://api.mediaviz.com'),")
+        lines.append("            'baseUrl' => $config['baseUrl'] ?? (getenv('MEDIAVIZ_BASE_URL') ?: 'https://api.mediaviz.ai'),")
         lines.append("            'redirectUri' => $config['redirectUri'] ?? (getenv('MEDIAVIZ_REDIRECT_URI') ?: null),")
         lines.append("        ];")
         lines.append("        $this->hosts = [")
