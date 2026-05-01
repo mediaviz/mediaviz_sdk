@@ -124,7 +124,7 @@ Each generator is responsible for:
 - Converting endpoint `id` (snake_case) to the framework's naming convention
 - Generating function signatures with path params as required args, query params as optional args, and schema-expanded request_body fields as individual unary params (required first, then optional)
 - Interpolating path parameters into the URL string
-- Serializing query params with array values as repeated keys (`?k=a&k=b`), not comma-joined or bracket-indexed: JS uses `URLSearchParams.append` per element; Python uses `urlencode(_q, doseq=True)` and stores list values as-is in `_q`; PHP iterates manually with `rawurlencode($k) . '=' . rawurlencode($v)` per element since `http_build_query` would emit `k[0]=...`
+- Serializing query params with array values as repeated keys (`?k=a&k=b`), not comma-joined or bracket-indexed: JS uses `URLSearchParams.append` per element; Python uses `urlencode(_q, doseq=True)` and stores list values as-is in `_q`; PHP iterates manually with `rawurlencode($k) . '=' . rawurlencode($v)` per element since `http_build_query` would emit `k[0]=...`. For params declared with a list-style type in the YAML (`list`, `array`, `List[...]`), all three frameworks normalize a scalar argument to a 1-element list before serialization so callers can pass either a single value or a list (Python: `value if isinstance(value, (list, tuple)) else [value]`; JS/PHP wrap non-arrays equivalently)
 - Routing `auth: required` endpoints through the OAuth client's `request()` method
 - Routing `auth: none` endpoints through a simple unauthenticated HTTP call
 - Reassembling expanded body fields back into the original nested object shape on the wire (stripping undefined/null), driven by the `orig_path` carried on each leaf

@@ -1579,5 +1579,27 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 69,
+    "description": "Python generator: when a query param's YAML type is a list (List[...], list, array), normalize a scalar caller-arg to a 1-element list before urlencode so a single string isn't iterated char-by-char by doseq=True; aligns with JS/PHP wrapping behavior",
+    "touch_points": [
+      {
+        "file": "generators/python.py",
+        "location": "_is_list_type",
+        "status": "complete — new helper returning True for 'list', 'array', and 'List[...]' (case-insensitive)"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "_build_path",
+        "status": "complete — for list-typed query params emits `_q['k'] = v if isinstance(v, (list, tuple)) else [v]`; scalar params unchanged"
+      },
+      {
+        "file": "spec.md",
+        "location": "Generator responsibilities — array query param serialization",
+        "status": "complete — documented scalar-to-list normalization for list-typed params"
+      }
+    ],
+    "completion_status": true
   }
 ]

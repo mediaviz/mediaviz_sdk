@@ -1077,6 +1077,15 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             return [_js_safe(request_body["param_name"])]
         if shape == "expanded":
             ordered = self._order_expanded_fields(self._expanded_fields(request_body))
+            # All-optional expanded body → destructured options bag, so callers
+            # can pass { field: value } instead of counting positional `undefined`s.
+            if ordered and not any(f.get("required") for f in ordered):
+                parts = []
+                for f in ordered:
+                    camel = f["name"]
+                    safe = _js_safe(camel)
+                    parts.append(camel if camel == safe else f"{camel}: {safe}")
+                return ["{ " + ", ".join(parts) + " } = {}"]
             tokens = []
             for f in ordered:
                 name = _js_safe(f["name"])

@@ -378,9 +378,17 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             parts.append(_js_literal(self.test_value_for_type("string")))
         elif shape == "expanded":
             ordered = self._order_expanded_fields(self._expanded_fields(request_body))
-            for f in ordered:
-                val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
-                parts.append(_js_literal(val))
+            # Mirror generator: all-optional expanded body → single destructured options bag.
+            if ordered and not any(f.get("required") for f in ordered):
+                bag_parts = []
+                for f in ordered:
+                    val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
+                    bag_parts.append(f"{f['name']}: {_js_literal(val)}")
+                parts.append("{ " + ", ".join(bag_parts) + " }")
+            else:
+                for f in ordered:
+                    val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
+                    parts.append(_js_literal(val))
         elif shape == "flat_dict":
             field_parts = []
             for field in request_body:

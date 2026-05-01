@@ -39,6 +39,13 @@ def _python_nullable(t: str) -> str:
     return f"{t} | None"
 
 
+def _is_list_type(t) -> bool:
+    if not t:
+        return False
+    s = str(t).strip().lower()
+    return s in ("list", "array") or s.startswith("list[")
+
+
 class PythonGenerator(BaseGenerator):
     framework_name = "python"
 
@@ -842,7 +849,10 @@ class PythonGenerator(BaseGenerator):
             lines.append("        _q: dict[str, Any] = {}")
             for p in query_params:
                 lines.append(f"        if {p['name']} is not None:")
-                lines.append(f"            _q['{p['name']}'] = {p['name']}")
+                if _is_list_type(p.get("type")):
+                    lines.append(f"            _q['{p['name']}'] = {p['name']} if isinstance({p['name']}, (list, tuple)) else [{p['name']}]")
+                else:
+                    lines.append(f"            _q['{p['name']}'] = {p['name']}")
             lines.append("        if _q:")
             lines.append("            path += '?' + urlencode(_q, doseq=True)")
         else:
@@ -880,6 +890,10 @@ class PythonGenerator(BaseGenerator):
         if shape == "expanded":
             ordered = self._order_expanded_fields(self._expanded_fields(request_body))
             tokens = []
+            # All-optional expanded body → force keyword-only so callers can't
+            # accidentally pass a value into the wrong positional slot.
+            if ordered and not any(f.get("required") for f in ordered):
+                tokens.append("*")
             for f in ordered:
                 name = f["name"]
                 t = "list" if f.get("kind") == "list" else _python_type(f.get("type"))

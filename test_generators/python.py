@@ -314,13 +314,16 @@ class PythonTestGenerator(BaseTestGenerator):
                 parts.append(_py_literal(self.test_value_for_type("string")))
 
         shape = self._body_shape(request_body)
+        kwargs_only = False
         if shape == "scalar":
             parts.append(_py_literal(self.test_value_for_type(request_body.get("type", "string"))))
         elif shape == "expanded":
             ordered = self._order_expanded_fields(self._expanded_fields(request_body))
+            kwargs_only = bool(ordered) and not any(f.get("required") for f in ordered)
             for f in ordered:
                 t = "array" if f.get("kind") == "list" else f.get("type", "string")
-                parts.append(_py_literal(self.test_value_for_type(t)))
+                val = _py_literal(self.test_value_for_type(t))
+                parts.append(f"{f['name']}={val}" if kwargs_only else val)
         elif shape == "flat_dict":
             for field, val_spec in request_body.items():
                 if field.startswith("_"):
@@ -332,10 +335,13 @@ class PythonTestGenerator(BaseTestGenerator):
 
         if is_alt_host:
             for p in (h for h in header_params if not h.get("required")):
-                parts.append(_py_literal(self.test_value_for_type("string")))
+                val = _py_literal(self.test_value_for_type("string"))
+                param = self.header_to_param(p["name"])
+                parts.append(f"{param}={val}" if kwargs_only else val)
 
         for p in query_params:
-            parts.append(_py_literal(self.test_value_for_type(p.get("type", "string"))))
+            val = _py_literal(self.test_value_for_type(p.get("type", "string")))
+            parts.append(f"{p['name']}={val}" if kwargs_only else val)
 
         return ", ".join(parts)
 
