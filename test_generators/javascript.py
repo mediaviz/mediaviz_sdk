@@ -123,7 +123,7 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             "export class SpyOAuthClient {",
             "  constructor() { this.calls = []; }",
             "",
-            "  request(path, method, accessToken, refreshToken, body) {",
+            "  request(path, method, accessToken, refreshToken, body, onRefreshSuccess) {",
             "    this.calls.push({ path, method, accessToken, refreshToken, body });",
             "    return Promise.resolve({ data: null });",
             "  }",

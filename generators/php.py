@@ -313,6 +313,11 @@ class PhpGenerator(BaseGenerator):
         utils_emitted = self._emit_utils_class_php(lines, utilities)
 
         # _TokenTrackingClient
+        # Persists rotated tokens via the OAuth client's onRefreshSuccess callback
+        # so they are saved the moment refresh resolves — before the retry. If the
+        # retry throws (server hiccup, JSON parse error), the new pair is preserved
+        # and the next call uses it. Without this, single-use refresh-token rotation
+        # (RFC 6749 §6) would lock the caller out on any retry failure.
         lines.append("class _TokenTrackingClient {")
         lines.append("    private MediaVizClient $mv;")
         lines.append("    private object $inner;")
@@ -323,13 +328,13 @@ class PhpGenerator(BaseGenerator):
         lines.append("    }")
         lines.append("")
         lines.append("    public function request(string $url, string $method, string $accessToken, string $refreshToken, mixed $body = null): mixed {")
-        lines.append("        $result = $this->inner->request($url, $method, $accessToken, $refreshToken, $body);")
-        lines.append("        if (isset($result->updatedTokens) && $result->updatedTokens !== null) {")
-        lines.append("            $this->mv->setTokens($result->updatedTokens->accessToken, $result->updatedTokens->refreshToken);")
-        lines.append("            $cb = $this->mv->getOnTokenRefresh();")
-        lines.append("            if ($cb !== null) ($cb)($result->updatedTokens);")
-        lines.append("        }")
-        lines.append("        return $result;")
+        lines.append("        $mv = $this->mv;")
+        lines.append("        $onRefreshSuccess = function ($newTokens) use ($mv): void {")
+        lines.append("            $mv->setTokens($newTokens->accessToken, $newTokens->refreshToken);")
+        lines.append("            $cb = $mv->getOnTokenRefresh();")
+        lines.append("            if ($cb !== null) ($cb)($newTokens);")
+        lines.append("        };")
+        lines.append("        return $this->inner->request($url, $method, $accessToken, $refreshToken, $body, $onRefreshSuccess);")
         lines.append("    }")
         lines.append("")
         lines.append("    public function __call(string $method, array $args): mixed {")

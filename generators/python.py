@@ -192,6 +192,11 @@ class PythonGenerator(BaseGenerator):
         ]
 
         # _TokenTrackingClient
+        # Persists rotated tokens via the OAuth client's on_refresh_success callback
+        # so they are saved the moment refresh resolves — before the retry. If the
+        # retry raises (server hiccup, JSON parse error), the new pair is preserved
+        # and the next call uses it. Without this, single-use refresh-token rotation
+        # (RFC 6749 §6) would lock the caller out on any retry failure.
         lines += [
             "class _TokenTrackingClient:",
             "    def __init__(self, mv: \"MediaVizClient\", inner: Any) -> None:",
@@ -199,12 +204,14 @@ class PythonGenerator(BaseGenerator):
             "        self._inner = inner",
             "",
             "    def request(self, url: str, method: str, access_token: str, refresh_token: str, body: Any = None) -> Any:",
-            "        result = self._inner.request(url, method, access_token, refresh_token, body)",
-            "        if result.updated_tokens is not None:",
-            "            self._mv.set_tokens(result.updated_tokens.access_token, result.updated_tokens.refresh_token)",
+            "        def _on_refresh_success(new_tokens: Any) -> None:",
+            "            self._mv.set_tokens(new_tokens.access_token, new_tokens.refresh_token)",
             "            if self._mv._on_token_refresh:",
-            "                self._mv._on_token_refresh(result.updated_tokens)",
-            "        return result",
+            "                self._mv._on_token_refresh(new_tokens)",
+            "        return self._inner.request(",
+            "            url, method, access_token, refresh_token, body,",
+            "            on_refresh_success=_on_refresh_success,",
+            "        )",
             "",
             "    def __getattr__(self, name: str) -> Any:",
             "        return getattr(self._inner, name)",

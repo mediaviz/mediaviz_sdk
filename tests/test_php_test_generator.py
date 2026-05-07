@@ -38,6 +38,11 @@ class TestEmitHelpers:
         content = open(os.path.join(tmp, "helpers.php")).read()
         assert "public function request(" in content
 
+    def test_spy_request_signature_matches_parent(self, gen, tmp):
+        gen.emit_helpers(tmp)
+        content = open(os.path.join(tmp, "helpers.php")).read()
+        assert "?callable $onRefreshSuccess = null" in content
+
     def test_spy_request_records_calls(self, gen, tmp):
         gen.emit_helpers(tmp)
         content = open(os.path.join(tmp, "helpers.php")).read()

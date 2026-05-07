@@ -332,16 +332,20 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("")
 
         # _TokenTrackingClient class
+        # Persists rotated tokens via the OAuth client's onRefreshSuccess callback
+        # so they are saved the moment refresh resolves — before the retry. If the
+        # retry throws (server hiccup, JSON parse error), the new pair is preserved
+        # and the next call uses it. Without this, single-use refresh-token rotation
+        # (RFC 6749 §6) would lock the caller out on any retry failure.
         lines.append("class _TokenTrackingClient {")
         lines.append("  constructor(mv, inner) { this._mv = mv; this._inner = inner; }")
         lines.append("  async request(url, method, accessToken, refreshToken, body) {")
-        lines.append("    const result = await this._inner.request(url, method, accessToken, refreshToken, body);")
-        lines.append("    if (result.updatedTokens) {")
-        lines.append("      this._mv._accessToken = result.updatedTokens.access_token;")
-        lines.append("      this._mv._refreshToken = result.updatedTokens.refresh_token;")
-        lines.append("      if (this._mv._onTokenRefresh) this._mv._onTokenRefresh(result.updatedTokens);")
-        lines.append("    }")
-        lines.append("    return result;")
+        lines.append("    const onRefreshSuccess = (newTokens) => {")
+        lines.append("      this._mv._accessToken = newTokens.access_token;")
+        lines.append("      this._mv._refreshToken = newTokens.refresh_token;")
+        lines.append("      if (this._mv._onTokenRefresh) this._mv._onTokenRefresh(newTokens);")
+        lines.append("    };")
+        lines.append("    return this._inner.request(url, method, accessToken, refreshToken, body, onRefreshSuccess);")
         lines.append("  }")
         lines.append("}")
         lines.append("")

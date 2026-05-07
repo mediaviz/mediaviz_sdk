@@ -67,7 +67,7 @@ class PythonTestGenerator(BaseTestGenerator):
             "    def __init__(self) -> None:",
             "        self.calls: list[dict] = []",
             "",
-            "    def request(self, url: str, method: str, access_token: str, refresh_token: str, body=None) -> _FakeResponse:",
+            "    def request(self, url: str, method: str, access_token: str, refresh_token: str, body=None, on_refresh_success=None) -> _FakeResponse:",
             "        self.calls.append({'url': url, 'method': method, 'access_token': access_token, 'refresh_token': refresh_token, 'body': body})",
             "        return _FakeResponse()",
             "",

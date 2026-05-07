@@ -1601,5 +1601,42 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 70,
+    "description": "_TokenTrackingClient wrappers (JS/PHP/Python) pass an onRefreshSuccess callback into _inner.request() so rotated tokens are persisted the moment refresh resolves — before the retry. Without this, the upstream oauth_library fix is inert: if the retry throws after a successful rotation, the new refresh token is lost, the old one is already deleted server-side, and the caller is locked out (every subsequent refresh returns 400 invalid_grant)",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_TokenTrackingClient.request template",
+        "status": "complete — wrapper builds onRefreshSuccess closure that updates _mv tokens + fires _onTokenRefresh, then passes it as 6th arg to _inner.request"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_TokenTrackingClient::request template",
+        "status": "complete — wrapper builds $onRefreshSuccess closure (uses captured $mv) calling setTokens + getOnTokenRefresh, then passes it as 6th arg to inner->request"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "_TokenTrackingClient.request template",
+        "status": "complete — wrapper defines _on_refresh_success that updates mv tokens + fires _on_token_refresh, then passes it as on_refresh_success kwarg to _inner.request"
+      },
+      {
+        "file": "test_generators/python.py",
+        "location": "SpyOAuthClient.request template",
+        "status": "complete — added on_refresh_success=None kwarg so generated unit tests keep passing"
+      },
+      {
+        "file": "test_generators/javascript.py",
+        "location": "SpyOAuthClient.request template",
+        "status": "complete — added onRefreshSuccess 6th arg so generated unit tests keep passing"
+      },
+      {
+        "file": "spec.md",
+        "location": "Token refresh section under MediaViz client class",
+        "status": "complete — describes the callback contract and the RFC 6749 §6 rotation rationale"
+      }
+    ],
+    "completion_status": true
   }
 ]

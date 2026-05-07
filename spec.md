@@ -250,7 +250,7 @@ $photos = $mv->photos->getAllProjectPhotoIds($tableName, limit: 10);
 | `handleCallback(code, codeVerifier)` | Exchanges auth code for tokens after PKCE redirect |
 | `setTokens(accessToken, refreshToken)` | Manually seed tokens |
 
-**Token refresh:** A `_TokenTrackingClient` proxy wraps `OAuthClient` and intercepts `request()` responses. When the OAuth client auto-refreshes on 401, the proxy updates the stored tokens and fires the `onTokenRefresh` callback.
+**Token refresh:** A `_TokenTrackingClient` proxy wraps `OAuthClient`. When `request()` is called, the proxy passes an `onRefreshSuccess` (PHP/JS) / `on_refresh_success` (Python) callback to the inner OAuth client. On a 401-triggered refresh, the OAuth client invokes that callback synchronously the moment the rotated tokens arrive — **before** the retry. The callback updates the stored tokens via `setTokens()` and fires the user's `onTokenRefresh` hook. This is required because the upstream OAuth server enforces single-use refresh-token rotation per RFC 6749 §6: the old refresh token is deleted server-side the instant the rotation succeeds, so if the retry then throws (server hiccup, JSON parse error, etc.) the new pair must already be persisted — otherwise the caller is locked out and every subsequent refresh attempt returns 400 `invalid_grant`.
 
 ### Per-Controller File
 
