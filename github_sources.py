@@ -14,6 +14,7 @@ from typing import NamedTuple
 HUB_API_DOCS = "api_docs"
 FLOW_SUBPATH = "common_flows/sdk_endpoints"
 ENDPOINT_LIST_SUBPATH = "api_docs/endpoint_list"
+UTILITIES_SUBPATH = "api_docs/utilities"
 OAUTH_SDK_SUBPATH = "sdk"
 
 # Local sibling directory names (relative to this file's parent's parent)
@@ -28,6 +29,7 @@ class SourcePaths(NamedTuple):
     flows_dir: str             # hand-authored SDK flow YAML files (common_flows/sdk_endpoints/)
     endpoint_list_dir: str     # generated endpoint registries (api_docs/endpoint_list/, e.g. all_endpoints.yaml)
     schemas_path: str          # api_docs/api_schemas.yaml — Pydantic schema registry
+    utilities_dir: str         # api_docs/utilities/ — non-endpoint helpers exposed on mv.utils
 
 
 @contextmanager
@@ -45,6 +47,7 @@ def fetch_sources(branch: str | None = None):
     oauth_sdk_root = os.path.join(_OAUTH_LOCAL, OAUTH_SDK_SUBPATH)
     flows_dir = os.path.join(_HUB_LOCAL, FLOW_SUBPATH)
     endpoint_list_dir = os.path.join(_HUB_LOCAL, ENDPOINT_LIST_SUBPATH)
+    utilities_dir = os.path.join(_HUB_LOCAL, UTILITIES_SUBPATH)
     schemas_path = os.path.join(controllers_dir, "api_schemas.yaml")
 
     required_dirs = [
@@ -67,6 +70,7 @@ def fetch_sources(branch: str | None = None):
         flows_dir=flows_dir,
         endpoint_list_dir=endpoint_list_dir,
         schemas_path=schemas_path,
+        utilities_dir=utilities_dir,
     )
 
 

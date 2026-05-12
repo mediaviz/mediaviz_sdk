@@ -4,6 +4,7 @@ import os
 import re
 from .base import BaseGenerator
 from naming import snake_to_camel as _snake_to_camel
+from utilities_resolver import collect_framework_imports, indent_body
 
 _TYPE_MAP = {
     "string": "string", "integer": "int", "boolean": "bool", "number": "float",
@@ -274,6 +275,10 @@ class PhpGenerator(BaseGenerator):
             "namespace MediaVizSdk;",
             "",
         ]
+        php_imports = collect_framework_imports(utilities, "php")
+        if php_imports:
+            lines.extend(php_imports)
+            lines.append("")
 
         # _Context class
         lines.append("class _Context {")
@@ -285,11 +290,14 @@ class PhpGenerator(BaseGenerator):
         lines.append("        $this->client = $mv->getTrackingClient();")
         lines.append("    }")
         lines.append("")
+        has_utils = bool(utilities) and any(m.get("utilities") for m in utilities)
         lines.append("    public function __get(string $name): mixed {")
         lines.append("        return match($name) {")
         lines.append("            'accessToken' => $this->_mv->getAccessToken(),")
         lines.append("            'refreshToken' => $this->_mv->getRefreshToken(),")
         lines.append("            'baseUrl' => $this->_mv->getBaseUrl(),")
+        if has_utils:
+            lines.append("            'utils' => $this->_mv->utils,")
         lines.append("            default => null,")
         lines.append("        };")
         lines.append("    }")
@@ -448,11 +456,8 @@ class PhpGenerator(BaseGenerator):
         lines.append("    private MediaVizClient $_mv;")
         lines.append("    public function __construct(MediaVizClient $mv) { $this->_mv = $mv; }")
         for module in utilities:
-            source_module = module["source_module"]
-            inner_expr = self._php_inner_expr(source_module)
             for util in module["utilities"]:
                 fn_name = util["function_name"]["php"]
-                target = util["target"]["php"]
                 sig_parts = []
                 call_parts = []
                 for p in util["params"]:
@@ -460,13 +465,18 @@ class PhpGenerator(BaseGenerator):
                     sig_parts.append(f"{_php_type(p.get('type'))} {var}")
                     call_parts.append(var)
                 sig = ", ".join(sig_parts)
-                call = ", ".join(call_parts)
                 lines.append(f"    public function {fn_name}({sig}): mixed {{")
                 if util.get("requires_tokens"):
                     lines.append("        if ($this->_mv->getAccessToken() === null) {")
                     lines.append("            throw new \\RuntimeException('Not authenticated. Call authenticate(), handleCallback(), or setTokens() first.');")
                     lines.append("        }")
-                lines.append(f"        return {inner_expr}->{target}({call});")
+                if "snippet_body" in util:
+                    lines.extend(indent_body(util["snippet_body"]["php"], "        "))
+                else:
+                    inner_expr = self._php_inner_expr(module["source_module"])
+                    target = util["target"]["php"]
+                    call = ", ".join(call_parts)
+                    lines.append(f"        return {inner_expr}->{target}({call});")
                 lines.append("    }")
         lines.append("}")
         lines.append("")
@@ -566,34 +576,30 @@ class PhpGenerator(BaseGenerator):
         for p in path_params:
             sig_parts.append(f"{_php_type(p.get('type'))} ${self.snake_to_camel(p['name'])}")
 
+        sig_parts.extend(self._php_body_sig_tokens(request_body))
+        for p in query_params:
+            t = _php_type(p.get("type"))
+            camel = self.snake_to_camel(p["name"])
+            sig_parts.append(f"{_php_nullable(t)} ${camel} = null")
+
+        if len(sig_parts) > 1:
+            indent = "        "
+            sig = f"    public function {func_name}(\n"
+            sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
+            sig += "\n    ): mixed {"
+        elif sig_parts:
+            sig = f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"
+        else:
+            sig = f"    public function {func_name}(): mixed {{"
+        lines = [sig]
+        lines.append("        $baseUrl = $this->ctx->baseUrl;")
+        lines.extend(self._build_path(ep["path"], path_params, query_params, "unauth"))
+
         if request_body:
-            sig_parts.extend(self._php_body_sig_tokens(request_body))
-            if len(sig_parts) > 1:
-                indent = "        "
-                sig = f"    public function {func_name}(\n"
-                sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
-                sig += "\n    ): mixed {"
-            elif sig_parts:
-                sig = f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"
-            else:
-                sig = f"    public function {func_name}(): mixed {{"
-            lines = [sig]
-            lines.append("        $baseUrl = $this->ctx->baseUrl;")
-            lines.extend(self._build_path(ep["path"], path_params, [], "unauth"))
             preamble, _ = self._php_body_build(request_body, content_type, "        ")
             lines.extend(preamble)
             lines.extend(self._curl_post(method, content_type))
         else:
-            for p in query_params:
-                t = _php_type(p.get("type"))
-                camel = self.snake_to_camel(p["name"])
-                sig_parts.append(f"{_php_nullable(t)} ${camel} = null")
-            if sig_parts:
-                lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
-            else:
-                lines = [f"    public function {func_name}(): mixed {{"]
-            lines.append("        $baseUrl = $this->ctx->baseUrl;")
-            lines.extend(self._build_path(ep["path"], path_params, query_params, "unauth"))
             lines.append("        $ch = curl_init($baseUrl . $path);")
             lines.append("        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);")
             lines.append(f"        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '{method}');")
@@ -756,7 +762,6 @@ class PhpGenerator(BaseGenerator):
 
         for step in steps:
             lines.append("")
-            ep = step["endpoint"]
             step_id = step["step_id"]
             execution = step.get("execution", "once")
             cache = step.get("cache", {})
@@ -764,6 +769,18 @@ class PhpGenerator(BaseGenerator):
             output_as = step.get("output_as")
             on_error = step.get("on_error", "abort")
 
+            if "utility" in step:
+                util = step["utility"]
+                if execution == "once":
+                    lines.extend(self._emit_php_once_utility_step(step_id, util, input_map, output_as, cache, comp))
+                elif execution == "for_each":
+                    lines.extend(self._emit_php_foreach_utility_step(
+                        step_id, util, input_map, output_as, on_error,
+                        step["for_each_over"], step["for_each_as"], comp,
+                    ))
+                continue
+
+            ep = step["endpoint"]
             if execution == "once":
                 lines.extend(self._emit_php_once_step(step_id, ep, input_map, output_as, cache, comp))
             elif execution == "for_each":
@@ -791,8 +808,8 @@ class PhpGenerator(BaseGenerator):
         cache_enabled = cache.get("enabled", False)
 
         if cache_enabled:
-            cache_key_expr = self._resolve_php_expr(cache["key"], comp)
-            lines.append(f"        $_cacheKey = (string){cache_key_expr};")
+            cache_key_expr = self._resolve_php_cache_key(cache["key"], comp)
+            lines.append(f"        $_cacheKey = {cache_key_expr};")
             lines.append(f"        if (isset($this->_{step_id}Cache[$_cacheKey])) {{")
             lines.append(f"            ${var} = $this->_{step_id}Cache[$_cacheKey];")
             lines.append("        } else {")
@@ -893,6 +910,66 @@ class PhpGenerator(BaseGenerator):
         lines.append(f"{indent}${var} = handleResponse($_respBody, $_statusCode, $_respHeaders);")
         return lines
 
+    def _emit_php_once_utility_step(self, step_id: str, util: dict, input_map: dict, output_as: str | None, cache: dict, comp: dict) -> list[str]:
+        lines: list[str] = []
+        var = output_as or step_id
+        cache_enabled = cache.get("enabled", False)
+        if cache_enabled:
+            cache_key_expr = self._resolve_php_cache_key(cache["key"], comp)
+            lines.append(f"        $_cacheKey = {cache_key_expr};")
+            lines.append(f"        if (isset($this->_{step_id}Cache[$_cacheKey])) {{")
+            lines.append(f"            ${var} = $this->_{step_id}Cache[$_cacheKey];")
+            lines.append("        } else {")
+            indent = "            "
+        else:
+            indent = "        "
+        lines.append(f"{indent}${var} = {self._php_utility_call(util, input_map, comp, loop_var=None)};")
+        if cache_enabled:
+            lines.append(f"{indent}$this->_{step_id}Cache[$_cacheKey] = ${var};")
+            lines.append("        }")
+        return lines
+
+    def _emit_php_foreach_utility_step(self, step_id: str, util: dict, input_map: dict, output_as: str | None, on_error: str, for_each_over: str, for_each_as: str, comp: dict) -> list[str]:
+        lines: list[str] = []
+        var = output_as or step_id
+        arr_expr = self._resolve_php_expr(for_each_over, comp)
+        item = for_each_as
+        lines.append(f"        ${var} = [];")
+        if on_error == "collect":
+            lines.append(f"        ${var}Errors = [];")
+        lines.append(f"        foreach ({arr_expr} as $_index => ${item}) {{")
+        if on_error in ("collect", "continue"):
+            lines.append("            try {")
+            inner = "                "
+        else:
+            inner = "            "
+        call = self._php_utility_call(util, input_map, comp, loop_var=item)
+        lines.append(f"{inner}${var}[] = {call};")
+        if on_error == "collect":
+            lines.append("            } catch (\\Exception $_err) {")
+            lines.append(f"                ${var}Errors[] = ['index' => $_index, 'error' => $_err->getMessage()];")
+            lines.append("            }")
+        elif on_error == "continue":
+            lines.append("            } catch (\\Exception $_err) {")
+            lines.append("                // skip failed item")
+            lines.append("            }")
+        lines.append("        }")
+        return lines
+
+    def _php_utility_call(self, util: dict, input_map: dict, comp: dict, loop_var: str | None) -> str:
+        fn_name = util["function_name"]["php"]
+        args = []
+        for p in util["params"]:
+            mapped = input_map.get(p["name"])
+            if mapped is None:
+                args.append("null")
+                continue
+            if loop_var:
+                args.append(self._resolve_php_expr_loop(mapped, comp, loop_var))
+            else:
+                args.append(self._resolve_php_expr(mapped, comp))
+        return f"$this->ctx->utils->{fn_name}({', '.join(args)})"
+
     def _emit_php_foreach_step(self, step_id: str, ep: dict, input_map: dict, output_as: str | None, on_error: str, for_each_over: str, for_each_as: str, comp: dict) -> list[str]:
         lines = []
         var = output_as or step_id
@@ -965,6 +1042,20 @@ class PhpGenerator(BaseGenerator):
                 return f"${parts[1]}"
             return f"${parts[1]}['{parts[2]}']"
         return f"'{expr}'"
+
+    def _resolve_php_cache_key(self, expr: str, comp: dict) -> str:
+        """Convert template cache-key string with {placeholders} to a PHP string-concat expression."""
+        spans = re.split(r"\{([^}]+)\}", expr)
+        if len(spans) == 1:
+            raise ValueError(f"cache key must contain {{...}} placeholder: {expr!r}")
+        parts = []
+        for i, span in enumerate(spans):
+            if i % 2 == 0:
+                if span:
+                    parts.append("'" + span.replace("\\", "\\\\").replace("'", "\\'") + "'")
+            else:
+                parts.append(self._resolve_php_expr(span, comp))
+        return " . ".join(parts) if parts else "''"
 
     def _resolve_php_expr_loop(self, expr: str, comp: dict, loop_var: str | None) -> str:
         if loop_var and expr == f"{loop_var}._index":

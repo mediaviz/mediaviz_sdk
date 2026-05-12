@@ -7,9 +7,21 @@ from datetime import datetime, timezone
 import yaml
 
 from naming import snake_to_camel
+from utilities_resolver import find_utility
 
 # Matches {param_name:converter} in URL paths (e.g. FastAPI's {directory:path})
 _PATH_CONVERTER_RE = re.compile(r"\{(\w+):\w+\}")
+
+
+def _is_utility_ref(file_part: str) -> bool:
+    """Refs pointing at api_docs/utilities/<module>.yaml are utility refs."""
+    return file_part.startswith("utilities/") and file_part.endswith((".yaml", ".yml"))
+
+
+def _utility_source_module_from_ref(file_part: str) -> str:
+    """Extract source_module from 'utilities/<module>.yaml'."""
+    base = os.path.basename(file_part)
+    return os.path.splitext(base)[0]
 
 # Matches List[T] / list[t] in schema field types
 _LIST_TYPE_RE = re.compile(r"^[Ll]ist\[(.+)\]$")
@@ -252,12 +264,72 @@ def _flatten(ep: dict, controller: str, base_path: str, schemas: dict | None = N
     }
 
 
+def _resolve_step(
+    step: dict,
+    composite_id: str,
+    resolve_base: str,
+    controller_cache: dict,
+    schemas: dict,
+    utilities: list[dict] | None,
+    warnings: list[str],
+) -> dict | None:
+    """Resolve one composite step's ``ref`` into either an inlined ``endpoint`` or ``utility``.
+
+    Returns the resolved step dict (with ``ref`` stripped), or ``None`` if the ref
+    could not be resolved (warning is appended in that case).
+    """
+    file_part, ref_id = parse_ref(step["ref"])
+    resolved_step = {k: v for k, v in step.items() if k != "ref"}
+
+    cache = resolved_step.get("cache")
+    if cache and cache.get("enabled") and "{" not in cache.get("key", ""):
+        raise ValueError(
+            f"Composite '{composite_id}' step '{step.get('step_id')}' cache key "
+            f"must be a template string with {{...}} placeholders (got: {cache.get('key')!r})"
+        )
+
+    if _is_utility_ref(file_part):
+        source_module = _utility_source_module_from_ref(file_part)
+        util = find_utility(utilities, source_module, ref_id)
+        if util is None:
+            warnings.append(
+                f"Composite '{composite_id}' step utility '{ref_id}' not found in "
+                f"utilities/{source_module}.yaml — skipped"
+            )
+            return None
+        resolved_step["utility"] = util
+        return resolved_step
+
+    controller_path = os.path.normpath(os.path.join(resolve_base, file_part))
+    if controller_path not in controller_cache:
+        if not os.path.exists(controller_path):
+            warnings.append(f"Controller file not found: {controller_path} — skipped")
+            controller_cache[controller_path] = None
+            return None
+        with open(controller_path) as f:
+            controller_cache[controller_path] = yaml.safe_load(f)
+    if controller_cache[controller_path] is None:
+        return None
+    ctrl = controller_cache[controller_path]
+    matching = [ep for ep in ctrl["endpoints"] if ep["id"] == ref_id]
+    if not matching:
+        warnings.append(
+            f"Composite '{composite_id}' step endpoint '{ref_id}' not found in "
+            f"{controller_path} — skipped"
+        )
+        return None
+    flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
+    resolved_step["endpoint"] = flat_ep
+    return resolved_step
+
+
 def resolve_composites(
     composites_path: str,
     controllers_dir: str | None = None,
     schemas: dict | None = None,
+    utilities: list[dict] | None = None,
 ) -> tuple[list[dict], list[str]]:
-    """Read composites ref-list YAML, resolve each step's endpoint ref, return composites with embedded endpoints and warnings."""
+    """Read composites ref-list YAML, resolve each step's ref, return composites with embedded endpoints/utilities and warnings."""
     schemas = schemas or {}
     with open(composites_path) as f:
         ref_list = yaml.safe_load(f)
@@ -279,26 +351,11 @@ def resolve_composites(
 
         resolved_steps = []
         for step in composite["steps"]:
-            file_part, endpoint_id = parse_ref(step["ref"])
-            controller_path = os.path.normpath(os.path.join(resolve_base, file_part))
-            if controller_path not in controller_cache:
-                if not os.path.exists(controller_path):
-                    warnings.append(f"Controller file not found: {controller_path} — skipped")
-                    controller_cache[controller_path] = None
-                    continue
-                with open(controller_path) as f:
-                    controller_cache[controller_path] = yaml.safe_load(f)
-            if controller_cache[controller_path] is None:
-                continue
-            ctrl = controller_cache[controller_path]
-            matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
-            if not matching:
-                warnings.append(f"Composite '{composite['id']}' step endpoint '{endpoint_id}' not found in {controller_path} — skipped")
-                continue
-            flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
-            resolved_step = {k: v for k, v in step.items() if k != "ref"}
-            resolved_step["endpoint"] = flat_ep
-            resolved_steps.append(resolved_step)
+            rs = _resolve_step(
+                step, composite["id"], resolve_base, controller_cache, schemas, utilities, warnings,
+            )
+            if rs is not None:
+                resolved_steps.append(rs)
 
         result.append({
             "id": composite["id"],
@@ -318,6 +375,7 @@ def resolve_composite_files(
     composite_paths: list[str],
     controllers_dir: str | None = None,
     schemas: dict | None = None,
+    utilities: list[dict] | None = None,
 ) -> tuple[list[dict], list[str]]:
     """Resolve individual composite YAML files (not a ref-list). Each path points directly to a composite definition and warnings."""
     schemas = schemas or {}
@@ -337,26 +395,11 @@ def resolve_composite_files(
 
         resolved_steps = []
         for step in composite["steps"]:
-            file_part, endpoint_id = parse_ref(step["ref"])
-            controller_path = os.path.normpath(os.path.join(resolve_base, file_part))
-            if controller_path not in controller_cache:
-                if not os.path.exists(controller_path):
-                    warnings.append(f"Controller file not found: {controller_path} — skipped")
-                    controller_cache[controller_path] = None
-                    continue
-                with open(controller_path) as f:
-                    controller_cache[controller_path] = yaml.safe_load(f)
-            if controller_cache[controller_path] is None:
-                continue
-            ctrl = controller_cache[controller_path]
-            matching = [ep for ep in ctrl["endpoints"] if ep["id"] == endpoint_id]
-            if not matching:
-                warnings.append(f"Composite '{composite['id']}' step endpoint '{endpoint_id}' not found in {controller_path} — skipped")
-                continue
-            flat_ep = _flatten(matching[0], ctrl["controller"], ctrl.get("base_path", ""), schemas)
-            resolved_step = {k: v for k, v in step.items() if k != "ref"}
-            resolved_step["endpoint"] = flat_ep
-            resolved_steps.append(resolved_step)
+            rs = _resolve_step(
+                step, composite["id"], resolve_base, controller_cache, schemas, utilities, warnings,
+            )
+            if rs is not None:
+                resolved_steps.append(rs)
 
         result.append({
             "id": composite["id"],
@@ -373,11 +416,16 @@ def resolve_composite_files(
 
 
 def validate_composite_endpoints(composites: list[dict], endpoints: list[dict]) -> None:
-    """Verify every composite step endpoint exists in the resolved endpoints list. Raises ValueError if not."""
+    """Verify every composite endpoint step references an endpoint in the resolved list.
+
+    Utility steps are auto-included from ``api_docs/utilities/`` and skip this check.
+    """
     endpoint_ids = {ep["id"] for ep in endpoints}
     missing = []
     for comp in composites:
         for step in comp["steps"]:
+            if "utility" in step:
+                continue
             ep_id = step["endpoint"]["id"]
             if ep_id not in endpoint_ids:
                 missing.append(f"  composite '{comp['id']}' step '{step['step_id']}' requires endpoint '{ep_id}'")

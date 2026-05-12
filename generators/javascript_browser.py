@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from .base import BaseGenerator
 from naming import snake_to_camel as _snake_to_camel
+from utilities_resolver import collect_framework_imports, indent_body
 
 # Reserved words that cannot be used as JS parameter names in strict/module mode.
 _JS_RESERVED = {
@@ -301,6 +302,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "// Auto-generated — do not edit",
             f"import {{ OAuthClient }} from './{self._oauth_import_path()}';",
         ]
+        for stmt in collect_framework_imports(utilities, "javascript"):
+            lines.append(stmt)
         for prop, cls, fname in controllers:
             lines.append(f"import {{ {cls} }} from './{fname}';")
         lines.append("")
@@ -320,6 +323,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("  get refreshToken() { return this._mv._refreshToken; }")
         lines.append("  get baseUrl() { return this._mv._config.baseUrl; }")
         lines.append("  get hosts() { return this._mv._hosts; }")
+        if self._has_utilities(utilities):
+            lines.append("  get utils() { return this._mv.utils; }")
         lines.append("  requireHost(key) {")
         lines.append("    const url = this._mv._hosts[key];")
         lines.append("    if (!url) throw new Error(`Host '${key}' not configured. Pass hosts.${key} in MediaViz constructor or set the corresponding env var.`);")
@@ -443,17 +448,20 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("class _Utils {")
         lines.append("  constructor(mv) { this._mv = mv; }")
         for module in utilities:
-            source_module = module["source_module"]
-            inner_expr = self._js_inner_expr(source_module)
             for util in module["utilities"]:
                 fn_name = util["function_name"]["javascript"]
-                target = util["target"]["javascript"]
                 param_names = [_js_safe(_snake_to_camel(p["name"])) for p in util["params"]]
                 params = ", ".join(param_names)
-                lines.append(f"  {fn_name}({params}) {{")
+                async_kw = "async " if (util.get("async") or {}).get("javascript") else ""
+                lines.append(f"  {async_kw}{fn_name}({params}) {{")
                 if util.get("requires_tokens"):
                     lines.append("    if (!this._mv._accessToken) throw new Error('Not authenticated. Call authenticate(), handleCallback(), or setTokens() first.');")
-                lines.append(f"    return {inner_expr}.{target}({params});")
+                if "snippet_body" in util:
+                    lines.extend(indent_body(util["snippet_body"]["javascript"], "    "))
+                else:
+                    inner_expr = self._js_inner_expr(module["source_module"])
+                    target = util["target"]["javascript"]
+                    lines.append(f"    return {inner_expr}.{target}({params});")
                 lines.append("  }")
         lines.append("}")
         lines.append("")
@@ -508,6 +516,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             },
             "scripts": {
                 "build": "rollup -c",
+            },
+            "optionalDependencies": {
+                "sharp": "^0.33.0",
             },
             "devDependencies": {
                 "rollup": "^4.0.0",
@@ -580,39 +591,39 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         request_body = ep.get("request_body")
         content_type = ep.get("content_type") or "application/json"
 
+        sig_parts = list(path_args)
+        sig_parts.extend(self._js_body_sig_tokens(request_body))
+        if query_params:
+            q_names = [self.snake_to_camel(p["name"]) for p in query_params]
+            sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
+
+        lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
+        tmpl = self._path_template(ep["path"], path_params)
+
+        if query_params:
+            lines.append(f"    let path = {tmpl};")
+            lines.append("    const query = new URLSearchParams();")
+            for p in query_params:
+                camel = self.snake_to_camel(p["name"])
+                lines.append(f"    if ({camel} !== undefined) (Array.isArray({camel}) ? {camel} : [{camel}]).forEach(v => query.append('{p['name']}', v));")
+            lines.append("    const qs = query.toString();")
+            lines.append("    if (qs) path += '?' + qs;")
+            url_expr = "this._ctx.baseUrl + path"
+        else:
+            url_expr = f"this._ctx.baseUrl + {tmpl}"
+
         if request_body:
-            sig_parts = list(path_args)
-            sig_parts.extend(self._js_body_sig_tokens(request_body))
-            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
-            tmpl = self._path_template(ep["path"], path_params)
             preamble, body_expr = self._js_body_build(request_body, content_type, "    ")
             lines.extend(preamble)
-            lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{")
+            lines.append(f"    const resp = await fetch({url_expr}, {{")
             lines.append(f"      method: '{method}',")
             lines.append(f"      headers: {{ 'Content-Type': '{content_type}' }},")
             lines.append(f"      body: {body_expr},")
             lines.append("    });")
-            lines.append("    return handleResponse(resp);")
         else:
-            sig_parts = list(path_args)
-            if query_params:
-                q_names = [self.snake_to_camel(p["name"]) for p in query_params]
-                sig_parts.append("{ " + ", ".join(q_names) + " } = {}")
-            lines = [f"  async {func_name}({', '.join(sig_parts)}) {{"]
-            tmpl = self._path_template(ep["path"], path_params)
-            if query_params:
-                lines.append(f"    let path = {tmpl};")
-                lines.append("    const query = new URLSearchParams();")
-                for p in query_params:
-                    camel = self.snake_to_camel(p["name"])
-                    lines.append(f"    if ({camel} !== undefined) (Array.isArray({camel}) ? {camel} : [{camel}]).forEach(v => query.append('{p['name']}', v));")
-                lines.append("    const qs = query.toString();")
-                lines.append("    if (qs) path += '?' + qs;")
-                lines.append(f"    const resp = await fetch(this._ctx.baseUrl + path, {{ method: '{method}' }});")
-            else:
-                lines.append(f"    const resp = await fetch(this._ctx.baseUrl + {tmpl}, {{ method: '{method}' }});")
-            lines.append("    return handleResponse(resp);")
+            lines.append(f"    const resp = await fetch({url_expr}, {{ method: '{method}' }});")
 
+        lines.append("    return handleResponse(resp);")
         lines.append("  }")
         return lines
 
@@ -700,7 +711,6 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
         for step in steps:
             lines.append("")
-            ep = step["endpoint"]
             step_id = step["step_id"]
             execution = step.get("execution", "once")
             cache = step.get("cache", {})
@@ -708,6 +718,18 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             output_as = step.get("output_as")
             on_error = step.get("on_error", "abort")
 
+            if "utility" in step:
+                util = step["utility"]
+                if execution == "once":
+                    lines.extend(self._emit_composite_once_utility_step(step_id, util, input_map, output_as, cache, comp))
+                elif execution == "for_each":
+                    lines.extend(self._emit_composite_foreach_utility_step(
+                        step_id, util, input_map, output_as, on_error,
+                        step["for_each_over"], step["for_each_as"], comp,
+                    ))
+                continue
+
+            ep = step["endpoint"]
             if execution == "once":
                 lines.extend(self._emit_composite_once_step(step_id, ep, input_map, output_as, cache, comp, sibling_eps))
             elif execution == "for_each":
@@ -738,10 +760,10 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         cache_enabled = cache.get("enabled", False)
 
         if cache_enabled:
-            cache_key_expr = self._resolve_js_expr(cache["key"], comp)
+            cache_key_expr = self._resolve_js_cache_key(cache["key"], comp)
             cache_name = f"_{step_id}"
             lines.append(f"    if (!this._caches['{cache_name}']) this._caches['{cache_name}'] = new Map();")
-            lines.append(f"    const _cacheKey_{step_id} = String({cache_key_expr});")
+            lines.append(f"    const _cacheKey_{step_id} = {cache_key_expr};")
             lines.append(f"    let {var} = this._caches['{cache_name}'].get(_cacheKey_{step_id});")
             lines.append(f"    if ({var} === undefined) {{")
             indent = "      "
@@ -959,6 +981,70 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("    }")
         return lines
 
+    def _emit_composite_once_utility_step(self, step_id: str, util: dict, input_map: dict, output_as: str | None, cache: dict, comp: dict) -> list[str]:
+        lines: list[str] = []
+        var = output_as or step_id
+        cache_enabled = cache.get("enabled", False)
+        if cache_enabled:
+            cache_key_expr = self._resolve_js_cache_key(cache["key"], comp)
+            cache_name = f"_{step_id}"
+            lines.append(f"    if (!this._caches['{cache_name}']) this._caches['{cache_name}'] = new Map();")
+            lines.append(f"    const _cacheKey_{step_id} = {cache_key_expr};")
+            lines.append(f"    let {var} = this._caches['{cache_name}'].get(_cacheKey_{step_id});")
+            lines.append(f"    if ({var} === undefined) {{")
+            call = self._js_utility_call(util, input_map, comp, loop_var=None)
+            lines.append(f"      {var} = {call};")
+            lines.append(f"      this._caches['{cache_name}'].set(_cacheKey_{step_id}, {var});")
+            lines.append("    }")
+        else:
+            call = self._js_utility_call(util, input_map, comp, loop_var=None)
+            lines.append(f"    const {var} = {call};")
+        return lines
+
+    def _emit_composite_foreach_utility_step(self, step_id: str, util: dict, input_map: dict, output_as: str | None, on_error: str, for_each_over: str, for_each_as: str, comp: dict) -> list[str]:
+        lines: list[str] = []
+        var = output_as or step_id
+        arr_expr = self._resolve_js_expr(for_each_over, comp)
+        item = for_each_as
+        lines.append(f"    const {var} = [];")
+        if on_error == "collect":
+            lines.append(f"    const {var}Errors = [];")
+        lines.append(f"    for (let _index = 0; _index < {arr_expr}.length; _index++) {{")
+        lines.append(f"      const {item} = {arr_expr}[_index];")
+        if on_error in ("collect", "continue"):
+            lines.append("      try {")
+            inner = "        "
+        else:
+            inner = "      "
+        call = self._js_utility_call(util, input_map, comp, loop_var=item)
+        lines.append(f"{inner}{var}.push({call});")
+        if on_error == "collect":
+            lines.append("      } catch (_err) {")
+            lines.append(f"        {var}Errors.push({{ index: _index, error: _err }});")
+            lines.append("      }")
+        elif on_error == "continue":
+            lines.append("      } catch (_err) {")
+            lines.append("        // skip failed item")
+            lines.append("      }")
+        lines.append("    }")
+        return lines
+
+    def _js_utility_call(self, util: dict, input_map: dict, comp: dict, loop_var: str | None) -> str:
+        fn_name = util["function_name"]["javascript"]
+        is_async = bool((util.get("async") or {}).get("javascript"))
+        args = []
+        for p in util["params"]:
+            mapped = input_map.get(p["name"])
+            if mapped is None:
+                args.append("undefined")
+                continue
+            if loop_var:
+                args.append(self._resolve_js_expr_loop(mapped, comp, loop_var))
+            else:
+                args.append(self._resolve_js_expr(mapped, comp))
+        await_kw = "await " if is_async else ""
+        return f"{await_kw}this._ctx.utils.{fn_name}({', '.join(args)})"
+
     def _emit_inline_foreach_fetch(self, ep: dict, input_map: dict, results_var: str, comp: dict, item: str, indent: str) -> list[str]:
         """Inline a fetch call inside a for_each loop body."""
         lines = []
@@ -1052,6 +1138,19 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 return parts[1]  # steps.template -> template
             return f"{parts[1]}.{parts[2]}"  # steps.template.bucket_name -> template.bucket_name
         return expr
+
+    def _resolve_js_cache_key(self, expr: str, comp: dict) -> str:
+        """Convert template cache-key string with {placeholders} to a JS template literal."""
+        spans = re.split(r"\{([^}]+)\}", expr)
+        if len(spans) == 1:
+            raise ValueError(f"cache key must contain {{...}} placeholder: {expr!r}")
+        out = []
+        for i, span in enumerate(spans):
+            if i % 2 == 0:
+                out.append(span.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${"))
+            else:
+                out.append("${" + self._resolve_js_expr(span, comp) + "}")
+        return "`" + "".join(out) + "`"
 
     def _resolve_js_expr_loop(self, expr: str, comp: dict, loop_var: str) -> str:
         """Convert dot-path expression to JS variable reference inside a for_each loop."""

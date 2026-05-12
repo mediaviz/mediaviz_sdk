@@ -4,6 +4,7 @@ import re
 import shutil
 import textwrap
 from .base import BaseGenerator
+from utilities_resolver import collect_framework_imports, indent_body
 
 def _pascal_to_snake(name: str) -> str:
     s = re.sub('([A-Z]+)([A-Z][a-z])', r'\1_\2', name)
@@ -158,9 +159,13 @@ class PythonGenerator(BaseGenerator):
             "",
             "from oauth_sdk import OAuthClient, OAuthClientConfig",
         ]
+        for stmt in collect_framework_imports(utilities, "python"):
+            lines.append(stmt)
         for ctrl, cls in controllers:
             lines.append(f"from .{ctrl} import {cls}")
         lines += ["", ""]
+
+        has_utils = bool(utilities) and any(m.get("utilities") for m in utilities)
 
         # _Context
         lines += [
@@ -176,6 +181,14 @@ class PythonGenerator(BaseGenerator):
             "    @property",
             "    def base_url(self) -> str: return self._mv._config['base_url']",
             "",
+        ]
+        if has_utils:
+            lines += [
+                "    @property",
+                "    def utils(self) -> \"_Utils\": return self._mv.utils",
+                "",
+            ]
+        lines += [
             "    def require_host(self, key: str) -> str:",
             "        url = self._mv._hosts.get(key)",
             "        if url is None:",
@@ -313,11 +326,8 @@ class PythonGenerator(BaseGenerator):
             "",
         ]
         for module in utilities:
-            source_module = module["source_module"]
-            inner_expr = self._py_inner_expr(source_module)
             for util in module["utilities"]:
                 fn_name = util["function_name"]["python"]
-                target = util["target"]["python"]
                 sig_parts = ["self"]
                 call_parts = []
                 for p in util["params"]:
@@ -328,12 +338,17 @@ class PythonGenerator(BaseGenerator):
                         sig_parts.append(f"{p['name']}: {_python_nullable(t)} = None")
                     call_parts.append(p["name"])
                 sig = ", ".join(sig_parts)
-                call = ", ".join(call_parts)
                 lines.append(f"    def {fn_name}({sig}) -> Any:")
                 if util.get("requires_tokens"):
                     lines.append("        if self._mv._access_token is None:")
                     lines.append("            raise RuntimeError('Not authenticated. Call authenticate(), handle_callback(), or set_tokens() first.')")
-                lines.append(f"        return {inner_expr}.{target}({call})")
+                if "snippet_body" in util:
+                    lines.extend(indent_body(util["snippet_body"]["python"], "        "))
+                else:
+                    inner_expr = self._py_inner_expr(module["source_module"])
+                    target = util["target"]["python"]
+                    call = ", ".join(call_parts)
+                    lines.append(f"        return {inner_expr}.{target}({call})")
                 lines.append("")
         lines += ["", ""]
         return True
@@ -639,7 +654,6 @@ class PythonGenerator(BaseGenerator):
 
         for step in steps:
             lines.append("")
-            ep = step["endpoint"]
             step_id = step["step_id"]
             execution = step.get("execution", "once")
             cache = step.get("cache", {})
@@ -647,6 +661,18 @@ class PythonGenerator(BaseGenerator):
             output_as = step.get("output_as")
             on_error = step.get("on_error", "abort")
 
+            if "utility" in step:
+                util = step["utility"]
+                if execution == "once":
+                    lines.extend(self._emit_python_once_utility_step(step_id, util, input_map, output_as, cache, comp))
+                elif execution == "for_each":
+                    lines.extend(self._emit_python_foreach_utility_step(
+                        step_id, util, input_map, output_as, on_error,
+                        step["for_each_over"], step["for_each_as"], comp,
+                    ))
+                continue
+
+            ep = step["endpoint"]
             if execution == "once":
                 lines.extend(self._emit_python_once_step(step_id, ep, input_map, output_as, cache, comp))
             elif execution == "for_each":
@@ -668,6 +694,80 @@ class PythonGenerator(BaseGenerator):
 
         return lines
 
+    def _emit_python_once_utility_step(
+        self,
+        step_id: str,
+        util: dict,
+        input_map: dict,
+        output_as: str | None,
+        cache: dict,
+        comp: dict,
+    ) -> list[str]:
+        lines: list[str] = []
+        var = output_as or step_id
+        cache_enabled = cache.get("enabled", False)
+        if cache_enabled:
+            cache_key_expr = self._resolve_python_cache_key(cache["key"], comp)
+            lines.append(f"        _cache_key = {cache_key_expr}")
+            lines.append(f"        if _cache_key in self._{step_id}_cache:")
+            lines.append(f"            {var} = self._{step_id}_cache[_cache_key]")
+            lines.append(f"        else:")
+            indent = "            "
+        else:
+            indent = "        "
+        lines.append(f"{indent}{var} = {self._python_utility_call(util, input_map, comp, loop_var=None)}")
+        if cache_enabled:
+            lines.append(f"            self._{step_id}_cache[_cache_key] = {var}")
+        return lines
+
+    def _emit_python_foreach_utility_step(
+        self,
+        step_id: str,
+        util: dict,
+        input_map: dict,
+        output_as: str | None,
+        on_error: str,
+        for_each_over: str,
+        for_each_as: str,
+        comp: dict,
+    ) -> list[str]:
+        lines: list[str] = []
+        var = output_as or step_id
+        arr_expr = self._resolve_python_expr(for_each_over, comp)
+        item = for_each_as
+        lines.append(f"        {var}: list = []")
+        if on_error == "collect":
+            lines.append(f"        {var}_errors: list = []")
+        lines.append(f"        for _index, {item} in enumerate({arr_expr}):")
+        if on_error in ("collect", "continue"):
+            lines.append("            try:")
+            inner = "                "
+        else:
+            inner = "            "
+        call = self._python_utility_call(util, input_map, comp, loop_var=item)
+        lines.append(f"{inner}{var}.append({call})")
+        if on_error == "collect":
+            lines.append("            except Exception as _err:")
+            lines.append(f"                {var}_errors.append({{'index': _index, 'error': str(_err)}})")
+        elif on_error == "continue":
+            lines.append("            except Exception:")
+            lines.append("                pass")
+        return lines
+
+    def _python_utility_call(self, util: dict, input_map: dict, comp: dict, loop_var: str | None) -> str:
+        fn_name = util["function_name"]["python"]
+        args = []
+        for p in util["params"]:
+            mapped = input_map.get(p["name"])
+            if mapped is None:
+                args.append("None")
+                continue
+            if loop_var:
+                args.append(self._resolve_python_expr_loop(mapped, comp, loop_var))
+            else:
+                args.append(self._resolve_python_expr(mapped, comp))
+        return f"self._ctx.utils.{fn_name}({', '.join(args)})"
+
     def _emit_python_once_step(
         self,
         step_id: str,
@@ -682,8 +782,8 @@ class PythonGenerator(BaseGenerator):
         cache_enabled = cache.get("enabled", False)
 
         if cache_enabled:
-            cache_key_expr = self._resolve_python_expr(cache["key"], comp)
-            lines.append(f"        _cache_key = str({cache_key_expr})")
+            cache_key_expr = self._resolve_python_cache_key(cache["key"], comp)
+            lines.append(f"        _cache_key = {cache_key_expr}")
             lines.append(f"        if _cache_key in self._{step_id}_cache:")
             lines.append(f"            {var} = self._{step_id}_cache[_cache_key]")
             lines.append(f"        else:")
@@ -838,6 +938,18 @@ class PythonGenerator(BaseGenerator):
                 return parts[1]
             return f"{parts[1]}['{parts[2]}']"
         return repr(expr)
+
+    def _resolve_python_cache_key(self, expr: str, comp: dict) -> str:
+        spans = re.split(r"\{([^}]+)\}", expr)
+        if len(spans) == 1:
+            raise ValueError(f"cache key must contain {{...}} placeholder: {expr!r}")
+        out = []
+        for i, span in enumerate(spans):
+            if i % 2 == 0:
+                out.append(span.replace("{", "{{").replace("}", "}}"))
+            else:
+                out.append("{" + self._resolve_python_expr(span, comp) + "}")
+        return 'f"' + "".join(out) + '"'
 
     def _resolve_python_expr_loop(self, expr: str, comp: dict, loop_var: str | None) -> str:
         if loop_var and expr == f"{loop_var}._index":

@@ -17,9 +17,7 @@ mediaviz_sdk/
     javascript_node.py      # Node.js generator (ESM)
     php.py                  # PHP generator
   resolver.py              # Reads ref-list YAML, resolves refs, outputs flattened YAML
-  utilities_resolver.py    # Reads /utilities YAML, validates, outputs flattened snapshot
-  utilities/               # Config for non-endpoint helpers exposed on the client (e.g. OAuth utils)
-    oauth.yaml
+  utilities_resolver.py    # Reads api_docs/utilities YAML, validates, outputs flattened snapshot
   versioning.py            # Version auto-increment logic
   sdk/                     # Static output directory
     v{major}.{minor}.{iteration}/  # Current version (only one active at a time)
@@ -157,10 +155,11 @@ Encapsulates source path resolution. Currently resolves against local sibling di
 | Schemas | `../mediaviz_intelligence_hub/api_docs/api_schemas.yaml` | same repo, same path |
 | Hand-authored flow YAMLs | `../mediaviz_intelligence_hub/common_flows/sdk_endpoints/` | `imaige/mediaviz_intelligence_hub` → `common_flows/sdk_endpoints/` |
 | Generated endpoint registries | `../mediaviz_intelligence_hub/api_docs/endpoint_list/` | `imaige/mediaviz_intelligence_hub` → `api_docs/endpoint_list/` |
+| Utilities | `../mediaviz_intelligence_hub/api_docs/utilities/` | `imaige/mediaviz_intelligence_hub` → `api_docs/utilities/` |
 | OAuth SDK | `../oauth_library/sdk/` | `imaige/oauth_library` → `sdk/` |
 
 **Key functions:**
-- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir, endpoint_list_dir, schemas_path)`
+- `fetch_sources(branch)` — context manager yielding `SourcePaths(controllers_dir, oauth_sdk_root, flows_dir, endpoint_list_dir, schemas_path, utilities_dir)`. `utilities_dir` is permissive (missing dir → resolver returns an empty list, no error).
 - `resolve_flow_path(flow_name, flows_dir, endpoint_list_dir)` — returns path to `{flow_name}.yaml` from the first directory containing it (flows_dir wins on collision); exits with the union of available flow names if not found
 
 ### 6. CLI Entrypoint (`generate.py`)
@@ -194,7 +193,9 @@ Output is written to the folder specified by `--destination-dir` (default `./sdk
    b. Create `sdk/v{ver}/{framework}/`
    c. Call `copy_auth_wrapper()` to bundle OAuth SDK source
    d. Call `generate()` to emit SDK files
-5. Print summary: version number, frameworks generated, file counts
+8. Print summary: version number, frameworks generated, file counts
+
+**Failure recovery:** Steps 5–7 are wrapped in a single try/except. If any step raises (e.g., a composite cache-key validation error, a generator crash), the partial `sdk/v{ver}/` directory is removed and any version archived in step 4 is moved back to `sdk/` from `sdk/archive/`, restoring the pre-run state. The process then exits non-zero with the error. This guarantees the working tree never ends up with the previous version archived and only a malformed/partial new version present.
 
 ## Generated SDK Shape
 
@@ -413,7 +414,7 @@ steps:
     execution: once
     cache:
       enabled: true
-      key: "params.project_table_name"
+      key: "upload_template:{params.project_table_name}"
     input_map:
       project_table_name: "params.project_table_name"
     output_as: template
@@ -433,16 +434,23 @@ returns: "steps.upload_result"
 
 | Field | Purpose |
 |---|---|
-| `steps[].ref` | Points to existing endpoint (same format as top_endpoints refs) |
-| `steps[].execution` | `once` or `for_each` |
-| `steps[].cache` | Static/module-level cache — `key` is a dot-path expression for the cache key |
-| `steps[].input_map` | Maps endpoint params to dot-path expressions: `params.*`, `params.<obj>.<prop>`, `steps.<id>.*` |
+| `steps[].ref` | Points to an existing endpoint (`controllers/<file>.yaml#<endpoint_id>`) or utility (`utilities/<module>.yaml#<util_id>`). Utility steps are auto-included from `api_docs/utilities/` — no separate ref-list enumeration is required. |
+| `steps[].execution` | `once` or `for_each` (supported for both endpoint and utility steps) |
+| `steps[].cache` | Static/module-level cache — `key` is a template string with `{...}` placeholders, e.g. `"upload_template:{params.project_table_name}"`. Each placeholder is a dot-path expression (`params.*`, `params.<obj>.<prop>`, `steps.<id>.*`); literals between placeholders namespace the entry for self-describing keys. Bare dot-paths (no `{}`) are rejected at composite-resolve time. Supported for both endpoint and utility steps; evaluated verbatim (no content hashing). |
+| `steps[].input_map` | Maps endpoint params or utility params to dot-path expressions: `params.*`, `params.<obj>.<prop>`, `steps.<id>.*`. For utility steps, the keys are utility param names (canonical snake_case from the utility YAML) and the call is positional in declaration order. |
 | `steps[].output_as` | Name to store step response under for later steps |
-| `steps[].on_error` | `abort` (throw), `continue` (skip), `collect` (accumulate errors alongside results) |
+| `steps[].on_error` | `abort` (throw), `continue` (skip), `collect` (accumulate errors alongside results) — supported for both endpoint and utility steps |
 
 ### Resolver
 
-`resolve_composites()` reads the composites ref-list, resolves each step's endpoint `ref` through the existing `parse_ref()` + controller lookup, and embeds the flattened endpoint data inline into each step. The resolved output is written to `resolved_composites.yaml`.
+`resolve_composites()` / `resolve_composite_files()` read each composite, then dispatch every step's `ref` through `_resolve_step()`:
+
+- Endpoint refs (`controllers/<file>.yaml#<id>`) are resolved against the controller YAML and the flattened endpoint is embedded inline as `step["endpoint"]`.
+- Utility refs (`utilities/<module>.yaml#<id>`) are resolved against the pre-loaded utilities list (the module name is derived from the YAML basename) and the full utility dict — including `snippet_body.<fw>`, `function_name.<fw>`, `params`, and any `async`/`imports` flags — is embedded inline as `step["utility"]`. Generators distinguish the two by which key is present.
+
+The resolved output (`resolved_composites.yaml`) is self-contained: the utility snippet bodies are embedded into each step that references them, so the snapshot can be replayed without consulting `resolved_utilities.yaml` or the source `utilities/` directory.
+
+`validate_composite_endpoints()` enforces that every endpoint step's `id` is present in the resolved `--endpoints` list. Utility steps are skipped — utilities are auto-discovered (`load_utilities(sources.utilities_dir)` in `generate.py`) and are not subject to the endpoint-ref-list enumeration rule.
 
 ### Generator Behavior
 
@@ -450,8 +458,10 @@ returns: "steps.upload_result"
 - **Cross-controller imports:** If a composite step calls an endpoint from a different controller, the generator adds the necessary import (JS) or inlines the call (PHP)
 - **Once steps — same-controller:** When a step's endpoint belongs to the same controller as the composite, the generated code delegates to the sibling method (e.g., `this.uploadPhotoToMediaviz(...)`) with `input_map` values mapped to the method's positional signature. Generation fails if the sibling endpoint is missing from the endpoint list. If cache is enabled, the step is still wrapped in a static `Map` (JS) or instance-property array (PHP)
 - **Once steps — cross-controller:** Inlined via the context's `client.request()` (auth endpoints) or direct `fetch`/`curl` (alt-host endpoints)
-- **For-each steps:** Loop over the array. Inline the HTTP call when intermediate data flow requires it (e.g., passing cached template values as headers). Otherwise call the generated function
-- **On-error modes:** `abort` throws immediately; `collect` wraps in try/catch and returns `{ results, errors }`
+- **Utility steps:** Detected by `step["utility"]` being present. Emitted as a positional call through the `_Context.utils` accessor — `self._ctx.utils.<fn>(...)` in Python, `$this->ctx->utils-><fn>(...)` in PHP, `this._ctx.utils.<fn>(...)` in JS. JS wraps the call in `await` when the utility's `async.javascript` flag is set. Argument order follows the utility's `params` declaration; each arg is the resolved `input_map[paramName]` dot-path expression (or the framework's null literal if no mapping is supplied). `_Context.utils` is only emitted when at least one utility is registered — composites without utility steps see no surface-area change.
+- **For-each steps:** Loop over the array. For endpoint steps, inline the HTTP call when intermediate data flow requires it (e.g., passing cached template values as headers); otherwise call the generated function. For utility steps, the same loop scaffolding wraps a per-iteration positional call through `_ctx.utils`.
+- **On-error modes:** `abort` throws immediately; `collect` wraps in try/catch and returns `{ results, errors }`. Both apply identically to endpoint and utility steps.
+- **Cache:** Same wrapping shape for both endpoint and utility steps (static `Map` per step in JS, instance-property array in PHP, instance dict in Python). The cache key is the verbatim evaluation of `cache.key` — no content hashing — so utility-step caching is only safe when the key fully identifies the output (e.g. keying a derivation by `params.project_id`).
 - **Nested param expressions:** `params.<obj>.<prop>` resolves to property access (JS: `obj.prop`, PHP: `$obj['prop']`)
 - **Alt-host endpoints:** When a composite includes alt-host steps, `baseUrl` is added to the function signature
 
@@ -474,48 +484,108 @@ Every endpoint referenced by a composite's steps must also be present in the sam
 
 ## Utilities
 
-Utilities are non-endpoint helper functions that live on a bundled module (e.g. the OAuth SDK's `decodeAccessToken`) and should be callable directly from the user-facing client without reaching into private internals. They are defined in YAML under the package-root `utilities/` folder — one file per source module — and exposed on the generated client under a `utils` namespace (`mv.utils.<name>(...)` in JS/Python, `$mv->utils-><name>(...)` in PHP).
+Utilities are non-endpoint helper functions exposed on the generated client under a `utils` namespace (`mv.utils.<name>(...)` in JS/Python, `$mv->utils-><name>(...)` in PHP). They are defined in YAML under `mediaviz_intelligence_hub/api_docs/utilities/` (one file per source module) so they sit alongside controllers/composites and can eventually be referenced from composite step refs.
 
-### Config Format (`utilities/*.yaml`)
+A utility comes in one of two forms, chosen per-utility:
+
+- **`target` form** — pass-through wrapper around a method on a bundled module client (e.g. the OAuth SDK's `decodeAccessToken`). The emitted method body is `return <inner>.<target>(...)`. Today only `source_module: oauth` has a registered inner expression.
+- **`snippets` form** — standalone implementation. Each framework points at a snippet file containing the method body, and the resolver inlines the body verbatim (re-indented). Optional `imports` and `async` fields control the surrounding emission. The `source_module` is informational under this form (no `_inner_expr` lookup).
+
+`target` and `snippets` are mutually exclusive; exactly one must be present.
+
+### Config Format (`api_docs/utilities/*.yaml`)
 
 ```yaml
-source_module: oauth          # must match a module bundled via copy_module() (e.g. 'oauth')
+source_module: photos
 utilities:
+  # snippets form — standalone implementation per framework
+  - id: downscale_photos
+    description: "Resize an image to fit within max_dimension while preserving aspect ratio."
+    function_name:
+      javascript: downscalePhotos
+      php: downscalePhotos
+      python: downscale_photos
+    params:
+      - { name: image_bytes,   type: bytes, required: true }
+      - { name: max_dimension, type: int,   required: true }
+    snippets:                    # paths relative to this YAML file
+      python:     snippets/photos/downscale_photos.py
+      php:        snippets/photos/downscale_photos.php
+      javascript: snippets/photos/downscale_photos.js
+    imports:                     # optional, hoisted to the top of the client file
+      python:
+        - "from PIL import Image"
+        - "from io import BytesIO"
+    async:                       # optional, prefixes the method declaration
+      javascript: true
+
+  # target form — pass-through wrapper around an inner-client method
   - id: decode_access_token
-    description: "Decode a JWT access token payload without verifying signature."
-    target:                    # method name on the underlying module client, per framework
+    target:
       javascript: decodeAccessToken
       php: decodeAccessToken
       python: decode_access_token
-    function_name:             # method name exposed on mv.utils, per framework
+    function_name:
       javascript: decodeAccessToken
       php: decodeAccessToken
       python: decode_access_token
     params:
-      - name: access_token
-        type: str              # canonical type; generators map to framework type
-        required: true
-    returns: TokenPayload      # informational
-    requires_tokens: false     # if true, emit require_tokens() guard
+      - { name: access_token, type: str, required: true }
+    requires_tokens: false
 ```
 
 ### Key Schema Fields
 
 | Field | Purpose |
 |---|---|
-| `source_module` | Bundled module name (matches `copy_module` key). Only `oauth` is supported today; other modules raise `ValueError` in the generator. |
-| `target.<fw>` | Method name on the underlying module client, per framework. |
-| `function_name.<fw>` | Public method name on `mv.utils` — typically equal to `target.<fw>`. |
+| `source_module` | Module name. For `target`-form utilities this must match a registered inner expression (today: `oauth`). For `snippets`-form utilities it is informational. |
+| `function_name.<fw>` | Public method name on `mv.utils`, per framework. |
+| `target.<fw>` | (target form) Method name on the underlying module client, per framework. |
+| `snippets.<fw>` | (snippets form) Path to a body file, **relative to the YAML file's directory**. All three frameworks (`javascript`, `php`, `python`) must be present. |
+| `imports.<fw>` | (optional) List of statements hoisted to the top of the generated client file (`client.py`, `MediaVizClient.php`, `MediaViz.js`). Deduplicated across all utilities. |
+| `async.<fw>` | (optional, boolean) When true, the emitted method declaration is prefixed with the framework's async keyword. Today only `javascript` honors this; PHP/Python ignore it. |
 | `params[].name/type/required` | Same `{name, type, required}` shape as endpoint params. |
-| `requires_tokens` | Prepend the standard "not authenticated" guard used by controllers. |
+| `requires_tokens` | Prepend the standard "not authenticated" guard used by controllers (applies to both forms). |
+
+### Snippet File Conventions
+
+- **Zero-indent**: write the body at column 0; the generator re-indents each non-empty line to the per-framework body indent (8 spaces for Python/PHP, 4 spaces for JS browser). Blank lines stay blank (no trailing whitespace).
+- **No signature**: do not include `def`/`function`/`public function`. The generator emits the signature from `function_name` and `params`. The snippet is the body only.
+- **Parameter naming**: snippets reference the parameter names that the generator emits in the signature. Python uses the YAML name verbatim (snake_case). PHP and JS camelCase the YAML name (so `image_bytes` becomes `$imageBytes` in PHP, `imageBytes` in JS).
+- **Return statement**: the snippet is responsible for its own `return`. The generator does not append one in snippet form.
+- **Async**: when `async.javascript: true`, the snippet may use `await` freely. PHP/Python remain sync.
 
 ### Resolver (`utilities_resolver.py`)
 
-`load_utilities(utilities_dir)` walks `utilities/*.yaml`, validates each module and utility (required fields, all frameworks present on `target` / `function_name`), and returns a flat list of module dicts. `write_flattened_utilities_yaml(modules, version_dir)` writes a `resolved_utilities.yaml` snapshot alongside the generated SDK. Validation failures raise `ValueError` so generation aborts before emitting a broken SDK.
+`load_utilities(utilities_dir)` walks `*.yaml`, validates each utility, and resolves snippet paths to absolute file paths relative to the YAML directory. The YAML's `source_module` value must match the filename basename (e.g. `photos.yaml` must declare `source_module: photos`); a mismatch raises `ValueError` and aborts generation, because composite utility refs derive `source_module` from the filename and a mismatch would silently unreference the module. Snippet bodies are read at resolve time and stored under `snippet_body.<fw>` so the in-memory dict and the `resolved_utilities.yaml` snapshot are self-contained. Validation failures raise `ValueError` so generation aborts before emitting a broken SDK. `load_utilities` returns `[]` (no error) when the utilities directory does not exist, which keeps old `mediaviz_intelligence_hub` branches without utilities buildable.
+
+Helpers exported to generators:
+- `collect_framework_imports(modules, framework)` — deduplicated list of import statements across all utilities for one framework.
+- `indent_body(body, indent)` — re-indent each non-empty line; empty lines stay empty.
 
 ### Generator Behavior
 
-Each generator receives the utilities list as a kwarg on `generate()` / `emit_client_class()` and emits a small `_Utils` class next to the existing `_Context` / `_TokenTrackingClient` helpers. The `_Utils` class holds a back-reference to the client and forwards each method to the underlying module client (for `source_module: oauth`: `this._oauthClient._inner.<target>(...)` in JS, `$this->_mv->getOAuthClient()-><target>(...)` in PHP, `self._mv._tracking_client._inner.<target>(...)` in Python). Constructor wiring adds `this.utils = new _Utils(this)` (or the equivalent); field declaration is added in PHP (`public readonly _Utils $utils;`). When the utilities list is empty, no `_Utils` class is emitted.
+Each generator receives the utilities list as a kwarg on `generate()` / `emit_client_class()` and emits a small `_Utils` class next to the existing `_Context` / `_TokenTrackingClient` helpers. Per-utility emission:
+
+- **`target` form**: `return <inner_expr>.<target>(<params>)` (`self._mv._tracking_client._inner` in Python, `$this->_mv->getOAuthClient()` in PHP, `this._mv._oauthClient._inner` in JS).
+- **`snippets` form**: the loaded `snippet_body.<fw>` is re-indented and inlined as the method body. No trailing `return` is added.
+
+Constructor wiring adds `this.utils = new _Utils(this)` (or the equivalent); field declaration is added in PHP (`public readonly _Utils $utils;`). Utility-declared `imports.<fw>` are hoisted to the top of the generated client file. When the utilities list is empty, no `_Utils` class and no extra imports are emitted.
+
+### Shipped Utilities
+
+#### `photos.downscale_photos(image_bytes, max_dimension)`
+
+Resizes an image to fit within `max_dimension` while preserving aspect ratio, **re-encodes as JPEG (quality 90)**, and returns the JPEG bytes. JPEG output is intentional across all three frameworks so callers get the same on-the-wire format regardless of runtime — input PNG/WebP transparency is flattened.
+
+- **Python** — PIL: `ImageOps.exif_transpose` → `Image.resize(..., LANCZOS)` → `convert("RGB")` → `save(format="JPEG", quality=90)`. Returns `bytes`.
+- **PHP** — GD: `imagecreatefromstring` → `imagecopyresampled` → `imagejpeg(..., 90)`. Returns `string` (raw JPEG bytes).
+- **JavaScript** — dual-runtime. The snippet detects browser vs Node at call time:
+  - **Browser** path (renderer process / web app): `createImageBitmap(blob, { imageOrientation: 'from-image' })` + `OffscreenCanvas` (or `<canvas>`), then `canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 })` or `canvas.toBlob(...)`. The resulting Blob is converted to `Uint8Array`.
+  - **Node** path (Electron main process, server-side): lazy-loads `sharp` via an indirect-specifier dynamic `import()` — `const _sharpSpec = 'sharp'; (await import(_sharpSpec)).default` — so rollup/webpack do not statically resolve `sharp` when bundling for the browser. Pipeline: `.rotate().resize({ width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer()`.
+  - Both JS paths return `Uint8Array`. If the Node path is invoked without `sharp` installed, the snippet throws a clear error: `"downscalePhotos requires 'sharp' when running in Node.js. Install it: npm install sharp"`.
+
+`sharp` is declared in the generated `package.json` `optionalDependencies` (`emit_package_json` in `generators/javascript_browser.py`). Browser-only consumers can `npm install --no-optional` or ignore it; Node/Electron consumers install `sharp` normally.
 
 ## Constraints
 

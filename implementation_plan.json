@@ -1638,5 +1638,281 @@
       }
     ],
     "completion_status": true
+  },
+  {
+    "id": 71,
+    "description": "Move utilities config from mediaviz_sdk/utilities/ into ../mediaviz_intelligence_hub/api_docs/utilities/ so utilities sit alongside controllers/composites/schemas and can later be referenced from composite step refs",
+    "touch_points": [
+      {
+        "file": "github_sources.py",
+        "location": "SourcePaths / fetch_sources",
+        "status": "complete — added UTILITIES_SUBPATH constant + utilities_dir on SourcePaths; permissive (not in required_dirs) so older hub branches without the dir still build"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "complete — removed UTILITIES_DIR constant; load_utilities now uses sources.utilities_dir"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 72,
+    "description": "Extend utilities_resolver to support a 'snippets' form (per-framework standalone bodies) alongside the existing 'target' pass-through form. Snippets paths resolve relative to the YAML directory; bodies are loaded into snippet_body at resolve time so resolved_utilities.yaml is self-contained. Add optional 'imports' (deduped, hoisted to client file) and 'async' (per-framework flag) fields",
+    "touch_points": [
+      {
+        "file": "utilities_resolver.py",
+        "location": "_validate_utility / _validate_and_load_snippets / _validate_optional_imports / _validate_optional_async",
+        "status": "complete — target and snippets are mutually exclusive; both validated against all three frameworks"
+      },
+      {
+        "file": "utilities_resolver.py",
+        "location": "collect_framework_imports / indent_body",
+        "status": "complete — helpers consumed by all three generators"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 73,
+    "description": "Update each framework generator's _emit_utils_class_* to inline snippet bodies when present (skipping the _inner_expr forwarding path) and to hoist per-utility imports into the top of the generated client file. JS additionally honors async.<javascript>=true by prefixing the method declaration with 'async'",
+    "touch_points": [
+      {
+        "file": "generators/python.py",
+        "location": "emit_client_class / _emit_utils_class_py",
+        "status": "complete — imports hoisted into client.py header; snippet bodies indented 8 spaces"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "emit_client_class / _emit_utils_class_php",
+        "status": "complete — imports emitted after namespace declaration; snippet bodies indented 8 spaces"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_client_class / _emit_utils_class_js",
+        "status": "complete — imports emitted after OAuth import; snippet bodies indented 4 spaces; async flag prefixes method decl"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 74,
+    "description": "Add the photos utilities module with downscale_photos(image_bytes, max_dimension) in all three frameworks. Python uses PIL Image.resize w/ LANCZOS; PHP uses GD imagecopyresampled with format dispatch; JS browser uses createImageBitmap + OffscreenCanvas/canvas (async, returns Promise<Blob>)",
+    "touch_points": [
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/photos.yaml",
+        "location": "downscale_photos",
+        "status": "complete"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/snippets/photos/downscale_photos.py",
+        "location": "body",
+        "status": "complete"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/snippets/photos/downscale_photos.php",
+        "location": "body",
+        "status": "complete"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/snippets/photos/downscale_photos.js",
+        "location": "body",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 75,
+    "description": "Extend composite ref machinery so composite step refs can target utilities (utilities/<module>.yaml#<id>) alongside endpoint refs. The composite resolver branches on path prefix: utility refs look up the pre-loaded utilities list and embed the full util dict inline as step['utility']; endpoint refs continue to embed step['endpoint']. validate_composite_endpoints skips utility steps. Generator emitters dispatch on which key is present, calling through _Context.utils with positional input_map args; JS uses await when async.javascript",
+    "touch_points": [
+      {
+        "file": "utilities_resolver.py",
+        "location": "find_utility",
+        "status": "complete — (source_module, util_id) lookup helper consumed by resolver._resolve_step"
+      },
+      {
+        "file": "resolver.py",
+        "location": "_resolve_step / resolve_composites / resolve_composite_files / validate_composite_endpoints",
+        "status": "complete — shared step dispatcher branches on utilities/ prefix vs controller path; both composite-resolver entrypoints accept utilities kwarg; validation skips utility steps"
+      },
+      {
+        "file": "generate.py",
+        "location": "main",
+        "status": "complete — utilities loaded before composite resolution and threaded into resolve_composite_files()"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "emit_client_class / _emit_composite_method / _emit_python_once_utility_step / _emit_python_foreach_utility_step / _python_utility_call",
+        "status": "complete — _Context.utils property emitted when has_utils; composite emitter dispatches utility steps to new emitters that share cache/on_error scaffolding with endpoint steps"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "emit_client_class __get / _emit_composite_method / _emit_php_once_utility_step / _emit_php_foreach_utility_step / _php_utility_call",
+        "status": "complete — _Context::__get adds 'utils' branch when has_utils; emitter dispatches and reuses cache/on_error scaffolding"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_client_class / _emit_composite_method / _emit_composite_once_utility_step / _emit_composite_foreach_utility_step / _js_utility_call",
+        "status": "complete — _Context.utils getter emitted when has_utilities; call wrapped with await when async.javascript"
+      },
+      {
+        "file": "spec.md / implementation_plan.md",
+        "location": "Composites + Utilities sections",
+        "status": "complete — schema field doc updated, resolver/emitter behavior documented"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 76,
+    "description": "Fail-fast validation in load_utilities: a YAML's source_module must match its filename basename (e.g. photos.yaml -> source_module: photos). Mismatch raises ValueError during load — earlier than composite resolution — so generation aborts before any module silently unreferenced from composite step refs",
+    "touch_points": [
+      {
+        "file": "utilities_resolver.py",
+        "location": "_validate_module",
+        "status": "complete — compares basename to source_module after the missing-field check; verified happy path + mismatch path"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 77,
+    "description": "Composite cache keys use template-string syntax with {placeholder} segments (e.g. \"upload_template:{params.project_table_name}\") so the stored key value self-describes its namespace. Bare dot-paths are rejected at composite-resolve time. Generators emit framework-idiomatic interpolation: Python f-string, JS template literal, PHP string concatenation.",
+    "touch_points": [
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/composites/upload_photos.yaml",
+        "location": "steps[0].cache.key",
+        "status": "complete — updated to \"upload_template:{params.project_table_name}\""
+      },
+      {
+        "file": "resolver.py",
+        "location": "_resolve_step",
+        "status": "complete — raises ValueError if cache.enabled and key lacks {...} placeholder"
+      },
+      {
+        "file": "generators/python.py",
+        "location": "_resolve_python_cache_key",
+        "status": "complete — emits f-string; wired into both once-endpoint and once-utility cache emissions"
+      },
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_resolve_js_cache_key",
+        "status": "complete — emits template literal; wired into both once-endpoint and once-utility cache emissions"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_resolve_php_cache_key",
+        "status": "complete — emits string concatenation; wired into both once-endpoint and once-utility cache emissions"
+      },
+      {
+        "file": "spec.md",
+        "location": "Composite Functions > Key Schema Fields + example block",
+        "status": "complete — documents template syntax and rejection of bare dot-paths"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 78,
+    "description": "On generation failure (any exception after the pre-run archive step), reinstate the previously-archived version instead of leaving a partial/malformed SDK on disk. Removes the partial v{next} dir and moves the archived v{prev} back from sdk/archive/ to sdk/. Process exits non-zero with the originating error.",
+    "touch_points": [
+      {
+        "file": "generate.py",
+        "location": "archive_existing_versions / restore_archived_versions / main",
+        "status": "complete — archive_existing_versions now returns the list of (original, archived) pairs; main wraps resolve→generate→test in a try/except that calls restore_archived_versions on failure. The previous inline sys.exit on validate_composite_endpoints error was removed so the outer handler catches it uniformly"
+      },
+      {
+        "file": "spec.md",
+        "location": "Run sequence > Failure recovery",
+        "status": "complete — documents the restore behavior"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 79,
+    "description": "Standardize downscale_photos JPEG output across all three frameworks. Python: ImageOps.exif_transpose, LANCZOS resize, convert('RGB'), save format='JPEG' quality=90. PHP: drop mime-type sniffing, always imagejpeg quality 90. Removes the Blob/mime-preservation round-trip in favor of a uniform on-the-wire format. Required so the JS Node path can return raw bytes without a Blob abstraction.",
+    "touch_points": [
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/snippets/photos/downscale_photos.py",
+        "location": "body",
+        "status": "complete"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/snippets/photos/downscale_photos.php",
+        "location": "body",
+        "status": "complete"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/photos.yaml",
+        "location": "downscale_photos.imports.python",
+        "status": "complete — added ImageOps to PIL import"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 80,
+    "description": "Make JS downscale_photos work in Node.js (Electron main process, server) in addition to browser. Snippet detects runtime via typeof createImageBitmap and OffscreenCanvas/document; browser path uses createImageBitmap({imageOrientation:'from-image'}) + canvas convertToBlob('image/jpeg'); Node path lazy-loads 'sharp' via an indirect-specifier dynamic import() so bundlers cannot resolve it statically when emitting browser bundles, then runs .rotate().resize({fit:'inside', withoutEnlargement:true}).jpeg({quality:90}).toBuffer(). Both paths return Uint8Array.",
+    "touch_points": [
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/snippets/photos/downscale_photos.js",
+        "location": "body",
+        "status": "complete — _hasBrowserCanvas branch; const _sharpSpec = 'sharp' indirection bypasses rollup static analysis"
+      },
+      {
+        "file": "../mediaviz_intelligence_hub/api_docs/utilities/photos.yaml",
+        "location": "downscale_photos.description",
+        "status": "complete — description now notes dual-runtime + sharp requirement"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 81,
+    "description": "Declare 'sharp' as optionalDependency in the generated JS package.json so Node/Electron consumers install it automatically while browser-only consumers can skip the native binary. Lives in emit_package_json since dist/ is rollup-built off this manifest.",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "emit_package_json",
+        "status": "complete — optionalDependencies: { sharp: ^0.33.0 }"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 82,
+    "description": "Update spec.md (new 'Shipped Utilities' subsection under Utilities) and implementation_plan.md (Shipped utilities bullet) to document the dual-runtime JS behavior, JPEG normalization across frameworks, and sharp dependency model.",
+    "touch_points": [
+      {
+        "file": "spec.md",
+        "location": "Utilities > Shipped Utilities > photos.downscale_photos",
+        "status": "complete"
+      },
+      {
+        "file": "implementation_plan.md",
+        "location": "Utilities > Shipped utilities",
+        "status": "complete"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 83,
+    "description": "Fix unauth-endpoint emitters dropping query params when a request_body is present. JS and PHP both had a branch that handled query params only in the no-body path, so endpoints like POST /api/v1/users/new_company/ (auth:none, JSON body, invite_token query) lost the query parameter entirely from the signature and URL. Unified the two branches in each emitter so signature order is always path -> body -> query and the URL builder runs regardless of body presence. Python was already correct.",
+    "touch_points": [
+      {
+        "file": "generators/javascript_browser.py",
+        "location": "_emit_unauth_method",
+        "status": "complete - single branch builds sig + path with query, then appends body handling only if request_body present"
+      },
+      {
+        "file": "generators/php.py",
+        "location": "_emit_unauth_method",
+        "status": "complete - unified sig assembly, _build_path now receives query_params in both cases"
+      }
+    ],
+    "completion_status": true
   }
 ]
