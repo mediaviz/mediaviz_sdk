@@ -1,0 +1,125 @@
+name: Update SDK
+
+on:
+  repository_dispatch:
+    types: [hub-updated]
+  pull_request:
+    branches: [dev, qa, main]
+
+concurrency:
+  group: update-sdk-${{ github.event.client_payload.branch || github.base_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine mode + branch
+        id: ctx
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "mode=propagate" >> $GITHUB_OUTPUT
+            echo "branch=${{ github.event.client_payload.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "mode=verify" >> $GITHUB_OUTPUT
+            echo "branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_APP_ID }}
+          private-key: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY }}
+          owner: imaige
+          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library
+
+      - name: Checkout mediaviz_sdk
+        uses: actions/checkout@v4
+        with:
+          repository: imaige/mediaviz_sdk
+          ref: ${{ steps.ctx.outputs.branch }}
+          path: mediaviz_sdk
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Checkout mediaviz_intelligence_hub
+        uses: actions/checkout@v4
+        with:
+          repository: imaige/mediaviz_intelligence_hub
+          ref: ${{ steps.ctx.outputs.branch }}
+          path: mediaviz_intelligence_hub
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Checkout oauth_library (branch)
+        id: oauth-branch
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: imaige/oauth_library
+          ref: ${{ steps.ctx.outputs.branch }}
+          path: oauth_library
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Checkout oauth_library (main fallback)
+        if: steps.oauth-branch.outcome == 'failure'
+        uses: actions/checkout@v4
+        with:
+          repository: imaige/oauth_library
+          ref: main
+          path: oauth_library
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Install Python deps
+        run: pip install pyyaml pytest
+
+      - name: Decide version bump flag
+        id: bump
+        run: |
+          if [ "${{ steps.ctx.outputs.mode }}" = "propagate" ] && [ "${{ steps.ctx.outputs.branch }}" = "main" ]; then
+            echo "flag=--minor-version" >> $GITHUB_OUTPUT
+          else
+            echo "flag=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run SDK generator
+        working-directory: mediaviz_sdk
+        run: python generate.py --endpoints all_endpoints ${{ steps.bump.outputs.flag }}
+
+      - name: Configure git identity
+        if: steps.ctx.outputs.mode == 'propagate'
+        working-directory: mediaviz_sdk
+        run: |
+          git config user.name "mediaviz-pipeline-bot[bot]"
+          git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
+
+      - name: Commit + push regenerated SDK
+        if: steps.ctx.outputs.mode == 'propagate'
+        working-directory: mediaviz_sdk
+        run: |
+          HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
+          if [ -n "$(git status --porcelain sdk/)" ]; then
+            git add -A sdk/
+            git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
+            git push origin HEAD:${{ steps.ctx.outputs.branch }}
+          else
+            echo "No SDK changes to commit."
+          fi
