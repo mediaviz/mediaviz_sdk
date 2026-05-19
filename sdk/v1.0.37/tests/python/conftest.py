@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-sys.path.insert(0, '/Users/calebbalbera/Documents/_code/mediaviz_sdk/sdk/v1.0.36/python')
+sys.path.insert(0, '/home/runner/work/mediaviz_sdk/mediaviz_sdk/mediaviz_sdk/sdk/v1.0.37/python')
 
 import pytest
 from mediaviz_sdk import MediaVizClient
