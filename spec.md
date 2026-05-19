@@ -593,4 +593,33 @@ Resizes an image to fit within `max_dimension` while preserving aspect ratio, **
 - Previous version directories are archived to `sdk/archive/` when a new version is generated. Archived versions are never modified or deleted.
 - When adding a new framework generator, the project `.gitignore` must be updated to ignore that framework's dependency/install directories (e.g., `node_modules/` for JS, `vendor/` for PHP). This prevents committed generated SDKs from including third-party dependency trees.
 - The resolved YAML is the source of truth for what was generated in a given version — it is an immutable snapshot, packaged inside the version directory.
+
+## CI / Automation Pipeline
+
+Three-repo propagation chain wired with GitHub Actions: `mediaviz_external_api` → `mediaviz_intelligence_hub` → `mediaviz_sdk`. Branches dev/qa/main are mirrored end-to-end.
+
+### Triggers
+- **`mediaviz_external_api/.github/workflows/docker-image.yml`** (modified)
+  - `notify_downstream` job: on push to dev/qa/main after `build_and_publish` succeeds, sends `repository_dispatch` event `api-updated` to `mediaviz_intelligence_hub` with `{branch, sha, release_version}`.
+  - `verify_hub` + `verify_sdk` jobs: on PR to dev/qa/main, run the full downstream chain inside the same workflow run using artifacts to ship hub output into the SDK gen. No commits in verify mode.
+- **`mediaviz_intelligence_hub/.github/workflows/update-intelligence-hub.yml`** (new)
+  - Triggered by `repository_dispatch: api-updated` (propagate mode) or `pull_request: [dev, qa, main]` (verify mode).
+  - Propagate mode: checks out external_api at the dispatched SHA, runs `run_pipeline.py`, commits regenerated `api_docs/` + `mediaviz_api_endpoints_scanned.json` to the matching branch, then dispatches `hub-updated` to `mediaviz_sdk`.
+  - Verify mode: runs the pipeline against the PR's base branch; failures fail the PR check; no commit.
+- **`mediaviz_sdk/.github/workflows/update-sdk.yml`** (new)
+  - Triggered by `repository_dispatch: hub-updated` (propagate mode) or `pull_request: [dev, qa, main]` (verify mode).
+  - Propagate mode: checks out hub + oauth_library at the matching branch, runs `python generate.py --endpoints all_endpoints` (with `--minor-version` only when `branch == main`), commits regenerated `sdk/` to the branch.
+  - Verify mode: runs the generator (which runs the test suite); failures fail the PR check; no commit.
+
+### Auth
+A single GitHub App `mediaviz-pipeline-bot` installed on all four repos (`mediaviz_external_api`, `mediaviz_intelligence_hub`, `mediaviz_sdk`, `oauth_library`) in the `imaige` org. Permissions: `contents: write`, `metadata: read`, `actions: write` (for `repository_dispatch`). Secrets `MEDIAVIZ_PIPELINE_BOT_APP_ID` and `MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY` are referenced by `actions/create-github-app-token@v1` in each workflow that needs to push or dispatch.
+
+### Loop prevention
+The hub and SDK propagate workflows trigger only on `repository_dispatch` (not `push`), so the bot's auto-commit cannot re-fire them. Manual direct pushes to hub/sdk dev/qa/main therefore do not regenerate; direct edits must go through PRs.
+
+### Version-bump rule
+`update-sdk.yml` passes `--minor-version` to `generate.py` only when `mode == propagate AND branch == main`. dev/qa propagate runs use the default iteration bump. Verify-mode runs never bump (no commit happens).
+
+### Path resolution in CI
+`actions/checkout` with `path: <sibling_name>` replicates the local sibling layout (`$GITHUB_WORKSPACE/{mediaviz_external_api,mediaviz_intelligence_hub,mediaviz_sdk,oauth_library}`), so `github_sources._CODE_ROOT = dirname(dirname(__file__))` and the hub scripts' `../mediaviz_external_api/...` defaults work without any generator-script changes.
 - No runtime dependencies beyond the bundled OAuth SDK and the language's standard HTTP primitives (`fetch` for JS, `curl` for PHP).
