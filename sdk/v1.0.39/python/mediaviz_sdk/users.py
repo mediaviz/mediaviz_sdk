@@ -31,30 +31,6 @@ class Users:
         }.items() if v is not None}
         return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
 
-    def create_mediaviz_internal_admin(
-        self,
-        name: str,
-        email: str,
-        accountType: int,
-        password: str,
-        companyId: int | None = None,
-        profilePicture: str | None = None,
-        paymentPlanType: str | None = None,
-    ) -> dict[str, Any]:
-        path = '/api/v1/users/new_internal_admin'
-        body = {k: v for k, v in {
-            'name': name,
-            'email': email,
-            'company_id': companyId,
-            'profile_picture': profilePicture,
-            'payment_plan_type': paymentPlanType,
-            'account_type': accountType,
-            'password': password,
-        }.items() if v is not None}
-        with httpx.Client() as _client:
-            _resp = _client.request('POST', self._ctx.base_url + path, json=body)
-        return handle_response(_resp.text, _resp.status_code, dict(_resp.headers))
-
     def create_user_and_company(
         self,
         name: str,

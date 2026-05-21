@@ -46,26 +46,6 @@ class UsersTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
-    public function test_post_create_mediaviz_internal_admin_exists(): void {
-        $this->assertTrue(method_exists(Users::class, 'createMediavizInternalAdmin'));
-    }
-
-    public function test_post_create_mediaviz_internal_admin_http_method(): void {
-        $this->assertTrue(method_exists(Users::class, 'createMediavizInternalAdmin'));
-    }
-
-    public function test_post_create_mediaviz_internal_admin_path(): void {
-        $this->assertTrue(method_exists(Users::class, 'createMediavizInternalAdmin'));
-    }
-
-    public function test_post_create_mediaviz_internal_admin_request_body(): void {
-        $this->assertTrue(method_exists(Users::class, 'createMediavizInternalAdmin'));
-    }
-
-    public function test_post_create_mediaviz_internal_admin_auth_routing(): void {
-        $this->assertTrue(method_exists(Users::class, 'createMediavizInternalAdmin'));
-    }
-
     public function test_post_create_user_and_company_exists(): void {
         $this->assertTrue(method_exists(Users::class, 'createUserAndCompany'));
     }

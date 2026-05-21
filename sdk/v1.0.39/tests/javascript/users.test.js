@@ -46,54 +46,6 @@ describe('Users', () => {
     expect(spy.calls.length).toBe(1);
   });
 
-  it('createMediavizInternalAdmin — exists', () => {
-    const users = new Users({});
-    expect(typeof users.createMediavizInternalAdmin).toBe('function');
-  });
-
-  it('createMediavizInternalAdmin — HTTP method is POST', async () => {
-    const spy = makeSpyFetch();
-    globalThis.fetch = spy;
-    const ctx = { baseUrl: 'https://api.example.com' };
-    const users = new Users(ctx);
-    await users.createMediavizInternalAdmin('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value');
-    expect(spy.last_call().method).toBe('POST');
-  });
-
-  it('createMediavizInternalAdmin — path construction', async () => {
-    const spy = makeSpyFetch();
-    globalThis.fetch = spy;
-    const ctx = { baseUrl: 'https://api.example.com' };
-    const users = new Users(ctx);
-    await users.createMediavizInternalAdmin('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value');
-    expect(spy.last_call().url).toContain('/api/v1/users/new_internal_admin');
-  });
-
-  it('createMediavizInternalAdmin — request body', async () => {
-    const spy = makeSpyFetch();
-    globalThis.fetch = spy;
-    const ctx = { baseUrl: 'https://api.example.com' };
-    const users = new Users(ctx);
-    await users.createMediavizInternalAdmin('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value');
-    const body = JSON.parse(spy.last_call().body);
-    expect(body).toHaveProperty('name');
-    expect(body).toHaveProperty('email');
-    expect(body).toHaveProperty('company_id');
-    expect(body).toHaveProperty('profile_picture');
-    expect(body).toHaveProperty('payment_plan_type');
-    expect(body).toHaveProperty('account_type');
-    expect(body).toHaveProperty('password');
-  });
-
-  it('createMediavizInternalAdmin — auth routing', async () => {
-    const spy = makeSpyFetch();
-    globalThis.fetch = spy;
-    const ctx = { baseUrl: 'https://api.example.com' };
-    const users = new Users(ctx);
-    await users.createMediavizInternalAdmin('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value');
-    expect(spy.calls.length).toBe(1);
-  });
-
   it('createUserAndCompany — exists', () => {
     const users = new Users({});
     expect(typeof users.createUserAndCompany).toBe('function');

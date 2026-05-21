@@ -1,5 +1,3 @@
-'use strict';
-
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -1678,24 +1676,6 @@ class Users {
     return data;
   }
 
-  async createMediavizInternalAdmin(name, email, accountType, password, companyId = undefined, profilePicture = undefined, paymentPlanType = undefined) {
-    const body = stripUndef({
-      name: name,
-      email: email,
-      company_id: companyId,
-      profile_picture: profilePicture,
-      payment_plan_type: paymentPlanType,
-      account_type: accountType,
-      password: password,
-    });
-    const resp = await fetch(this._ctx.baseUrl + `/api/v1/users/new_internal_admin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    return handleResponse(resp);
-  }
-
   async createUserAndCompany(name, email, password, companyId = undefined, profilePicture = undefined, paymentPlanType = undefined, companyName = undefined, credits = undefined, { inviteToken } = {}) {
     let path = `/api/v1/users/new_company/`;
     const query = new URLSearchParams();
@@ -1920,31 +1900,4 @@ class MediaViz {
   get refreshToken() { return this._refreshToken; }
 }
 
-exports.Admin = Admin;
-exports.AiModelCredits = AiModelCredits;
-exports.ApiError = ApiError;
-exports.Company = Company;
-exports.CuratedAlbums = CuratedAlbums;
-exports.CustomAlbums = CustomAlbums;
-exports.EmailTokens = EmailTokens;
-exports.Health = Health;
-exports.Keywords = Keywords;
-exports.MediaViz = MediaViz;
-exports.NotFoundError = NotFoundError;
-exports.OAuthClient = OAuthClient;
-exports.OAuthError = OAuthError;
-exports.OAuthErrorCode = OAuthErrorCode;
-exports.OauthAuthorization = OauthAuthorization;
-exports.OauthClients = OauthClients;
-exports.OauthLogin = OauthLogin;
-exports.OauthToken = OauthToken;
-exports.Person = Person;
-exports.Photos = Photos;
-exports.Photoupload = Photoupload;
-exports.Projects = Projects;
-exports.RateLimitError = RateLimitError;
-exports.Search = Search;
-exports.ServerError = ServerError;
-exports.Users = Users;
-exports.ValidationError = ValidationError;
-exports.handleResponse = handleResponse;
+export { Admin, AiModelCredits, ApiError, Company, CuratedAlbums, CustomAlbums, EmailTokens, Health, Keywords, MediaViz, NotFoundError, OAuthClient, OAuthError, OAuthErrorCode, OauthAuthorization, OauthClients, OauthLogin, OauthToken, Person, Photos, Photoupload, Projects, RateLimitError, Search, ServerError, Users, ValidationError, handleResponse };

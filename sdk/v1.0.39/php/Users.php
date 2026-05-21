@@ -32,42 +32,6 @@ class Users {
         return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
     }
 
-    public function createMediavizInternalAdmin(
-        string $name,
-        string $email,
-        int $accountType,
-        string $password,
-        ?int $companyId = null,
-        ?string $profilePicture = null,
-        ?string $paymentPlanType = null
-    ): mixed {
-        $baseUrl = $this->ctx->baseUrl;
-        $path = "/api/v1/users/new_internal_admin";
-        $body = array_filter([
-            'name' => $name,
-            'email' => $email,
-            'company_id' => $companyId,
-            'profile_picture' => $profilePicture,
-            'payment_plan_type' => $paymentPlanType,
-            'account_type' => $accountType,
-            'password' => $password,
-        ], fn($v) => $v !== null);
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $baseUrl . $path);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_HEADER, true);
-        $raw = curl_exec($ch);
-        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        curl_close($ch);
-        $headers = self::parseHeaders(substr($raw, 0, $headerSize));
-        $body = substr($raw, $headerSize);
-        return handleResponse($body, $statusCode, $headers);
-    }
-
     public function createUserAndCompany(
         string $name,
         string $email,

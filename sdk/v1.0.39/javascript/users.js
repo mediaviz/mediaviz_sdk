@@ -20,24 +20,6 @@ export class Users {
     return data;
   }
 
-  async createMediavizInternalAdmin(name, email, accountType, password, companyId = undefined, profilePicture = undefined, paymentPlanType = undefined) {
-    const body = stripUndef({
-      name: name,
-      email: email,
-      company_id: companyId,
-      profile_picture: profilePicture,
-      payment_plan_type: paymentPlanType,
-      account_type: accountType,
-      password: password,
-    });
-    const resp = await fetch(this._ctx.baseUrl + `/api/v1/users/new_internal_admin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    return handleResponse(resp);
-  }
-
   async createUserAndCompany(name, email, password, companyId = undefined, profilePicture = undefined, paymentPlanType = undefined, companyName = undefined, credits = undefined, { inviteToken } = {}) {
     let path = `/api/v1/users/new_company/`;
     const query = new URLSearchParams();

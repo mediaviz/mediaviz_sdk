@@ -41,21 +41,6 @@ def test_post_create_user_request_body(mv_client, spy_client):
     assert 'payment_plan_type' in body
     assert 'account_type' in body
 
-def test_post_create_mediaviz_internal_admin_exists(mv_client):
-    assert callable(getattr(mv_client.users, 'create_mediaviz_internal_admin', None))
-
-def test_post_create_mediaviz_internal_admin_http_method(mv_client, monkeypatch):
-    _mc = _MockClient()
-    monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)
-    mv_client.users.create_mediaviz_internal_admin('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value')
-    assert _mc.recorded[0]['method'] == 'POST'
-
-def test_post_create_mediaviz_internal_admin_path(mv_client, monkeypatch):
-    _mc = _MockClient()
-    monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)
-    mv_client.users.create_mediaviz_internal_admin('test_value', 'user@example.com', 42, 'test_value', 42, 'test_value', 'test_value')
-    assert '/api/v1/users/new_internal_admin' in _mc.recorded[0]['url']
-
 def test_post_create_user_and_company_exists(mv_client):
     assert callable(getattr(mv_client.users, 'create_user_and_company', None))
 

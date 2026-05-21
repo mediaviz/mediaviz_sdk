@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-05-21T12:15:46Z'
+resolved_at: '2026-05-21T17:55:21Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -3218,77 +3218,6 @@ endpoints:
       kind: primitive
       orig_path:
       - account_type
-  response:
-    status: 200
-    source: response_model
-    body:
-      $ref: api_schemas.yaml#UserDisplay
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
-- id: post_create_mediaviz_internal_admin
-  function_name: create_mediaviz_internal_admin
-  controller: Users
-  base_path: /api/v1
-  method: POST
-  path: /api/v1/users/new_internal_admin
-  summary: create_mediaviz_internal_admin
-  auth: none
-  params: []
-  request_body:
-    _shape: expanded
-    fields:
-    - name: name
-      snake: name
-      type: str
-      required: true
-      kind: primitive
-      orig_path:
-      - name
-    - name: email
-      snake: email
-      type: EmailStr
-      required: true
-      kind: primitive
-      orig_path:
-      - email
-    - name: companyId
-      snake: company_id
-      type: int
-      required: false
-      kind: primitive
-      orig_path:
-      - company_id
-    - name: profilePicture
-      snake: profile_picture
-      type: str
-      required: false
-      kind: primitive
-      orig_path:
-      - profile_picture
-    - name: paymentPlanType
-      snake: payment_plan_type
-      type: str
-      required: false
-      kind: primitive
-      orig_path:
-      - payment_plan_type
-    - name: accountType
-      snake: account_type
-      type: int
-      required: true
-      kind: primitive
-      orig_path:
-      - account_type
-    - name: password
-      snake: password
-      type: str
-      required: true
-      kind: primitive
-      orig_path:
-      - password
   response:
     status: 200
     source: response_model
