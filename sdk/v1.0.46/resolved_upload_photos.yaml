@@ -1,5 +1,5 @@
 source: upload_photos.yaml
-resolved_at: '2026-05-26T19:08:59Z'
+resolved_at: '2026-05-26T19:46:40Z'
 composites:
 - id: composite_upload_photo
   function_name: upload_photo
