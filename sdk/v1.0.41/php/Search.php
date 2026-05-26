@@ -55,6 +55,26 @@ class Search {
         return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
     }
 
+    public function searchProjectPhotosText(
+        string $projectTableName,
+        ?string $q = null,
+        mixed $size = null
+    ): mixed {
+        $this->ctx->requireTokens();
+        $path = "/api/v1/search/text/" . rawurlencode((string)$projectTableName) . "/";
+        $query = [];
+        if ($q !== null) $query['q'] = $q;
+        if ($size !== null) $query['size'] = $size;
+        if ($query) {
+            $pairs = [];
+            foreach ($query as $k => $v) {
+                foreach ((is_array($v) ? $v : [$v]) as $vv) $pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);
+            }
+            $path .= '?' . implode('&', $pairs);
+        }
+        return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
+    }
+
     public function getProjectSavedSearches(string $projectTableName): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/search/saved/" . rawurlencode((string)$projectTableName) . "/";

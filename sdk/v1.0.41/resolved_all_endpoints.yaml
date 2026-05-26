@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-05-22T13:32:39Z'
+resolved_at: '2026-05-26T13:23:39Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -3002,6 +3002,34 @@ endpoints:
     status: 200
     source: inferred
     body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_search_project_photos_text
+  function_name: search_project_photos_text
+  controller: Search
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/search/text/{project_table_name}/
+  summary: search_project_photos_text
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: q
+    in: query
+    type: str
+    required: false
+  - name: size
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
   content_type: null
   tags:
   - all

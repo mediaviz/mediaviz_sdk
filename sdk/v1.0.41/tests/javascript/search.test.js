@@ -55,6 +55,45 @@ describe('Search', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('searchProjectPhotosText — exists', () => {
+    const search = new Search({});
+    expect(typeof search.searchProjectPhotosText).toBe('function');
+  });
+
+  it('searchProjectPhotosText — HTTP method is GET', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosText('test_value', { q: 'test_value', size: 'test_value' });
+    expect(spy.last_call().method).toBe('GET');
+  });
+
+  it('searchProjectPhotosText — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosText('hello world', { q: 'test_value', size: 'test_value' });
+    expect(spy.last_call().path).toContain('/api/v1/search/text/hello%20world/');
+  });
+
+  it('searchProjectPhotosText — query params', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosText('test_value', { q: 'test_value', size: 'test_value' });
+    const path = spy.last_call().path;
+    expect(path).toContain('q=');
+    expect(path).toContain('size=');
+  });
+
+  it('searchProjectPhotosText — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosText('test_value', { q: 'test_value', size: 'test_value' });
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('getProjectSavedSearches — exists', () => {
     const search = new Search({});
     expect(typeof search.getProjectSavedSearches).toBe('function');

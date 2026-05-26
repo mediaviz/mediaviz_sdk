@@ -35,6 +35,26 @@ def test_get_search_project_photos_query_params(mv_client, spy_client):
     assert 'curated_album_id=' in url
     assert 'split_by_tier=' in url
 
+def test_get_search_project_photos_text_exists(mv_client):
+    assert callable(getattr(mv_client.search, 'search_project_photos_text', None))
+
+def test_get_search_project_photos_text_http_method(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_text('test_value', 'test_value', 'test_value')
+    assert spy_client.last_call()['method'] == 'GET'
+
+def test_get_search_project_photos_text_path(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_text('hello world', 'test_value', 'test_value')
+    assert '/api/v1/search/text/hello%20world/' in spy_client.last_call()['url']
+
+def test_get_search_project_photos_text_query_params(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_text('test_value', 'test_value', 'test_value')
+    url = spy_client.last_call()['url']
+    assert 'q=' in url
+    assert 'size=' in url
+
 def test_get_get_project_saved_searches_exists(mv_client):
     assert callable(getattr(mv_client.search, 'get_project_saved_searches', None))
 

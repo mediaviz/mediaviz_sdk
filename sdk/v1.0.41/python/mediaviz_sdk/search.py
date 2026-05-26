@@ -66,6 +66,23 @@ class Search:
             path += '?' + urlencode(_q, doseq=True)
         return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
 
+    def search_project_photos_text(
+        self,
+        project_table_name: str,
+        q: str | None = None,
+        size: Any | None = None,
+    ) -> dict[str, Any]:
+        self._ctx.require_tokens()
+        path = '/api/v1/search/text/' + quote(str(project_table_name), safe='') + '/'
+        _q: dict[str, Any] = {}
+        if q is not None:
+            _q['q'] = q
+        if size is not None:
+            _q['size'] = size
+        if _q:
+            path += '?' + urlencode(_q, doseq=True)
+        return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
+
     def get_project_saved_searches(self, project_table_name: str) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/search/saved/' + quote(str(project_table_name), safe='') + '/'

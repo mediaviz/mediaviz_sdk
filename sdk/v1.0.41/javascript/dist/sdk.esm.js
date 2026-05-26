@@ -1608,6 +1608,18 @@ class Search {
     return data;
   }
 
+  async searchProjectPhotosText(projectTableName, { q, size } = {}) {
+    this._ctx.requireTokens();
+    let path = `/api/v1/search/text/${encodeURIComponent(projectTableName)}/`;
+    const query = new URLSearchParams();
+    if (q !== undefined) (Array.isArray(q) ? q : [q]).forEach(v => query.append('q', v));
+    if (size !== undefined) (Array.isArray(size) ? size : [size]).forEach(v => query.append('size', v));
+    const qs = query.toString();
+    if (qs) path += '?' + qs;
+    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
+    return data;
+  }
+
   async getProjectSavedSearches(projectTableName) {
     this._ctx.requireTokens();
     const path = `/api/v1/search/saved/${encodeURIComponent(projectTableName)}/`;

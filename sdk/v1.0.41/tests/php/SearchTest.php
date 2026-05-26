@@ -55,6 +55,40 @@ class SearchTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
+    public function test_get_search_project_photos_text_exists(): void {
+        $this->assertTrue(method_exists(Search::class, 'searchProjectPhotosText'));
+    }
+
+    public function test_get_search_project_photos_text_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Search($ctx);
+        $obj->searchProjectPhotosText('test_value', 'test_value', 'test_value');
+        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_get_search_project_photos_text_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Search($ctx);
+        $obj->searchProjectPhotosText('hello world', 'test_value', 'test_value');
+        $this->assertStringContainsString('/api/v1/search/text/hello%20world/', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_get_search_project_photos_text_query_params(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Search($ctx);
+        $obj->searchProjectPhotosText('test_value', 'test_value', 'test_value');
+        $path = $ctx->client->lastCall()['path'];
+        $this->assertStringContainsString('q=', $path);
+        $this->assertStringContainsString('size=', $path);
+    }
+
+    public function test_get_search_project_photos_text_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Search($ctx);
+        $obj->searchProjectPhotosText('test_value', 'test_value', 'test_value');
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
     public function test_get_get_project_saved_searches_exists(): void {
         $this->assertTrue(method_exists(Search::class, 'getProjectSavedSearches'));
     }
