@@ -1,3 +1,5 @@
+'use strict';
+
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -513,6 +515,17 @@ class Admin {
   async getGoogleSheetsCredentials() {
     this._ctx.requireTokens();
     const path = `/api/v1/admin/get_google_sheets_credentials`;
+    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken);
+    return data;
+  }
+
+  async adminCreateCompanyNlpIndexes({ companyIds } = {}) {
+    this._ctx.requireTokens();
+    let path = `/api/v1/admin/create_company_nlp_indexes/`;
+    const query = new URLSearchParams();
+    if (companyIds !== undefined) (Array.isArray(companyIds) ? companyIds : [companyIds]).forEach(v => query.append('company_ids', v));
+    const qs = query.toString();
+    if (qs) path += '?' + qs;
     const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken);
     return data;
   }
@@ -1912,4 +1925,31 @@ class MediaViz {
   get refreshToken() { return this._refreshToken; }
 }
 
-export { Admin, AiModelCredits, ApiError, Company, CuratedAlbums, CustomAlbums, EmailTokens, Health, Keywords, MediaViz, NotFoundError, OAuthClient, OAuthError, OAuthErrorCode, OauthAuthorization, OauthClients, OauthLogin, OauthToken, Person, Photos, Photoupload, Projects, RateLimitError, Search, ServerError, Users, ValidationError, handleResponse };
+exports.Admin = Admin;
+exports.AiModelCredits = AiModelCredits;
+exports.ApiError = ApiError;
+exports.Company = Company;
+exports.CuratedAlbums = CuratedAlbums;
+exports.CustomAlbums = CustomAlbums;
+exports.EmailTokens = EmailTokens;
+exports.Health = Health;
+exports.Keywords = Keywords;
+exports.MediaViz = MediaViz;
+exports.NotFoundError = NotFoundError;
+exports.OAuthClient = OAuthClient;
+exports.OAuthError = OAuthError;
+exports.OAuthErrorCode = OAuthErrorCode;
+exports.OauthAuthorization = OauthAuthorization;
+exports.OauthClients = OauthClients;
+exports.OauthLogin = OauthLogin;
+exports.OauthToken = OauthToken;
+exports.Person = Person;
+exports.Photos = Photos;
+exports.Photoupload = Photoupload;
+exports.Projects = Projects;
+exports.RateLimitError = RateLimitError;
+exports.Search = Search;
+exports.ServerError = ServerError;
+exports.Users = Users;
+exports.ValidationError = ValidationError;
+exports.handleResponse = handleResponse;

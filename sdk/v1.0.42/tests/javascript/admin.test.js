@@ -186,6 +186,44 @@ describe('Admin', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('adminCreateCompanyNlpIndexes — exists', () => {
+    const admin = new Admin({});
+    expect(typeof admin.adminCreateCompanyNlpIndexes).toBe('function');
+  });
+
+  it('adminCreateCompanyNlpIndexes — HTTP method is POST', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminCreateCompanyNlpIndexes({ companyIds: 'test_value' });
+    expect(spy.last_call().method).toBe('POST');
+  });
+
+  it('adminCreateCompanyNlpIndexes — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminCreateCompanyNlpIndexes({ companyIds: 'test_value' });
+    expect(spy.last_call().path).toContain('/api/v1/admin/create_company_nlp_indexes/');
+  });
+
+  it('adminCreateCompanyNlpIndexes — query params', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminCreateCompanyNlpIndexes({ companyIds: 'test_value' });
+    const path = spy.last_call().path;
+    expect(path).toContain('company_ids=');
+  });
+
+  it('adminCreateCompanyNlpIndexes — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminCreateCompanyNlpIndexes({ companyIds: 'test_value' });
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('adminDeleteUserProjects — exists', () => {
     const admin = new Admin({});
     expect(typeof admin.adminDeleteUserProjects).toBe('function');

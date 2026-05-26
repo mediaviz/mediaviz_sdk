@@ -86,6 +86,25 @@ def test_post_get_google_sheets_credentials_path(mv_client, spy_client):
     mv_client.admin.get_google_sheets_credentials()
     assert '/api/v1/admin/get_google_sheets_credentials' in spy_client.last_call()['url']
 
+def test_post_admin_create_company_nlp_indexes_exists(mv_client):
+    assert callable(getattr(mv_client.admin, 'admin_create_company_nlp_indexes', None))
+
+def test_post_admin_create_company_nlp_indexes_http_method(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.admin.admin_create_company_nlp_indexes('test_value')
+    assert spy_client.last_call()['method'] == 'POST'
+
+def test_post_admin_create_company_nlp_indexes_path(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.admin.admin_create_company_nlp_indexes('test_value')
+    assert '/api/v1/admin/create_company_nlp_indexes/' in spy_client.last_call()['url']
+
+def test_post_admin_create_company_nlp_indexes_query_params(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.admin.admin_create_company_nlp_indexes('test_value')
+    url = spy_client.last_call()['url']
+    assert 'company_ids=' in url
+
 def test_delete_admin_delete_user_projects_exists(mv_client):
     assert callable(getattr(mv_client.admin, 'admin_delete_user_projects', None))
 

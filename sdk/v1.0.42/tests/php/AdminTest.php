@@ -166,6 +166,39 @@ class AdminTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
+    public function test_post_admin_create_company_nlp_indexes_exists(): void {
+        $this->assertTrue(method_exists(Admin::class, 'adminCreateCompanyNlpIndexes'));
+    }
+
+    public function test_post_admin_create_company_nlp_indexes_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Admin($ctx);
+        $obj->adminCreateCompanyNlpIndexes('test_value');
+        $this->assertSame('POST', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_post_admin_create_company_nlp_indexes_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Admin($ctx);
+        $obj->adminCreateCompanyNlpIndexes('test_value');
+        $this->assertStringContainsString('/api/v1/admin/create_company_nlp_indexes/', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_post_admin_create_company_nlp_indexes_query_params(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Admin($ctx);
+        $obj->adminCreateCompanyNlpIndexes('test_value');
+        $path = $ctx->client->lastCall()['path'];
+        $this->assertStringContainsString('company_ids=', $path);
+    }
+
+    public function test_post_admin_create_company_nlp_indexes_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Admin($ctx);
+        $obj->adminCreateCompanyNlpIndexes('test_value');
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
     public function test_delete_admin_delete_user_projects_exists(): void {
         $this->assertTrue(method_exists(Admin::class, 'adminDeleteUserProjects'));
     }
