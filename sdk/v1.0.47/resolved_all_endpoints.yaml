@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-05-26T19:46:40Z'
+resolved_at: '2026-05-26T20:31:56Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
