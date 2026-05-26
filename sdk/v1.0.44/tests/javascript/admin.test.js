@@ -224,6 +224,44 @@ describe('Admin', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('adminDeleteCompanyNlpIndexes — exists', () => {
+    const admin = new Admin({});
+    expect(typeof admin.adminDeleteCompanyNlpIndexes).toBe('function');
+  });
+
+  it('adminDeleteCompanyNlpIndexes — HTTP method is DELETE', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminDeleteCompanyNlpIndexes({ companyIds: 'test_value' });
+    expect(spy.last_call().method).toBe('DELETE');
+  });
+
+  it('adminDeleteCompanyNlpIndexes — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminDeleteCompanyNlpIndexes({ companyIds: 'test_value' });
+    expect(spy.last_call().path).toContain('/api/v1/admin/delete_company_nlp_indexes/');
+  });
+
+  it('adminDeleteCompanyNlpIndexes — query params', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminDeleteCompanyNlpIndexes({ companyIds: 'test_value' });
+    const path = spy.last_call().path;
+    expect(path).toContain('company_ids=');
+  });
+
+  it('adminDeleteCompanyNlpIndexes — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminDeleteCompanyNlpIndexes({ companyIds: 'test_value' });
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('adminDeleteUserProjects — exists', () => {
     const admin = new Admin({});
     expect(typeof admin.adminDeleteUserProjects).toBe('function');

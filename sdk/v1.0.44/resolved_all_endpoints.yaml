@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-05-26T13:59:51Z'
+resolved_at: '2026-05-26T16:24:46Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -128,6 +128,29 @@ endpoints:
   method: POST
   path: /api/v1/admin/create_company_nlp_indexes/
   summary: admin_create_company_nlp_indexes
+  auth: required
+  params:
+  - name: company_ids
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_admin_delete_company_nlp_indexes
+  function_name: admin_delete_company_nlp_indexes
+  controller: Admin
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/admin/delete_company_nlp_indexes/
+  summary: admin_delete_company_nlp_indexes
   auth: required
   params:
   - name: company_ids

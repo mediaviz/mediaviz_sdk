@@ -105,6 +105,25 @@ def test_post_admin_create_company_nlp_indexes_query_params(mv_client, spy_clien
     url = spy_client.last_call()['url']
     assert 'company_ids=' in url
 
+def test_delete_admin_delete_company_nlp_indexes_exists(mv_client):
+    assert callable(getattr(mv_client.admin, 'admin_delete_company_nlp_indexes', None))
+
+def test_delete_admin_delete_company_nlp_indexes_http_method(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.admin.admin_delete_company_nlp_indexes('test_value')
+    assert spy_client.last_call()['method'] == 'DELETE'
+
+def test_delete_admin_delete_company_nlp_indexes_path(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.admin.admin_delete_company_nlp_indexes('test_value')
+    assert '/api/v1/admin/delete_company_nlp_indexes/' in spy_client.last_call()['url']
+
+def test_delete_admin_delete_company_nlp_indexes_query_params(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.admin.admin_delete_company_nlp_indexes('test_value')
+    url = spy_client.last_call()['url']
+    assert 'company_ids=' in url
+
 def test_delete_admin_delete_user_projects_exists(mv_client):
     assert callable(getattr(mv_client.admin, 'admin_delete_user_projects', None))
 

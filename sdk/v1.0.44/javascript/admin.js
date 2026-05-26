@@ -58,6 +58,17 @@ export class Admin {
     return data;
   }
 
+  async adminDeleteCompanyNlpIndexes({ companyIds } = {}) {
+    this._ctx.requireTokens();
+    let path = `/api/v1/admin/delete_company_nlp_indexes/`;
+    const query = new URLSearchParams();
+    if (companyIds !== undefined) (Array.isArray(companyIds) ? companyIds : [companyIds]).forEach(v => query.append('company_ids', v));
+    const qs = query.toString();
+    if (qs) path += '?' + qs;
+    const { data } = await this._ctx.client.request(path, 'DELETE', this._ctx.accessToken, this._ctx.refreshToken);
+    return data;
+  }
+
   async adminDeleteUserProjects({ userIds } = {}) {
     this._ctx.requireTokens();
     let path = `/api/v1/admin/delete_user_projects/`;

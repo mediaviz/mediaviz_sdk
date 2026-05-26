@@ -69,6 +69,21 @@ class Admin {
         return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
     }
 
+    public function adminDeleteCompanyNlpIndexes(mixed $companyIds = null): mixed {
+        $this->ctx->requireTokens();
+        $path = "/api/v1/admin/delete_company_nlp_indexes/";
+        $query = [];
+        if ($companyIds !== null) $query['company_ids'] = $companyIds;
+        if ($query) {
+            $pairs = [];
+            foreach ($query as $k => $v) {
+                foreach ((is_array($v) ? $v : [$v]) as $vv) $pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);
+            }
+            $path .= '?' . implode('&', $pairs);
+        }
+        return $this->ctx->client->request($path, 'DELETE', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
+    }
+
     public function adminDeleteUserProjects(mixed $userIds = null): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/admin/delete_user_projects/";
