@@ -49,11 +49,6 @@ class Admin:
             path += '?' + urlencode(_q, doseq=True)
         return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
 
-    def get_google_sheets_credentials(self) -> dict[str, Any]:
-        self._ctx.require_tokens()
-        path = '/api/v1/admin/get_google_sheets_credentials'
-        return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token).data
-
     def admin_create_company_nlp_indexes(self, company_ids: Any | None = None) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/admin/create_company_nlp_indexes/'

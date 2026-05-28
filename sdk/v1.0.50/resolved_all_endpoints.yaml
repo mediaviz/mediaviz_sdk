@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-05-26T20:59:15Z'
+resolved_at: '2026-05-28T19:17:38Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -115,25 +115,6 @@ endpoints:
     in: query
     type: Optional[str]
     required: false
-  request_body: null
-  response:
-    status: 200
-    source: inferred
-    body: dict
-  content_type: null
-  tags:
-  - all
-  hidden: false
-  api_host: null
-- id: post_get_google_sheets_credentials
-  function_name: get_google_sheets_credentials
-  controller: Admin
-  base_path: /api/v1
-  method: POST
-  path: /api/v1/admin/get_google_sheets_credentials
-  summary: get_google_sheets_credentials
-  auth: required
-  params: []
   request_body: null
   response:
     status: 200
@@ -3146,10 +3127,7 @@ endpoints:
     type: str
     required: true
   request_body: null
-  response:
-    status: 200
-    source: inferred
-    body: dict
+  response: null
   content_type: null
   tags:
   - all

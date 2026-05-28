@@ -47,13 +47,6 @@ export class Admin {
     return data;
   }
 
-  async getGoogleSheetsCredentials() {
-    this._ctx.requireTokens();
-    const path = `/api/v1/admin/get_google_sheets_credentials`;
-    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken);
-    return data;
-  }
-
   async adminCreateCompanyNlpIndexes({ companyIds } = {}) {
     this._ctx.requireTokens();
     let path = `/api/v1/admin/create_company_nlp_indexes/`;

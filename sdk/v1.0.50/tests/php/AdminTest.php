@@ -166,31 +166,6 @@ class AdminTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
-    public function test_post_get_google_sheets_credentials_exists(): void {
-        $this->assertTrue(method_exists(Admin::class, 'getGoogleSheetsCredentials'));
-    }
-
-    public function test_post_get_google_sheets_credentials_http_method(): void {
-        $ctx = new \OAuthSdk\SpyAuthContext();
-        $obj = new Admin($ctx);
-        $obj->getGoogleSheetsCredentials();
-        $this->assertSame('POST', $ctx->client->lastCall()['method']);
-    }
-
-    public function test_post_get_google_sheets_credentials_path(): void {
-        $ctx = new \OAuthSdk\SpyAuthContext();
-        $obj = new Admin($ctx);
-        $obj->getGoogleSheetsCredentials();
-        $this->assertStringContainsString('/api/v1/admin/get_google_sheets_credentials', $ctx->client->lastCall()['path']);
-    }
-
-    public function test_post_get_google_sheets_credentials_auth_routing(): void {
-        $ctx = new \OAuthSdk\SpyAuthContext();
-        $obj = new Admin($ctx);
-        $obj->getGoogleSheetsCredentials();
-        $this->assertCount(1, $ctx->client->calls);
-    }
-
     public function test_post_admin_create_company_nlp_indexes_exists(): void {
         $this->assertTrue(method_exists(Admin::class, 'adminCreateCompanyNlpIndexes'));
     }

@@ -54,12 +54,6 @@ class Admin {
         return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
     }
 
-    public function getGoogleSheetsCredentials(): mixed {
-        $this->ctx->requireTokens();
-        $path = "/api/v1/admin/get_google_sheets_credentials";
-        return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
-    }
-
     public function adminCreateCompanyNlpIndexes(mixed $companyIds = null): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/admin/create_company_nlp_indexes/";

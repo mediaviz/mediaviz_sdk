@@ -186,35 +186,6 @@ describe('Admin', () => {
     expect(spy.calls.length).toBe(1);
   });
 
-  it('getGoogleSheetsCredentials — exists', () => {
-    const admin = new Admin({});
-    expect(typeof admin.getGoogleSheetsCredentials).toBe('function');
-  });
-
-  it('getGoogleSheetsCredentials — HTTP method is POST', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const admin = new Admin(ctx);
-    await admin.getGoogleSheetsCredentials();
-    expect(spy.last_call().method).toBe('POST');
-  });
-
-  it('getGoogleSheetsCredentials — path construction', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const admin = new Admin(ctx);
-    await admin.getGoogleSheetsCredentials();
-    expect(spy.last_call().path).toContain('/api/v1/admin/get_google_sheets_credentials');
-  });
-
-  it('getGoogleSheetsCredentials — auth routing', async () => {
-    const spy = new SpyOAuthClient();
-    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
-    const admin = new Admin(ctx);
-    await admin.getGoogleSheetsCredentials();
-    expect(spy.calls.length).toBe(1);
-  });
-
   it('adminCreateCompanyNlpIndexes — exists', () => {
     const admin = new Admin({});
     expect(typeof admin.adminCreateCompanyNlpIndexes).toBe('function');
