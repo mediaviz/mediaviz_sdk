@@ -13,8 +13,6 @@ class Photoupload {
     }
 
     public function uploadPhotoToMediaviz(
-        string $bucketName,
-        string $photoIndex,
         string $companyId,
         string $userId,
         string $projectTableName,
@@ -35,7 +33,7 @@ class Photoupload {
         ?string $dateTaken = null,
         ?string $latitude = null,
         ?string $longitude = null,
-        ?string $resizedDimensions = null
+        ?string $ocr = null
     ): mixed {
         $this->ctx->requireTokens();
         $baseUrl = $this->ctx->requireHost('photoUpload');
@@ -44,8 +42,6 @@ class Photoupload {
         $headers = [
             'Content-Type: application/json',
             'Authorization: ' . $accessToken,
-            'x-bucket-name: ' . $bucketName,
-            'x-photo-index: ' . $photoIndex,
             'x-company-id: ' . $companyId,
             'x-user-id: ' . $userId,
             'x-project-table-name: ' . $projectTableName,
@@ -64,7 +60,7 @@ class Photoupload {
         if ($dateTaken !== null) $headers[] = 'x-date-taken: ' . $dateTaken;
         if ($latitude !== null) $headers[] = 'x-latitude: ' . $latitude;
         if ($longitude !== null) $headers[] = 'x-longitude: ' . $longitude;
-        if ($resizedDimensions !== null) $headers[] = 'x-resized-dimensions: ' . $resizedDimensions;
+        if ($ocr !== null) $headers[] = 'x-ocr: ' . $ocr;
         $body = [
             'file_content' => $fileContent,
             'mimetype' => $mimetype,
@@ -108,8 +104,6 @@ class Photoupload {
         $_headers = [
             'Content-Type: application/json',
             'Authorization: ' . $this->ctx->accessToken,
-            'x-bucket-name: ' . $template['bucket_name'],
-            'x-photo-index: ' . $photoIndex,
             'x-company-id: ' . $companyId,
             'x-user-id: ' . $userId,
             'x-project-table-name: ' . $projectTableName,
@@ -128,7 +122,6 @@ class Photoupload {
         if (($photo['date_taken'] ?? null) !== null) $_headers[] = 'x-date-taken: ' . $photo['date_taken'];
         if (($photo['latitude'] ?? null) !== null) $_headers[] = 'x-latitude: ' . $photo['latitude'];
         if (($photo['longitude'] ?? null) !== null) $_headers[] = 'x-longitude: ' . $photo['longitude'];
-        if (($photo['resized_dimensions'] ?? null) !== null) $_headers[] = 'x-resized-dimensions: ' . $photo['resized_dimensions'];
         $_body = [
             'file_content' => $photo['file_content'],
             'mimetype' => $photo['mimetype'],

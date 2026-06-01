@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-05-29T13:43:04Z'
+resolved_at: '2026-06-01T12:29:33Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -3763,14 +3763,6 @@ endpoints:
   summary: Upload a preprocessed photo with metadata via headers
   auth: required
   params:
-  - name: x-bucket-name
-    in: header
-    type: string
-    required: true
-  - name: x-photo-index
-    in: header
-    type: string
-    required: true
   - name: x-company-id
     in: header
     type: string
@@ -3839,9 +3831,9 @@ endpoints:
     in: header
     type: string (EXIF GPS longitude)
     required: false
-  - name: x-resized-dimensions
+  - name: x-ocr
     in: header
-    type: string (WxH resized dimensions, present only if image was resized)
+    type: string
     required: false
   request_body:
     file_content:

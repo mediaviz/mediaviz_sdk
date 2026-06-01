@@ -13,8 +13,6 @@ class PhotoUpload:
 
     def upload_photo_to_mediaviz(
         self,
-        bucketName: str,
-        photoIndex: str,
         companyId: str,
         userId: str,
         projectTableName: str,
@@ -35,7 +33,7 @@ class PhotoUpload:
         dateTaken: str | None = None,
         latitude: str | None = None,
         longitude: str | None = None,
-        resizedDimensions: str | None = None,
+        ocr: str | None = None,
     ) -> dict[str, Any]:
         self._ctx.require_tokens()
         _base_url = self._ctx.require_host('photoUpload')
@@ -43,8 +41,6 @@ class PhotoUpload:
         _headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {self._ctx.access_token}',
-            'x-bucket-name': bucketName,
-            'x-photo-index': photoIndex,
             'x-company-id': companyId,
             'x-user-id': userId,
             'x-project-table-name': projectTableName,
@@ -76,8 +72,8 @@ class PhotoUpload:
             _headers['x-latitude'] = latitude
         if longitude is not None:
             _headers['x-longitude'] = longitude
-        if resizedDimensions is not None:
-            _headers['x-resized-dimensions'] = resizedDimensions
+        if ocr is not None:
+            _headers['x-ocr'] = ocr
         body = {
             'file_content': fileContent,
             'mimetype': mimetype,
@@ -109,8 +105,6 @@ class PhotoUpload:
         _headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {self._ctx.access_token}',
-            'x-bucket-name': template['bucket_name'],
-            'x-photo-index': photo_index,
             'x-company-id': company_id,
             'x-user-id': user_id,
             'x-project-table-name': project_table_name,
@@ -142,8 +136,6 @@ class PhotoUpload:
             _headers['x-latitude'] = photo['latitude']
         if photo['longitude'] is not None:
             _headers['x-longitude'] = photo['longitude']
-        if photo['resized_dimensions'] is not None:
-            _headers['x-resized-dimensions'] = photo['resized_dimensions']
         _body = {
             'file_content': photo['file_content'],
             'mimetype': photo['mimetype'],

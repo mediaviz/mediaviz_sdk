@@ -1443,14 +1443,12 @@ class Projects {
 class Photoupload {
   constructor(ctx) { this._ctx = ctx; this._caches = {}; }
 
-  async uploadPhotoToMediaviz(bucketName, photoIndex, companyId, userId, projectTableName, title, { fileContent, mimetype, filePath }, { clientSideId, blur, colors, faceRecognition, imageDescribe, imageClassification, imageComparison, size, sourceResolutionX, sourceResolutionY, dateTaken, latitude, longitude, resizedDimensions } = {}) {
+  async uploadPhotoToMediaviz(companyId, userId, projectTableName, title, { fileContent, mimetype, filePath }, { clientSideId, blur, colors, faceRecognition, imageDescribe, imageClassification, imageComparison, size, sourceResolutionX, sourceResolutionY, dateTaken, latitude, longitude, ocr } = {}) {
     this._ctx.requireTokens();
     const baseUrl = this._ctx.requireHost('photoUpload');
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': this._ctx.accessToken,
-      'x-bucket-name': bucketName,
-      'x-photo-index': photoIndex,
       'x-company-id': companyId,
       'x-user-id': userId,
       'x-project-table-name': projectTableName,
@@ -1469,7 +1467,7 @@ class Photoupload {
     if (dateTaken !== undefined) headers['x-date-taken'] = dateTaken;
     if (latitude !== undefined) headers['x-latitude'] = latitude;
     if (longitude !== undefined) headers['x-longitude'] = longitude;
-    if (resizedDimensions !== undefined) headers['x-resized-dimensions'] = resizedDimensions;
+    if (ocr !== undefined) headers['x-ocr'] = ocr;
     const resp = await fetch(baseUrl + `/photo_upload`, {
       method: 'POST',
       headers,
@@ -1489,7 +1487,7 @@ class Photoupload {
       this._caches['_get_template'].set(_cacheKey_get_template, template);
     }
 
-    const upload_result = await this.uploadPhotoToMediaviz(template.bucket_name, photoIndex, companyId, userId, projectTableName, photo.title, { fileContent: photo.fileContent, mimetype: photo.mimetype, filePath: photo.filePath }, { clientSideId: photo.clientSideId, blur: photo.blur, colors: photo.colors, faceRecognition: photo.faceRecognition, imageDescribe: photo.imageDescribe, imageClassification: photo.imageClassification, imageComparison: photo.imageComparison, size: photo.size, sourceResolutionX: photo.sourceResolutionX, sourceResolutionY: photo.sourceResolutionY, dateTaken: photo.dateTaken, latitude: photo.latitude, longitude: photo.longitude, resizedDimensions: photo.resizedDimensions });
+    const upload_result = await this.uploadPhotoToMediaviz(companyId, userId, projectTableName, photo.title, { fileContent: photo.fileContent, mimetype: photo.mimetype, filePath: photo.filePath }, { clientSideId: photo.clientSideId, blur: photo.blur, colors: photo.colors, faceRecognition: photo.faceRecognition, imageDescribe: photo.imageDescribe, imageClassification: photo.imageClassification, imageComparison: photo.imageComparison, size: photo.size, sourceResolutionX: photo.sourceResolutionX, sourceResolutionY: photo.sourceResolutionY, dateTaken: photo.dateTaken, latitude: photo.latitude, longitude: photo.longitude });
 
     return upload_result;
   }

@@ -1,5 +1,5 @@
 source: upload_photos.yaml
-resolved_at: '2026-05-29T13:43:04Z'
+resolved_at: '2026-06-01T12:29:33Z'
 composites:
 - id: composite_upload_photo
   function_name: upload_photo
@@ -98,14 +98,6 @@ composites:
       summary: Upload a preprocessed photo with metadata via headers
       auth: required
       params:
-      - name: x-bucket-name
-        in: header
-        type: string
-        required: true
-      - name: x-photo-index
-        in: header
-        type: string
-        required: true
       - name: x-company-id
         in: header
         type: string
@@ -174,9 +166,9 @@ composites:
         in: header
         type: string (EXIF GPS longitude)
         required: false
-      - name: x-resized-dimensions
+      - name: x-ocr
         in: header
-        type: string (WxH resized dimensions, present only if image was resized)
+        type: string
         required: false
       request_body:
         file_content:
