@@ -85,6 +85,8 @@ class PythonGenerator(BaseGenerator):
         self.emit_pyproject_toml(output_dir)
         self.reexport_all_modules(output_dir)  # Python: emit_reexports returns None; no-op here
         self.emit_init_file(pkg_dir)
+        from .licenses import emit_license
+        emit_license(output_dir)
 
     def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
         # The Python OAuth SDK keeps the package at module_root/python/module_name/
