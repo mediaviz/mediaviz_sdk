@@ -1,6 +1,12 @@
 {
   "name": "@mediaviz/sdk",
-  "version": "0.1.0",
+  "version": "1.0.58",
+  "description": "MediaViz JavaScript SDK \u2014 auto-generated public endpoint client.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mediaviz/mediaviz_sdk"
+  },
   "type": "module",
   "main": "./dist/sdk.cjs",
   "module": "./dist/sdk.esm.js",
@@ -12,6 +18,14 @@
       "require": "./dist/sdk.cjs",
       "default": "./dist/sdk.cjs"
     }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "rollup -c"

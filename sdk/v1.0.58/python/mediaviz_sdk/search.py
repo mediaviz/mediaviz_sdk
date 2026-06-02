@@ -69,36 +69,30 @@ class Search:
     def search_project_photos_text(
         self,
         project_table_name: str,
-        q: str | None = None,
-        size: Any | None = None,
+        searchText: str,
+        size: int | None = None,
     ) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/search/text/' + quote(str(project_table_name), safe='') + '/'
-        _q: dict[str, Any] = {}
-        if q is not None:
-            _q['q'] = q
-        if size is not None:
-            _q['size'] = size
-        if _q:
-            path += '?' + urlencode(_q, doseq=True)
-        return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
+        body = {k: v for k, v in {
+            'search_text': searchText,
+            'size': size,
+        }.items() if v is not None}
+        return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
 
     def search_project_photos_natural_language(
         self,
         project_table_name: str,
-        search_text: str | None = None,
-        size: Any | None = None,
+        searchText: str,
+        size: int | None = None,
     ) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/search/nl/' + quote(str(project_table_name), safe='') + '/'
-        _q: dict[str, Any] = {}
-        if search_text is not None:
-            _q['search_text'] = search_text
-        if size is not None:
-            _q['size'] = size
-        if _q:
-            path += '?' + urlencode(_q, doseq=True)
-        return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
+        body = {k: v for k, v in {
+            'search_text': searchText,
+            'size': size,
+        }.items() if v is not None}
+        return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
 
     def get_project_saved_searches(self, project_table_name: str) -> dict[str, Any]:
         self._ctx.require_tokens()

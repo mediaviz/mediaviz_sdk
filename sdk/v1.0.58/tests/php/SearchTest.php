@@ -55,71 +55,71 @@ class SearchTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
-    public function test_get_search_project_photos_text_exists(): void {
+    public function test_post_search_project_photos_text_exists(): void {
         $this->assertTrue(method_exists(Search::class, 'searchProjectPhotosText'));
     }
 
-    public function test_get_search_project_photos_text_http_method(): void {
+    public function test_post_search_project_photos_text_http_method(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosText('test_value', 'test_value', 'test_value');
-        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+        $obj->searchProjectPhotosText('test_value', 'test_value', 42);
+        $this->assertSame('POST', $ctx->client->lastCall()['method']);
     }
 
-    public function test_get_search_project_photos_text_path(): void {
+    public function test_post_search_project_photos_text_path(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosText('hello world', 'test_value', 'test_value');
+        $obj->searchProjectPhotosText('hello world', 'test_value', 42);
         $this->assertStringContainsString('/api/v1/search/text/hello%20world/', $ctx->client->lastCall()['path']);
     }
 
-    public function test_get_search_project_photos_text_query_params(): void {
+    public function test_post_search_project_photos_text_request_body(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosText('test_value', 'test_value', 'test_value');
-        $path = $ctx->client->lastCall()['path'];
-        $this->assertStringContainsString('q=', $path);
-        $this->assertStringContainsString('size=', $path);
+        $obj->searchProjectPhotosText('test_value', 'test_value', 42);
+        $body = $ctx->client->lastCall()['body'];
+        $this->assertArrayHasKey('search_text', $body);
+        $this->assertArrayHasKey('size', $body);
     }
 
-    public function test_get_search_project_photos_text_auth_routing(): void {
+    public function test_post_search_project_photos_text_auth_routing(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosText('test_value', 'test_value', 'test_value');
+        $obj->searchProjectPhotosText('test_value', 'test_value', 42);
         $this->assertCount(1, $ctx->client->calls);
     }
 
-    public function test_get_search_project_photos_natural_language_exists(): void {
+    public function test_post_search_project_photos_natural_language_exists(): void {
         $this->assertTrue(method_exists(Search::class, 'searchProjectPhotosNaturalLanguage'));
     }
 
-    public function test_get_search_project_photos_natural_language_http_method(): void {
+    public function test_post_search_project_photos_natural_language_http_method(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguage('test_value', 'test_value', 'test_value');
-        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+        $obj->searchProjectPhotosNaturalLanguage('test_value', 'test_value', 42);
+        $this->assertSame('POST', $ctx->client->lastCall()['method']);
     }
 
-    public function test_get_search_project_photos_natural_language_path(): void {
+    public function test_post_search_project_photos_natural_language_path(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguage('hello world', 'test_value', 'test_value');
+        $obj->searchProjectPhotosNaturalLanguage('hello world', 'test_value', 42);
         $this->assertStringContainsString('/api/v1/search/nl/hello%20world/', $ctx->client->lastCall()['path']);
     }
 
-    public function test_get_search_project_photos_natural_language_query_params(): void {
+    public function test_post_search_project_photos_natural_language_request_body(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguage('test_value', 'test_value', 'test_value');
-        $path = $ctx->client->lastCall()['path'];
-        $this->assertStringContainsString('search_text=', $path);
-        $this->assertStringContainsString('size=', $path);
+        $obj->searchProjectPhotosNaturalLanguage('test_value', 'test_value', 42);
+        $body = $ctx->client->lastCall()['body'];
+        $this->assertArrayHasKey('search_text', $body);
+        $this->assertArrayHasKey('size', $body);
     }
 
-    public function test_get_search_project_photos_natural_language_auth_routing(): void {
+    public function test_post_search_project_photos_natural_language_auth_routing(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguage('test_value', 'test_value', 'test_value');
+        $obj->searchProjectPhotosNaturalLanguage('test_value', 'test_value', 42);
         $this->assertCount(1, $ctx->client->calls);
     }
 

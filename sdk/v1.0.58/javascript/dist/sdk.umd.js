@@ -623,7 +623,7 @@
 	  }
 	}
 
-	function stripUndef$6(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+	function stripUndef$7(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
 	class CuratedAlbums {
 	  constructor(ctx) { this._ctx = ctx; }
@@ -631,7 +631,7 @@
 	  async createCuratedAlbum(projectTableName, name, description = undefined, confidenceValue = undefined) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/curated_album/project/${encodeURIComponent(projectTableName)}`;
-	    const body = stripUndef$6({
+	    const body = stripUndef$7({
 	      name: name,
 	      description: description,
 	      confidence_value: confidenceValue,
@@ -685,7 +685,7 @@
 	  async updateCuratedAlbum(albumId, { name, description, confidenceValue } = {}) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/curated_album/${encodeURIComponent(albumId)}`;
-	    const body = stripUndef$6({
+	    const body = stripUndef$7({
 	      name: name,
 	      description: description,
 	      confidence_value: confidenceValue,
@@ -709,7 +709,7 @@
 	  }
 	}
 
-	function stripUndef$5(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+	function stripUndef$6(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
 	class CustomAlbums {
 	  constructor(ctx) { this._ctx = ctx; }
@@ -757,7 +757,7 @@
 	  async createProjectCustomAlbum(projectTableName, { name, description, photoIdInclusionList, photoIdRemovalList } = {}) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/custom_album/project/${encodeURIComponent(projectTableName)}`;
-	    const body = stripUndef$5({
+	    const body = stripUndef$6({
 	      name: name,
 	      description: description,
 	      photo_id_inclusion_list: photoIdInclusionList,
@@ -770,7 +770,7 @@
 	  async updateCustomAlbum(albumId, { name, description, photoIdInclusionList, photoIdRemovalList } = {}) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/custom_album/${encodeURIComponent(albumId)}`;
-	    const body = stripUndef$5({
+	    const body = stripUndef$6({
 	      name: name,
 	      description: description,
 	      photo_id_inclusion_list: photoIdInclusionList,
@@ -870,7 +870,7 @@
 	  }
 	}
 
-	function stripUndef$4(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+	function stripUndef$5(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
 	class EmailTokens {
 	  constructor(ctx) { this._ctx = ctx; }
@@ -901,7 +901,7 @@
 	  }
 
 	  async validateToken(token) {
-	    const body = stripUndef$4({
+	    const body = stripUndef$5({
 	      token: token,
 	    });
 	    const resp = await fetch(this._ctx.baseUrl + `/api/v1/validate-token`, {
@@ -913,7 +913,7 @@
 	  }
 
 	  async resetPassword(token, newPassword) {
-	    const body = stripUndef$4({
+	    const body = stripUndef$5({
 	      token: token,
 	      new_password: newPassword,
 	    });
@@ -952,7 +952,7 @@
 	  }
 	}
 
-	function stripUndef$3(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+	function stripUndef$4(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
 	class Keywords {
 	  constructor(ctx) { this._ctx = ctx; }
@@ -960,7 +960,7 @@
 	  async createKeywordFilteringList(name, projectList = undefined) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/keyword/`;
-	    const body = stripUndef$3({
+	    const body = stripUndef$4({
 	      name: name,
 	      project_list: projectList,
 	    });
@@ -1006,7 +1006,7 @@
 	  async updateKeywordFilteringListLabels(keywordListId, listKeywordsToInclude, listKeywordsToExclude) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/keyword/${encodeURIComponent(keywordListId)}`;
-	    const body = stripUndef$3({
+	    const body = stripUndef$4({
 	      list_keywords_to_include: listKeywordsToInclude,
 	      list_keywords_to_exclude: listKeywordsToExclude,
 	    });
@@ -1017,7 +1017,7 @@
 	  async updateKeywordFilteringListDetails(keywordListId, { name, projectList } = {}) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/keyword/details/${encodeURIComponent(keywordListId)}`;
-	    const body = stripUndef$3({
+	    const body = stripUndef$4({
 	      name: name,
 	      project_list: projectList,
 	    });
@@ -1128,7 +1128,7 @@
 	  }
 	}
 
-	function stripUndef$2(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+	function stripUndef$3(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
 	class OauthClients {
 	  constructor(ctx) { this._ctx = ctx; }
@@ -1136,7 +1136,7 @@
 	  async createClient(clientName, clientType, redirectUris, isFirstParty) {
 	    this._ctx.requireTokens();
 	    const path = `/oauth/clients`;
-	    const body = stripUndef$2({
+	    const body = stripUndef$3({
 	      client_name: clientName,
 	      client_type: clientType,
 	      redirect_uris: redirectUris,
@@ -1254,7 +1254,7 @@
 	  }
 	}
 
-	function stripUndef$1(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+	function stripUndef$2(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
 
 	class Projects {
 	  constructor(ctx) { this._ctx = ctx; }
@@ -1267,7 +1267,7 @@
 	    if (models !== undefined) (Array.isArray(models) ? models : [models]).forEach(v => query.append('models', v));
 	    const qs = query.toString();
 	    if (qs) path += '?' + qs;
-	    const body = stripUndef$1({
+	    const body = stripUndef$2({
 	      name: name,
 	      private: private_,
 	      type: type,
@@ -1344,7 +1344,7 @@
 	  async updateProject(projectId, { private: private_, type, description, directory, name, thumbnail } = {}) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/projects/${encodeURIComponent(projectId)}`;
-	    const body = stripUndef$1({
+	    const body = stripUndef$2({
 	      private: private_,
 	      type: type,
 	      description: description,
@@ -1430,7 +1430,7 @@
 	  async addProjectEvent(projectTableName, event, detail = undefined) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/projects/${encodeURIComponent(projectTableName)}/event`;
-	    const body = stripUndef$1({
+	    const body = stripUndef$2({
 	      event: event,
 	      detail: detail,
 	    });
@@ -1606,6 +1606,8 @@
 	  }
 	}
 
+	function stripUndef$1(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+
 	class Search {
 	  constructor(ctx) { this._ctx = ctx; }
 
@@ -1634,27 +1636,25 @@
 	    return data;
 	  }
 
-	  async searchProjectPhotosText(projectTableName, { q, size } = {}) {
+	  async searchProjectPhotosText(projectTableName, searchText, size = undefined) {
 	    this._ctx.requireTokens();
-	    let path = `/api/v1/search/text/${encodeURIComponent(projectTableName)}/`;
-	    const query = new URLSearchParams();
-	    if (q !== undefined) (Array.isArray(q) ? q : [q]).forEach(v => query.append('q', v));
-	    if (size !== undefined) (Array.isArray(size) ? size : [size]).forEach(v => query.append('size', v));
-	    const qs = query.toString();
-	    if (qs) path += '?' + qs;
-	    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
+	    const path = `/api/v1/search/text/${encodeURIComponent(projectTableName)}/`;
+	    const body = stripUndef$1({
+	      search_text: searchText,
+	      size: size,
+	    });
+	    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
 	    return data;
 	  }
 
-	  async searchProjectPhotosNaturalLanguage(projectTableName, { searchText, size } = {}) {
+	  async searchProjectPhotosNaturalLanguage(projectTableName, searchText, size = undefined) {
 	    this._ctx.requireTokens();
-	    let path = `/api/v1/search/nl/${encodeURIComponent(projectTableName)}/`;
-	    const query = new URLSearchParams();
-	    if (searchText !== undefined) (Array.isArray(searchText) ? searchText : [searchText]).forEach(v => query.append('search_text', v));
-	    if (size !== undefined) (Array.isArray(size) ? size : [size]).forEach(v => query.append('size', v));
-	    const qs = query.toString();
-	    if (qs) path += '?' + qs;
-	    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
+	    const path = `/api/v1/search/nl/${encodeURIComponent(projectTableName)}/`;
+	    const body = stripUndef$1({
+	      search_text: searchText,
+	      size: size,
+	    });
+	    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
 	    return data;
 	  }
 

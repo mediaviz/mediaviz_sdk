@@ -57,42 +57,30 @@ class Search {
 
     public function searchProjectPhotosText(
         string $projectTableName,
-        ?string $q = null,
-        mixed $size = null
+        string $searchText,
+        ?int $size = null
     ): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/search/text/" . rawurlencode((string)$projectTableName) . "/";
-        $query = [];
-        if ($q !== null) $query['q'] = $q;
-        if ($size !== null) $query['size'] = $size;
-        if ($query) {
-            $pairs = [];
-            foreach ($query as $k => $v) {
-                foreach ((is_array($v) ? $v : [$v]) as $vv) $pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);
-            }
-            $path .= '?' . implode('&', $pairs);
-        }
-        return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
+        $body = array_filter([
+            'search_text' => $searchText,
+            'size' => $size,
+        ], fn($v) => $v !== null);
+        return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
     }
 
     public function searchProjectPhotosNaturalLanguage(
         string $projectTableName,
-        ?string $searchText = null,
-        mixed $size = null
+        string $searchText,
+        ?int $size = null
     ): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/search/nl/" . rawurlencode((string)$projectTableName) . "/";
-        $query = [];
-        if ($searchText !== null) $query['search_text'] = $searchText;
-        if ($size !== null) $query['size'] = $size;
-        if ($query) {
-            $pairs = [];
-            foreach ($query as $k => $v) {
-                foreach ((is_array($v) ? $v : [$v]) as $vv) $pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);
-            }
-            $path .= '?' . implode('&', $pairs);
-        }
-        return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
+        $body = array_filter([
+            'search_text' => $searchText,
+            'size' => $size,
+        ], fn($v) => $v !== null);
+        return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
     }
 
     public function getProjectSavedSearches(string $projectTableName): mixed {

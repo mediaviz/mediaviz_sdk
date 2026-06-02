@@ -1,3 +1,5 @@
+function stripUndef(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k] = o[k]; return r; }
+
 export class Search {
   constructor(ctx) { this._ctx = ctx; }
 
@@ -26,27 +28,25 @@ export class Search {
     return data;
   }
 
-  async searchProjectPhotosText(projectTableName, { q, size } = {}) {
+  async searchProjectPhotosText(projectTableName, searchText, size = undefined) {
     this._ctx.requireTokens();
-    let path = `/api/v1/search/text/${encodeURIComponent(projectTableName)}/`;
-    const query = new URLSearchParams();
-    if (q !== undefined) (Array.isArray(q) ? q : [q]).forEach(v => query.append('q', v));
-    if (size !== undefined) (Array.isArray(size) ? size : [size]).forEach(v => query.append('size', v));
-    const qs = query.toString();
-    if (qs) path += '?' + qs;
-    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
+    const path = `/api/v1/search/text/${encodeURIComponent(projectTableName)}/`;
+    const body = stripUndef({
+      search_text: searchText,
+      size: size,
+    });
+    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
     return data;
   }
 
-  async searchProjectPhotosNaturalLanguage(projectTableName, { searchText, size } = {}) {
+  async searchProjectPhotosNaturalLanguage(projectTableName, searchText, size = undefined) {
     this._ctx.requireTokens();
-    let path = `/api/v1/search/nl/${encodeURIComponent(projectTableName)}/`;
-    const query = new URLSearchParams();
-    if (searchText !== undefined) (Array.isArray(searchText) ? searchText : [searchText]).forEach(v => query.append('search_text', v));
-    if (size !== undefined) (Array.isArray(size) ? size : [size]).forEach(v => query.append('size', v));
-    const qs = query.toString();
-    if (qs) path += '?' + qs;
-    const { data } = await this._ctx.client.request(path, 'GET', this._ctx.accessToken, this._ctx.refreshToken);
+    const path = `/api/v1/search/nl/${encodeURIComponent(projectTableName)}/`;
+    const body = stripUndef({
+      search_text: searchText,
+      size: size,
+    });
+    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
     return data;
   }
 

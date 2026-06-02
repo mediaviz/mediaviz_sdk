@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-06-01T12:43:28Z'
+resolved_at: '2026-06-02T16:19:19Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -3057,11 +3057,11 @@ endpoints:
   - all
   hidden: false
   api_host: null
-- id: get_search_project_photos_text
+- id: post_search_project_photos_text
   function_name: search_project_photos_text
   controller: Search
   base_path: /api/v1
-  method: GET
+  method: POST
   path: /api/v1/search/text/{project_table_name}/
   summary: search_project_photos_text
   auth: required
@@ -3070,26 +3070,34 @@ endpoints:
     in: path
     type: str
     required: true
-  - name: q
-    in: query
-    type: str
-    required: false
-  - name: size
-    in: query
-    type: Optional[int]
-    required: false
-  request_body: null
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
   response: null
   content_type: null
   tags:
   - all
   hidden: false
   api_host: null
-- id: get_search_project_photos_natural_language
+- id: post_search_project_photos_natural_language
   function_name: search_project_photos_natural_language
   controller: Search
   base_path: /api/v1
-  method: GET
+  method: POST
   path: /api/v1/search/nl/{project_table_name}/
   summary: search_project_photos_natural_language
   auth: required
@@ -3098,15 +3106,23 @@ endpoints:
     in: path
     type: str
     required: true
-  - name: search_text
-    in: query
-    type: str
-    required: false
-  - name: size
-    in: query
-    type: Optional[int]
-    required: false
-  request_body: null
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
   response: null
   content_type: null
   tags:

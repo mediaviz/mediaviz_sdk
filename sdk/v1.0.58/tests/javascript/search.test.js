@@ -60,37 +60,37 @@ describe('Search', () => {
     expect(typeof search.searchProjectPhotosText).toBe('function');
   });
 
-  it('searchProjectPhotosText — HTTP method is GET', async () => {
+  it('searchProjectPhotosText — HTTP method is POST', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosText('test_value', { q: 'test_value', size: 'test_value' });
-    expect(spy.last_call().method).toBe('GET');
+    await search.searchProjectPhotosText('test_value', 'test_value', 42);
+    expect(spy.last_call().method).toBe('POST');
   });
 
   it('searchProjectPhotosText — path construction', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosText('hello world', { q: 'test_value', size: 'test_value' });
+    await search.searchProjectPhotosText('hello world', 'test_value', 42);
     expect(spy.last_call().path).toContain('/api/v1/search/text/hello%20world/');
   });
 
-  it('searchProjectPhotosText — query params', async () => {
+  it('searchProjectPhotosText — request body', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosText('test_value', { q: 'test_value', size: 'test_value' });
-    const path = spy.last_call().path;
-    expect(path).toContain('q=');
-    expect(path).toContain('size=');
+    await search.searchProjectPhotosText('test_value', 'test_value', 42);
+    const body = spy.last_call().body;
+    expect(body).toHaveProperty('search_text');
+    expect(body).toHaveProperty('size');
   });
 
   it('searchProjectPhotosText — auth routing', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosText('test_value', { q: 'test_value', size: 'test_value' });
+    await search.searchProjectPhotosText('test_value', 'test_value', 42);
     expect(spy.calls.length).toBe(1);
   });
 
@@ -99,37 +99,37 @@ describe('Search', () => {
     expect(typeof search.searchProjectPhotosNaturalLanguage).toBe('function');
   });
 
-  it('searchProjectPhotosNaturalLanguage — HTTP method is GET', async () => {
+  it('searchProjectPhotosNaturalLanguage — HTTP method is POST', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosNaturalLanguage('test_value', { searchText: 'test_value', size: 'test_value' });
-    expect(spy.last_call().method).toBe('GET');
+    await search.searchProjectPhotosNaturalLanguage('test_value', 'test_value', 42);
+    expect(spy.last_call().method).toBe('POST');
   });
 
   it('searchProjectPhotosNaturalLanguage — path construction', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosNaturalLanguage('hello world', { searchText: 'test_value', size: 'test_value' });
+    await search.searchProjectPhotosNaturalLanguage('hello world', 'test_value', 42);
     expect(spy.last_call().path).toContain('/api/v1/search/nl/hello%20world/');
   });
 
-  it('searchProjectPhotosNaturalLanguage — query params', async () => {
+  it('searchProjectPhotosNaturalLanguage — request body', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosNaturalLanguage('test_value', { searchText: 'test_value', size: 'test_value' });
-    const path = spy.last_call().path;
-    expect(path).toContain('search_text=');
-    expect(path).toContain('size=');
+    await search.searchProjectPhotosNaturalLanguage('test_value', 'test_value', 42);
+    const body = spy.last_call().body;
+    expect(body).toHaveProperty('search_text');
+    expect(body).toHaveProperty('size');
   });
 
   it('searchProjectPhotosNaturalLanguage — auth routing', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.searchProjectPhotosNaturalLanguage('test_value', { searchText: 'test_value', size: 'test_value' });
+    await search.searchProjectPhotosNaturalLanguage('test_value', 'test_value', 42);
     expect(spy.calls.length).toBe(1);
   });
 
