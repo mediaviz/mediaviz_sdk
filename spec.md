@@ -623,3 +623,27 @@ The hub and SDK propagate workflows trigger only on `repository_dispatch` (not `
 ### Path resolution in CI
 `actions/checkout` with `path: <sibling_name>` replicates the local sibling layout (`$GITHUB_WORKSPACE/{mediaviz_external_api,mediaviz_intelligence_hub,mediaviz_sdk,oauth_library}`), so `github_sources._CODE_ROOT = dirname(dirname(__file__))` and the hub scripts' `../mediaviz_external_api/...` defaults work without any generator-script changes.
 - No runtime dependencies beyond the bundled OAuth SDK and the language's standard HTTP primitives (`fetch` for JS, `curl` for PHP).
+
+## Publishing
+
+After the SDK is regenerated and committed by `update-sdk.yml` propagate mode, the workflow publishes the JS package to npm on every dev/qa/main run, and the PHP package to Packagist on main runs only.
+
+### Endpoint set
+The CI workflow runs `python generate.py` with no `--endpoints` argument, so the generator uses its default of `public_sdk_endpoints` (the public-facing endpoint subset that excludes admin/system endpoints — `../mediaviz_intelligence_hub/api_docs/endpoint_list/public_sdk_endpoints.yaml`). Manual runs can still pass `--endpoints all_endpoints` for the internal/full build.
+
+### npm — `@mediaviz/sdk`
+Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: live SDK version (extracted from output dir via regex), `license: MIT`, `repository`, `publishConfig.access: public`, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles ship — the framework source files are inputs to the build, not part of the consumer payload.
+
+Auth via **npm Trusted Publishing** (OIDC). The workflow declares `permissions: id-token: write` and runs `npm publish --access public --tag <branch-tag> --provenance` from `sdk/v*/javascript/`. No long-lived `NPM_TOKEN` exists. npm verifies the GitHub-issued OIDC token against the trusted publisher config registered at the npm package level (org=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml).
+
+### Packagist — `mediaviz/sdk`
+Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedicated companion repo `mediaviz/mediaviz_php_sdk` rather than under `mediaviz_sdk/sdk/v*/php/`. On main propagate runs only, the workflow:
+1. Checks out `mediaviz_php_sdk` with the GitHub App token.
+2. `rsync`s the freshly-generated `sdk/v*/php/` contents over the php-sdk repo (excluding `.git`).
+3. Commits, tags `vX.Y.Z`, pushes tag + main.
+4. POSTs to `https://packagist.org/api/update-package` (auth: `PACKAGIST_USERNAME` + `PACKAGIST_API_TOKEN` secrets) to force a refresh.
+
+`composer.json` (emitted by `generators/php.py:emit_autoload_config`) carries: `name: mediaviz/sdk`, `type: library`, `license: MIT`, live `version` (same regex pattern as JS), `description`, and the PSR-4 + files autoload entries.
+
+### LICENSE
+Shared MIT text and version-extraction helper live in `generators/licenses.py`. The JS, PHP, and Python generators all call `emit_license(output_dir)` at the end of their `generate()` flow, so every framework directory ships a `LICENSE` file alongside its manifest.

@@ -48,6 +48,8 @@ class PhpGenerator(BaseGenerator):
         self.emit_client_class(all_groups, all_comp_groups, alt_hosts, output_dir, utilities=utilities)
         reexport_files = self.reexport_all_modules(output_dir)
         self.emit_autoload_config(output_dir, reexport_files=reexport_files)
+        from .licenses import emit_license
+        emit_license(output_dir)
 
     def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
         dst = self._copy_module_files(module_root, "php", module_name, output_dir)
@@ -489,8 +491,13 @@ class PhpGenerator(BaseGenerator):
         raise ValueError(f"Unsupported utilities source_module: {source_module!r}")
 
     def emit_autoload_config(self, output_dir: str, reexport_files: list[str] | None = None) -> None:
+        from .licenses import extract_sdk_version
         config = {
             "name": "mediaviz/sdk",
+            "description": "MediaViz PHP SDK — auto-generated public endpoint client.",
+            "type": "library",
+            "license": "MIT",
+            "version": extract_sdk_version(output_dir),
             "require": {},
             "autoload": {
                 "psr-4": {"MediaVizSdk\\": "./"}

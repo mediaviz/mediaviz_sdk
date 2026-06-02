@@ -59,3 +59,15 @@
   - `mediaviz_intelligence_hub/.github/workflows/update-intelligence-hub.yml`
   - `mediaviz_external_api/.github/workflows/docker-image.yml` (existing file, extended with `verify_hub`, `verify_sdk`, `notify_downstream` jobs)
 - Required org-level secrets: `MEDIAVIZ_PIPELINE_BOT_APP_ID`, `MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY`.
+
+## Publishing
+
+- **`generate.py:22`** — `--endpoints` defaults to `public_sdk_endpoints` so CI runs (which omit the flag) ship the public-facing SDK. Manual `--endpoints all_endpoints` still works for internal builds.
+- **`generators/licenses.py`** — shared MIT license text + `emit_license(output_dir)` + `extract_sdk_version(output_dir)`. JS/PHP/Python generators all import these.
+- **`generators/javascript_browser.py:emit_package_json`** — emits live version (via regex), `license: MIT`, `repository`, `publishConfig.access: public`, `files: ["dist", "LICENSE", "README.md"]`. JS generator's `generate()` calls `emit_license()` after manifest.
+- **`generators/php.py:emit_autoload_config`** — emits live `version`, `license: MIT`, `type: library`, `description`. PHP generator's `generate()` calls `emit_license()` after manifest.
+- **`generators/python.py:generate()`** — calls `emit_license()` for symmetry; `pyproject.toml` already carries its own version.
+- **`update-sdk.yml`** propagate-mode publish steps:
+  - **npm** (every dev/qa/main): via Trusted Publishing (OIDC). `permissions: id-token: write`, `npm install -g npm@latest`, `npm publish --access public --tag <dev|qa|latest> --provenance` from `sdk/v*/javascript/`. No `NPM_TOKEN` secret.
+  - **Packagist** (main only): checkout `mediaviz/mediaviz_php_sdk` → rsync php-sdk contents → commit + tag `vX.Y.Z` → push → POST to Packagist `/api/update-package`. Requires `PACKAGIST_USERNAME` + `PACKAGIST_API_TOKEN` secrets.
+- **Companion repo (manual setup)**: `mediaviz/mediaviz_php_sdk` is a dedicated repo with composer.json at the root, the only way Packagist can find the PHP SDK. Workflow syncs into it on every main run; tag history on that repo = release history visible on Packagist.
