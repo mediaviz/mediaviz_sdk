@@ -55,6 +55,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         self.emit_barrel_index(controller_files, output_dir, extra_files=reexport_files)
         self.emit_rollup_config(output_dir)
         self.emit_package_json(output_dir)
+        from .licenses import emit_license
+        emit_license(output_dir)
         self.build_dist(output_dir)
 
     def build_dist(self, output_dir: str) -> None:
@@ -499,9 +501,16 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             f.write(content)
 
     def emit_package_json(self, output_dir: str) -> None:
+        from .licenses import extract_sdk_version
         config = {
             "name": "@mediaviz/sdk",
-            "version": "0.1.0",
+            "version": extract_sdk_version(output_dir),
+            "description": "MediaViz JavaScript SDK — auto-generated public endpoint client.",
+            "license": "MIT",
+            "repository": {
+                "type": "git",
+                "url": "https://github.com/mediaviz/mediaviz_sdk",
+            },
             "type": "module",
             "main": "./dist/sdk.cjs",
             "module": "./dist/sdk.esm.js",
@@ -513,6 +522,10 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                     "require": "./dist/sdk.cjs",
                     "default": "./dist/sdk.cjs",
                 },
+            },
+            "files": ["dist", "LICENSE", "README.md"],
+            "publishConfig": {
+                "access": "public",
             },
             "scripts": {
                 "build": "rollup -c",

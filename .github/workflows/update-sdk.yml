@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: write
+  id-token: write  # required for npm Trusted Publishing (OIDC)
 
 jobs:
   update:
@@ -34,13 +35,13 @@ jobs:
         with:
           app-id: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_APP_ID }}
           private-key: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY }}
-          owner: imaige
-          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library
+          owner: mediaviz
+          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library,mediaviz_php_sdk
 
       - name: Checkout mediaviz_sdk
         uses: actions/checkout@v4
         with:
-          repository: imaige/mediaviz_sdk
+          repository: mediaviz/mediaviz_sdk
           ref: ${{ steps.ctx.outputs.branch }}
           path: mediaviz_sdk
           token: ${{ steps.app-token.outputs.token }}
@@ -49,7 +50,7 @@ jobs:
       - name: Checkout mediaviz_intelligence_hub
         uses: actions/checkout@v4
         with:
-          repository: imaige/mediaviz_intelligence_hub
+          repository: mediaviz/mediaviz_intelligence_hub
           ref: ${{ steps.ctx.outputs.branch }}
           path: mediaviz_intelligence_hub
           token: ${{ steps.app-token.outputs.token }}
@@ -59,7 +60,7 @@ jobs:
         uses: actions/checkout@v4
         continue-on-error: true
         with:
-          repository: imaige/oauth_library
+          repository: mediaviz/oauth_library
           ref: ${{ steps.ctx.outputs.branch }}
           path: oauth_library
           token: ${{ steps.app-token.outputs.token }}
@@ -68,7 +69,7 @@ jobs:
         if: steps.oauth-branch.outcome == 'failure'
         uses: actions/checkout@v4
         with:
-          repository: imaige/oauth_library
+          repository: mediaviz/oauth_library
           ref: main
           path: oauth_library
           token: ${{ steps.app-token.outputs.token }}
@@ -102,7 +103,8 @@ jobs:
 
       - name: Run SDK generator
         working-directory: mediaviz_sdk
-        run: python generate.py --endpoints all_endpoints ${{ steps.bump.outputs.flag }}
+        # --endpoints omitted → uses the public_sdk_endpoints default in generate.py
+        run: python generate.py ${{ steps.bump.outputs.flag }}
 
       - name: Configure git identity
         if: steps.ctx.outputs.mode == 'propagate'
@@ -123,3 +125,75 @@ jobs:
           else
             echo "No SDK changes to commit."
           fi
+
+      # ── npm publish via Trusted Publishing (all propagate runs) ────────────
+      - name: Locate freshly-generated SDK dirs
+        if: steps.ctx.outputs.mode == 'propagate'
+        id: dirs
+        run: |
+          JS_DIR=$(ls -d mediaviz_sdk/sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
+          PHP_DIR=$(ls -d mediaviz_sdk/sdk/v*/php 2>/dev/null | grep -v archive | sort -V | tail -1)
+          VERSION=$(echo "$JS_DIR" | sed -E 's|.*sdk/v([0-9.]+)/javascript|v\1|')
+          echo "js_dir=$JS_DIR" >> $GITHUB_OUTPUT
+          echo "php_dir=$PHP_DIR" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Located JS: $JS_DIR"
+          echo "Located PHP: $PHP_DIR"
+          echo "Version: $VERSION"
+
+      - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
+        if: steps.ctx.outputs.mode == 'propagate'
+        run: npm install -g npm@latest
+
+      - name: Determine npm dist-tag
+        if: steps.ctx.outputs.mode == 'propagate'
+        id: npm-meta
+        run: |
+          case "${{ steps.ctx.outputs.branch }}" in
+            dev)  echo "tag=dev"    >> $GITHUB_OUTPUT ;;
+            qa)   echo "tag=qa"     >> $GITHUB_OUTPUT ;;
+            main) echo "tag=latest" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Publish to npm
+        if: steps.ctx.outputs.mode == 'propagate'
+        working-directory: ${{ steps.dirs.outputs.js_dir }}
+        run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
+
+      # ── Packagist publish (main propagate only) ────────────────────────────
+      - name: Checkout mediaviz_php_sdk
+        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
+        uses: actions/checkout@v4
+        with:
+          repository: mediaviz/mediaviz_php_sdk
+          ref: main
+          path: mediaviz_php_sdk
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Sync PHP SDK → mediaviz_php_sdk + tag + push
+        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
+        run: |
+          rsync -av --delete --exclude=.git "${{ steps.dirs.outputs.php_dir }}/" mediaviz_php_sdk/
+          cd mediaviz_php_sdk
+          git config user.name "mediaviz-pipeline-bot[bot]"
+          git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "release ${{ steps.dirs.outputs.version }}"
+            git tag "${{ steps.dirs.outputs.version }}"
+            git push origin main --tags
+          else
+            echo "No PHP SDK changes to publish."
+            exit 0
+          fi
+
+      - name: Trigger Packagist refresh
+        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
+        run: |
+          curl -fsS -XPOST -H 'content-type:application/json' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}" \
+            -d '{"repository":{"url":"https://github.com/mediaviz/mediaviz_php_sdk"}}'

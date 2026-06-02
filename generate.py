@@ -19,7 +19,7 @@ SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk")
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate MediaViz SDK libraries from endpoint specs.")
-    p.add_argument("--endpoints", required=True, help="Flow name resolved against common_flows/sdk_endpoints/ then api_docs/endpoint_list/ (e.g. 'basic_sdk_flow_endpoints', 'all_endpoints')")
+    p.add_argument("--endpoints", default="public_sdk_endpoints", help="Flow name resolved against common_flows/sdk_endpoints/ then api_docs/endpoint_list/ (e.g. 'basic_sdk_flow_endpoints', 'all_endpoints'). Default: 'public_sdk_endpoints' (public-facing SDK).")
     p.add_argument("--branch", default=None, help="Git branch to use for all source repos. Falls back to main if not found.")
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
     p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk.")
