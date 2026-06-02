@@ -36,7 +36,7 @@ jobs:
           app-id: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_APP_ID }}
           private-key: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY }}
           owner: mediaviz
-          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library,mediaviz_php_sdk
+          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library,mediaviz-php-sdk
 
       - name: Checkout mediaviz_sdk
         uses: actions/checkout@v4
@@ -165,7 +165,7 @@ jobs:
         if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
         uses: actions/checkout@v4
         with:
-          repository: mediaviz/mediaviz_php_sdk
+          repository: mediaviz/mediaviz-php-sdk
           ref: main
           path: mediaviz_php_sdk
           token: ${{ steps.app-token.outputs.token }}
@@ -196,4 +196,4 @@ jobs:
         run: |
           curl -fsS -XPOST -H 'content-type:application/json' \
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}" \
-            -d '{"repository":{"url":"https://github.com/mediaviz/mediaviz_php_sdk"}}'
+            -d '{"repository":{"url":"https://github.com/mediaviz/mediaviz-php-sdk"}}'
