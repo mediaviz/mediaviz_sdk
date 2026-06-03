@@ -90,7 +90,9 @@ jobs:
           php-version: "8.2"
 
       - name: Install Python deps
-        run: pip install pyyaml pytest
+        # httpx is the generated SDK's runtime dep (oauth_sdk imports it at load);
+        # tests run inline inside generate.py, so it must be present beforehand.
+        run: pip install pyyaml pytest httpx
 
       - name: Decide version bump flag
         id: bump
