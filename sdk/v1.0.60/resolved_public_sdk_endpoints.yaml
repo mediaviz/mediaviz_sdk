@@ -1,5 +1,5 @@
 source: public_sdk_endpoints.yaml
-resolved_at: '2026-06-03T18:51:04Z'
+resolved_at: '2026-06-03T19:00:10Z'
 endpoints:
 - id: get_get_model_credit_relationship
   function_name: get_model_credit_relationship
