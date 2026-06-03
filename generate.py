@@ -174,6 +174,12 @@ def main() -> None:
                 print(f"\n── Warnings ({len(all_warnings)}) ────────────────────────────────")
                 for w in all_warnings:
                     print(f"  {w}")
+
+            # Test failures must fail the build (and block the propagate commit/publish steps),
+            # not just print a summary while the job goes green.
+            if any(not r.success for r in test_results.values()):
+                print("\nError: generation failed — one or more test suites failed", file=sys.stderr)
+                sys.exit(1)
         except Exception as e:
             print(f"\nError: generation aborted — {type(e).__name__}: {e}", file=sys.stderr)
             restore_archived_versions(version_dir, archived)
