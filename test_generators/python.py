@@ -16,11 +16,13 @@ def _pascal_to_snake(name: str) -> str:
 
 class PythonTestGenerator(BaseTestGenerator):
     framework_name = "python"
+    _sdk_dir: str | None = None  # captured in generate(), used by run() to install deps
 
     snake_to_pascal = staticmethod(snake_to_pascal)
     header_to_param = staticmethod(header_to_param)
 
     def generate(self, endpoints: list[dict], sdk_dir: str, test_dir: str) -> None:
+        self._sdk_dir = sdk_dir
         os.makedirs(test_dir, exist_ok=True)
         self.emit_helpers(test_dir, sdk_dir)
         self.emit_conftest(test_dir, sdk_dir)
@@ -31,6 +33,12 @@ class PythonTestGenerator(BaseTestGenerator):
             self.emit_controller_test(controller, eps, test_dir)
 
     def run(self, test_dir: str) -> TestResult:
+        deps = _read_dependencies(self._sdk_dir) if self._sdk_dir else []
+        if deps:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet", *deps],
+                check=True,
+            )
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "-v"],
             cwd=test_dir,
@@ -354,6 +362,27 @@ def _py_literal(value: object) -> str:
     if isinstance(value, (str, list, dict, float, int)):
         return repr(value)
     return str(value)
+
+
+def _read_dependencies(sdk_dir: str) -> list[str]:
+    """Return the generated package's declared runtime deps from its pyproject.toml.
+
+    Single source of truth for what the test env needs — avoids hardcoding deps
+    in CI. Uses stdlib tomllib (3.11+); falls back to a literal-array regex on
+    older interpreters where tomllib is unavailable.
+    """
+    path = os.path.join(sdk_dir, "pyproject.toml")
+    if not os.path.exists(path):
+        return []
+    try:
+        import tomllib
+        with open(path, "rb") as f:
+            return tomllib.load(f).get("project", {}).get("dependencies", [])
+    except ModuleNotFoundError:
+        pass
+    with open(path) as f:
+        m = re.search(r"dependencies\s*=\s*\[(.*?)\]", f.read(), re.DOTALL)
+    return [d.strip().strip("'\"") for d in m.group(1).split(",") if d.strip()] if m else []
 
 
 def _parse_pytest_counts(output: str) -> tuple[int, int, int]:
