@@ -58,6 +58,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         from .licenses import emit_license
         emit_license(output_dir)
         self.build_dist(output_dir)
+        self.prune_package_json_for_publish(output_dir)
 
     def build_dist(self, output_dir: str) -> None:
         npm = shutil.which("npm")
@@ -541,6 +542,18 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         }
         with open(os.path.join(output_dir, "package.json"), "w") as f:
             json.dump(config, f, indent=2)
+            f.write("\n")
+
+    def prune_package_json_for_publish(self, output_dir: str) -> None:
+        """Strip build-only fields after dist is built; consumers never need rollup or the build script."""
+        pkg_path = os.path.join(output_dir, "package.json")
+        if not os.path.isfile(pkg_path):
+            return
+        pkg = json.load(open(pkg_path))
+        pkg.pop("scripts", None)
+        pkg.pop("devDependencies", None)
+        with open(pkg_path, "w") as f:
+            json.dump(pkg, f, indent=2)
             f.write("\n")
 
     # ── internal ──────────────────────────────────────────────────────────────

@@ -634,6 +634,8 @@ The CI workflow runs `python generate.py` with no `--endpoints` argument, so the
 ### npm — `@mediaviz/sdk`
 Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: live SDK version (extracted from output dir via regex), `license: MIT`, `repository`, `publishConfig.access: public`, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles ship — the framework source files are inputs to the build, not part of the consumer payload.
 
+The Rollup build toolchain (`scripts.build` + the `rollup`/`@rollup/plugin-*` `devDependencies`) is needed only to produce the dist bundles, so `generate()` calls `prune_package_json_for_publish` immediately after `build_dist`: it removes `scripts` and `devDependencies` from the manifest before publish, leaving the published `package.json` with no build-only fields. `optionalDependencies` (`sharp`) is preserved as a real runtime optional dep. Net effect: a consumer running `npm install @mediaviz/sdk` pulls only the dist bundles + `sharp` (optional) — never Rollup.
+
 Auth via **npm Trusted Publishing** (OIDC). The workflow declares `permissions: id-token: write` and runs `npm publish --access public --tag <branch-tag> --provenance` from `sdk/v*/javascript/`. No long-lived `NPM_TOKEN` exists. npm verifies the GitHub-issued OIDC token against the trusted publisher config registered at the npm package level (org=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml).
 
 ### Packagist — `mediaviz/sdk`

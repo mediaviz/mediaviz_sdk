@@ -65,6 +65,7 @@
 - **`generate.py:22`** — `--endpoints` defaults to `public_sdk_endpoints` so CI runs (which omit the flag) ship the public-facing SDK. Manual `--endpoints all_endpoints` still works for internal builds.
 - **`generators/licenses.py`** — shared MIT license text + `emit_license(output_dir)` + `extract_sdk_version(output_dir)`. JS/PHP/Python generators all import these.
 - **`generators/javascript_browser.py:emit_package_json`** — emits live version (via regex), `license: MIT`, `repository`, `publishConfig.access: public`, `files: ["dist", "LICENSE", "README.md"]`. JS generator's `generate()` calls `emit_license()` after manifest.
+- **`generators/javascript_browser.py:prune_package_json_for_publish`** — called by `generate()` right after `build_dist`. Strips build-only fields (`scripts`, `devDependencies` — the Rollup toolchain) from the manifest so the published package carries no build deps; keeps `optionalDependencies` (`sharp`). Consumers `npm install`ing the SDK never pull Rollup.
 - **`generators/php.py:emit_autoload_config`** — emits live `version`, `license: MIT`, `type: library`, `description`. PHP generator's `generate()` calls `emit_license()` after manifest.
 - **`generators/python.py:generate()`** — calls `emit_license()` for symmetry; `pyproject.toml` already carries its own version.
 - **`update-sdk.yml`** propagate-mode publish steps:
