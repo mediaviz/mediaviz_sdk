@@ -1496,6 +1496,22 @@
 	    return data;
 	  }
 
+	  async searchProjectPhotosNaturalLanguageAuto(projectTableName, searchText, size = undefined, { blend, minCosine } = {}) {
+	    this._ctx.requireTokens();
+	    let path = `/api/v1/search/auto/${encodeURIComponent(projectTableName)}/`;
+	    const query = new URLSearchParams();
+	    if (blend !== undefined) (Array.isArray(blend) ? blend : [blend]).forEach(v => query.append('blend', v));
+	    if (minCosine !== undefined) (Array.isArray(minCosine) ? minCosine : [minCosine]).forEach(v => query.append('min_cosine', v));
+	    const qs = query.toString();
+	    if (qs) path += '?' + qs;
+	    const body = stripUndef$1({
+	      search_text: searchText,
+	      size: size,
+	    });
+	    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
+	    return data;
+	  }
+
 	  async getProjectSavedSearches(projectTableName) {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/search/saved/${encodeURIComponent(projectTableName)}/`;

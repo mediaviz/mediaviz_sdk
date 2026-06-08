@@ -1,5 +1,5 @@
 source: public_sdk_endpoints.yaml
-resolved_at: '2026-06-04T11:31:21Z'
+resolved_at: '2026-06-08T14:17:03Z'
 endpoints:
 - id: get_get_model_credit_relationship
   function_name: get_model_credit_relationship
@@ -2660,6 +2660,50 @@ endpoints:
   method: POST
   path: /api/v1/search/nl_hybrid/{project_table_name}/
   summary: search_project_photos_natural_language_hybrid
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: blend
+    in: query
+    type: str
+    required: false
+  - name: min_cosine
+    in: query
+    type: float
+    required: false
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_search_project_photos_natural_language_auto
+  function_name: search_project_photos_natural_language_auto
+  controller: Search
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/search/auto/{project_table_name}/
+  summary: search_project_photos_natural_language_auto
   auth: required
   params:
   - name: project_table_name

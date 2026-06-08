@@ -117,6 +117,29 @@ class Search:
         }.items() if v is not None}
         return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
 
+    def search_project_photos_natural_language_auto(
+        self,
+        project_table_name: str,
+        searchText: str,
+        size: int | None = None,
+        blend: str | None = None,
+        min_cosine: float | None = None,
+    ) -> dict[str, Any]:
+        self._ctx.require_tokens()
+        path = '/api/v1/search/auto/' + quote(str(project_table_name), safe='') + '/'
+        _q: dict[str, Any] = {}
+        if blend is not None:
+            _q['blend'] = blend
+        if min_cosine is not None:
+            _q['min_cosine'] = min_cosine
+        if _q:
+            path += '?' + urlencode(_q, doseq=True)
+        body = {k: v for k, v in {
+            'search_text': searchText,
+            'size': size,
+        }.items() if v is not None}
+        return self._ctx.client.request(path, 'POST', self._ctx.access_token, self._ctx.refresh_token, body).data
+
     def get_project_saved_searches(self, project_table_name: str) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/search/saved/' + quote(str(project_table_name), safe='') + '/'

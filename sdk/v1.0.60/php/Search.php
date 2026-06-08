@@ -109,6 +109,32 @@ class Search {
         return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
     }
 
+    public function searchProjectPhotosNaturalLanguageAuto(
+        string $projectTableName,
+        string $searchText,
+        ?int $size = null,
+        ?string $blend = null,
+        ?float $minCosine = null
+    ): mixed {
+        $this->ctx->requireTokens();
+        $path = "/api/v1/search/auto/" . rawurlencode((string)$projectTableName) . "/";
+        $query = [];
+        if ($blend !== null) $query['blend'] = $blend;
+        if ($minCosine !== null) $query['min_cosine'] = $minCosine;
+        if ($query) {
+            $pairs = [];
+            foreach ($query as $k => $v) {
+                foreach ((is_array($v) ? $v : [$v]) as $vv) $pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);
+            }
+            $path .= '?' . implode('&', $pairs);
+        }
+        $body = array_filter([
+            'search_text' => $searchText,
+            'size' => $size,
+        ], fn($v) => $v !== null);
+        return $this->ctx->client->request($path, 'POST', $this->ctx->accessToken, $this->ctx->refreshToken, $body)->data;
+    }
+
     public function getProjectSavedSearches(string $projectTableName): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/search/saved/" . rawurlencode((string)$projectTableName) . "/";

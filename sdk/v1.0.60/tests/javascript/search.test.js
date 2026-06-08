@@ -182,6 +182,55 @@ describe('Search', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('searchProjectPhotosNaturalLanguageAuto — exists', () => {
+    const search = new Search({});
+    expect(typeof search.searchProjectPhotosNaturalLanguageAuto).toBe('function');
+  });
+
+  it('searchProjectPhotosNaturalLanguageAuto — HTTP method is POST', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, { blend: 'test_value', minCosine: 3.14 });
+    expect(spy.last_call().method).toBe('POST');
+  });
+
+  it('searchProjectPhotosNaturalLanguageAuto — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosNaturalLanguageAuto('hello world', 'test_value', 42, { blend: 'test_value', minCosine: 3.14 });
+    expect(spy.last_call().path).toContain('/api/v1/search/auto/hello%20world/');
+  });
+
+  it('searchProjectPhotosNaturalLanguageAuto — query params', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, { blend: 'test_value', minCosine: 3.14 });
+    const path = spy.last_call().path;
+    expect(path).toContain('blend=');
+    expect(path).toContain('min_cosine=');
+  });
+
+  it('searchProjectPhotosNaturalLanguageAuto — request body', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, { blend: 'test_value', minCosine: 3.14 });
+    const body = spy.last_call().body;
+    expect(body).toHaveProperty('search_text');
+    expect(body).toHaveProperty('size');
+  });
+
+  it('searchProjectPhotosNaturalLanguageAuto — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const search = new Search(ctx);
+    await search.searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, { blend: 'test_value', minCosine: 3.14 });
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('getProjectSavedSearches — exists', () => {
     const search = new Search({});
     expect(typeof search.getProjectSavedSearches).toBe('function');

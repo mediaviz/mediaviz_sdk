@@ -1,3 +1,5 @@
+'use strict';
+
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -1490,6 +1492,22 @@ class Search {
     return data;
   }
 
+  async searchProjectPhotosNaturalLanguageAuto(projectTableName, searchText, size = undefined, { blend, minCosine } = {}) {
+    this._ctx.requireTokens();
+    let path = `/api/v1/search/auto/${encodeURIComponent(projectTableName)}/`;
+    const query = new URLSearchParams();
+    if (blend !== undefined) (Array.isArray(blend) ? blend : [blend]).forEach(v => query.append('blend', v));
+    if (minCosine !== undefined) (Array.isArray(minCosine) ? minCosine : [minCosine]).forEach(v => query.append('min_cosine', v));
+    const qs = query.toString();
+    if (qs) path += '?' + qs;
+    const body = stripUndef$1({
+      search_text: searchText,
+      size: size,
+    });
+    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
+    return data;
+  }
+
   async getProjectSavedSearches(projectTableName) {
     this._ctx.requireTokens();
     const path = `/api/v1/search/saved/${encodeURIComponent(projectTableName)}/`;
@@ -1739,4 +1757,29 @@ class MediaViz {
   get refreshToken() { return this._refreshToken; }
 }
 
-export { AiModelCredits, ApiError, Company, CuratedAlbums, CustomAlbums, EmailTokens, Health, Keywords, MediaViz, NotFoundError, OAuthClient, OAuthError, OAuthErrorCode, OauthAuthorization, OauthLogin, OauthToken, Person, Photos, Photoupload, Projects, RateLimitError, Search, ServerError, Users, ValidationError, handleResponse };
+exports.AiModelCredits = AiModelCredits;
+exports.ApiError = ApiError;
+exports.Company = Company;
+exports.CuratedAlbums = CuratedAlbums;
+exports.CustomAlbums = CustomAlbums;
+exports.EmailTokens = EmailTokens;
+exports.Health = Health;
+exports.Keywords = Keywords;
+exports.MediaViz = MediaViz;
+exports.NotFoundError = NotFoundError;
+exports.OAuthClient = OAuthClient;
+exports.OAuthError = OAuthError;
+exports.OAuthErrorCode = OAuthErrorCode;
+exports.OauthAuthorization = OauthAuthorization;
+exports.OauthLogin = OauthLogin;
+exports.OauthToken = OauthToken;
+exports.Person = Person;
+exports.Photos = Photos;
+exports.Photoupload = Photoupload;
+exports.Projects = Projects;
+exports.RateLimitError = RateLimitError;
+exports.Search = Search;
+exports.ServerError = ServerError;
+exports.Users = Users;
+exports.ValidationError = ValidationError;
+exports.handleResponse = handleResponse;

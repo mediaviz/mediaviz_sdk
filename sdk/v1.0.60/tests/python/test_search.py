@@ -102,6 +102,33 @@ def test_post_search_project_photos_natural_language_hybrid_request_body(mv_clie
     assert 'search_text' in body
     assert 'size' in body
 
+def test_post_search_project_photos_natural_language_auto_exists(mv_client):
+    assert callable(getattr(mv_client.search, 'search_project_photos_natural_language_auto', None))
+
+def test_post_search_project_photos_natural_language_auto_http_method(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_natural_language_auto('test_value', 'test_value', 42, 'test_value', 3.14)
+    assert spy_client.last_call()['method'] == 'POST'
+
+def test_post_search_project_photos_natural_language_auto_path(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_natural_language_auto('hello world', 'test_value', 42, 'test_value', 3.14)
+    assert '/api/v1/search/auto/hello%20world/' in spy_client.last_call()['url']
+
+def test_post_search_project_photos_natural_language_auto_query_params(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_natural_language_auto('test_value', 'test_value', 42, 'test_value', 3.14)
+    url = spy_client.last_call()['url']
+    assert 'blend=' in url
+    assert 'min_cosine=' in url
+
+def test_post_search_project_photos_natural_language_auto_request_body(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.search.search_project_photos_natural_language_auto('test_value', 'test_value', 42, 'test_value', 3.14)
+    body = spy_client.last_call()['body']
+    assert 'search_text' in body
+    assert 'size' in body
+
 def test_get_get_project_saved_searches_exists(mv_client):
     assert callable(getattr(mv_client.search, 'get_project_saved_searches', None))
 

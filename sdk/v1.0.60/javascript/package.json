@@ -1,6 +1,6 @@
 {
   "name": "@mediaviz/sdk",
-  "version": "1.0.59",
+  "version": "1.0.60",
   "description": "MediaViz JavaScript SDK \u2014 auto-generated public endpoint client.",
   "license": "MIT",
   "repository": {
