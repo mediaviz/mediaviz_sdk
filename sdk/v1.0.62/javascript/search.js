@@ -66,12 +66,14 @@ export class Search {
     return data;
   }
 
-  async searchProjectPhotosNaturalLanguageAuto(projectTableName, searchText, size = undefined, { blend, minCosine } = {}) {
+  async searchProjectPhotosNaturalLanguageAuto(projectTableName, searchText, size = undefined, { blend, minCosine, labelMinCosine, labelTopK } = {}) {
     this._ctx.requireTokens();
     let path = `/api/v1/search/auto/${encodeURIComponent(projectTableName)}/`;
     const query = new URLSearchParams();
     if (blend !== undefined) (Array.isArray(blend) ? blend : [blend]).forEach(v => query.append('blend', v));
     if (minCosine !== undefined) (Array.isArray(minCosine) ? minCosine : [minCosine]).forEach(v => query.append('min_cosine', v));
+    if (labelMinCosine !== undefined) (Array.isArray(labelMinCosine) ? labelMinCosine : [labelMinCosine]).forEach(v => query.append('label_min_cosine', v));
+    if (labelTopK !== undefined) (Array.isArray(labelTopK) ? labelTopK : [labelTopK]).forEach(v => query.append('label_top_k', v));
     const qs = query.toString();
     if (qs) path += '?' + qs;
     const body = stripUndef({

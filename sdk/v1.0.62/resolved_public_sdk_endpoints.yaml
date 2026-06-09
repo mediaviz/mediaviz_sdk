@@ -1,5 +1,5 @@
 source: public_sdk_endpoints.yaml
-resolved_at: '2026-06-09T12:33:21Z'
+resolved_at: '2026-06-09T17:08:43Z'
 endpoints:
 - id: get_get_model_credit_relationship
   function_name: get_model_credit_relationship
@@ -2743,6 +2743,14 @@ endpoints:
     in: query
     type: float
     required: false
+  - name: label_min_cosine
+    in: query
+    type: float
+    required: false
+  - name: label_top_k
+    in: query
+    type: int
+    required: false
   request_body:
     _shape: expanded
     fields:
@@ -2760,7 +2768,10 @@ endpoints:
       kind: primitive
       orig_path:
       - size
-  response: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
   content_type: null
   tags:
   - all

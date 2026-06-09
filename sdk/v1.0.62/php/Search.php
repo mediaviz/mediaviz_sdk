@@ -114,13 +114,17 @@ class Search {
         string $searchText,
         ?int $size = null,
         ?string $blend = null,
-        ?float $minCosine = null
+        ?float $minCosine = null,
+        ?float $labelMinCosine = null,
+        ?int $labelTopK = null
     ): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/search/auto/" . rawurlencode((string)$projectTableName) . "/";
         $query = [];
         if ($blend !== null) $query['blend'] = $blend;
         if ($minCosine !== null) $query['min_cosine'] = $minCosine;
+        if ($labelMinCosine !== null) $query['label_min_cosine'] = $labelMinCosine;
+        if ($labelTopK !== null) $query['label_top_k'] = $labelTopK;
         if ($query) {
             $pairs = [];
             foreach ($query as $k => $v) {

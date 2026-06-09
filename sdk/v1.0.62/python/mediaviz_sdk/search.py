@@ -124,6 +124,8 @@ class Search:
         size: int | None = None,
         blend: str | None = None,
         min_cosine: float | None = None,
+        label_min_cosine: float | None = None,
+        label_top_k: int | None = None,
     ) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/search/auto/' + quote(str(project_table_name), safe='') + '/'
@@ -132,6 +134,10 @@ class Search:
             _q['blend'] = blend
         if min_cosine is not None:
             _q['min_cosine'] = min_cosine
+        if label_min_cosine is not None:
+            _q['label_min_cosine'] = label_min_cosine
+        if label_top_k is not None:
+            _q['label_top_k'] = label_top_k
         if _q:
             path += '?' + urlencode(_q, doseq=True)
         body = {k: v for k, v in {

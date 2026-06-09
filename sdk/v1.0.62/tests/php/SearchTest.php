@@ -173,30 +173,32 @@ class SearchTest extends TestCase {
     public function test_post_search_project_photos_natural_language_auto_http_method(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14);
+        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14, 3.14, 42);
         $this->assertSame('POST', $ctx->client->lastCall()['method']);
     }
 
     public function test_post_search_project_photos_natural_language_auto_path(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguageAuto('hello world', 'test_value', 42, 'test_value', 3.14);
+        $obj->searchProjectPhotosNaturalLanguageAuto('hello world', 'test_value', 42, 'test_value', 3.14, 3.14, 42);
         $this->assertStringContainsString('/api/v1/search/auto/hello%20world/', $ctx->client->lastCall()['path']);
     }
 
     public function test_post_search_project_photos_natural_language_auto_query_params(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14);
+        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14, 3.14, 42);
         $path = $ctx->client->lastCall()['path'];
         $this->assertStringContainsString('blend=', $path);
         $this->assertStringContainsString('min_cosine=', $path);
+        $this->assertStringContainsString('label_min_cosine=', $path);
+        $this->assertStringContainsString('label_top_k=', $path);
     }
 
     public function test_post_search_project_photos_natural_language_auto_request_body(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14);
+        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14, 3.14, 42);
         $body = $ctx->client->lastCall()['body'];
         $this->assertArrayHasKey('search_text', $body);
         $this->assertArrayHasKey('size', $body);
@@ -205,7 +207,7 @@ class SearchTest extends TestCase {
     public function test_post_search_project_photos_natural_language_auto_auth_routing(): void {
         $ctx = new \OAuthSdk\SpyAuthContext();
         $obj = new Search($ctx);
-        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14);
+        $obj->searchProjectPhotosNaturalLanguageAuto('test_value', 'test_value', 42, 'test_value', 3.14, 3.14, 42);
         $this->assertCount(1, $ctx->client->calls);
     }
 
