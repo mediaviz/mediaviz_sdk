@@ -35,6 +35,19 @@ def test_get_get_user_keyword_filtering_lists_path(mv_client, spy_client):
     mv_client.keywords.get_user_keyword_filtering_lists()
     assert '/api/v1/keyword/user' in spy_client.last_call()['url']
 
+def test_get_get_company_keyword_lists_exists(mv_client):
+    assert callable(getattr(mv_client.keywords, 'get_company_keyword_lists', None))
+
+def test_get_get_company_keyword_lists_http_method(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.keywords.get_company_keyword_lists(42)
+    assert spy_client.last_call()['method'] == 'GET'
+
+def test_get_get_company_keyword_lists_path(mv_client, spy_client):
+    spy_client.reset()
+    mv_client.keywords.get_company_keyword_lists(42)
+    assert '/api/v1/keyword/company/42' in spy_client.last_call()['url']
+
 def test_get_get_keyword_filtering_list_and_projects_by_id_exists(mv_client):
     assert callable(getattr(mv_client.keywords, 'get_keyword_filtering_list_and_projects_by_id', None))
 

@@ -71,6 +71,35 @@ describe('Keywords', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('getCompanyKeywordLists — exists', () => {
+    const keywords = new Keywords({});
+    expect(typeof keywords.getCompanyKeywordLists).toBe('function');
+  });
+
+  it('getCompanyKeywordLists — HTTP method is GET', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.getCompanyKeywordLists(42);
+    expect(spy.last_call().method).toBe('GET');
+  });
+
+  it('getCompanyKeywordLists — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.getCompanyKeywordLists(42);
+    expect(spy.last_call().path).toContain('/api/v1/keyword/company/42');
+  });
+
+  it('getCompanyKeywordLists — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.getCompanyKeywordLists(42);
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('getKeywordFilteringListAndProjectsById — exists', () => {
     const keywords = new Keywords({});
     expect(typeof keywords.getKeywordFilteringListAndProjectsById).toBe('function');

@@ -25,6 +25,12 @@ class Keywords {
         return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
     }
 
+    public function getCompanyKeywordLists(int $companyId): mixed {
+        $this->ctx->requireTokens();
+        $path = "/api/v1/keyword/company/" . rawurlencode((string)$companyId);
+        return $this->ctx->client->request($path, 'GET', $this->ctx->accessToken, $this->ctx->refreshToken)->data;
+    }
+
     public function getKeywordFilteringListAndProjectsById(int $keywordListId): mixed {
         $this->ctx->requireTokens();
         $path = "/api/v1/keyword/" . rawurlencode((string)$keywordListId);
