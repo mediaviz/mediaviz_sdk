@@ -67,6 +67,31 @@ class KeywordsTest extends TestCase {
         $this->assertCount(1, $ctx->client->calls);
     }
 
+    public function test_get_get_company_keyword_lists_exists(): void {
+        $this->assertTrue(method_exists(Keywords::class, 'getCompanyKeywordLists'));
+    }
+
+    public function test_get_get_company_keyword_lists_http_method(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Keywords($ctx);
+        $obj->getCompanyKeywordLists(42);
+        $this->assertSame('GET', $ctx->client->lastCall()['method']);
+    }
+
+    public function test_get_get_company_keyword_lists_path(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Keywords($ctx);
+        $obj->getCompanyKeywordLists(42);
+        $this->assertStringContainsString('/api/v1/keyword/company/42', $ctx->client->lastCall()['path']);
+    }
+
+    public function test_get_get_company_keyword_lists_auth_routing(): void {
+        $ctx = new \OAuthSdk\SpyAuthContext();
+        $obj = new Keywords($ctx);
+        $obj->getCompanyKeywordLists(42);
+        $this->assertCount(1, $ctx->client->calls);
+    }
+
     public function test_get_get_keyword_filtering_list_and_projects_by_id_exists(): void {
         $this->assertTrue(method_exists(Keywords::class, 'getKeywordFilteringListAndProjectsById'));
     }

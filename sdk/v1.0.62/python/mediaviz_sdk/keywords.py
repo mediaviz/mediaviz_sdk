@@ -28,6 +28,11 @@ class Keywords:
         path = '/api/v1/keyword/user'
         return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
 
+    def get_company_keyword_lists(self, company_id: int) -> dict[str, Any]:
+        self._ctx.require_tokens()
+        path = '/api/v1/keyword/company/' + quote(str(company_id), safe='')
+        return self._ctx.client.request(path, 'GET', self._ctx.access_token, self._ctx.refresh_token).data
+
     def get_keyword_filtering_list_and_projects_by_id(self, keyword_list_id: int) -> dict[str, Any]:
         self._ctx.require_tokens()
         path = '/api/v1/keyword/' + quote(str(keyword_list_id), safe='')

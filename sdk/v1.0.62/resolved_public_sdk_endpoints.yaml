@@ -1,5 +1,5 @@
 source: public_sdk_endpoints.yaml
-resolved_at: '2026-06-08T19:05:48Z'
+resolved_at: '2026-06-09T16:55:03Z'
 endpoints:
 - id: get_get_model_credit_relationship
   function_name: get_model_credit_relationship
@@ -867,6 +867,31 @@ endpoints:
     body:
       type: List[KeywordListDisplayWithProjects]
       $ref: api_schemas.yaml#KeywordListDisplayWithProjects
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_company_keyword_lists
+  function_name: get_company_keyword_lists
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/company/{company_id}
+  summary: get_company_keyword_lists
+  auth: required
+  params:
+  - name: company_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[CompanyKeywordListOverview]
+      $ref: api_schemas.yaml#CompanyKeywordListOverview
   content_type: null
   tags:
   - all
