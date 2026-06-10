@@ -115,27 +115,13 @@ jobs:
         # --admin implies --endpoints all_endpoints.
         run: python generate.py --frameworks javascript --destination-dir admin-sdk --admin ${{ steps.bump.outputs.flag }}
 
-      - name: Configure git identity
-        if: steps.ctx.outputs.mode == 'propagate'
-        working-directory: mediaviz_sdk
-        run: |
-          git config user.name "mediaviz-pipeline-bot[bot]"
-          git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
-
-      - name: Commit + push regenerated SDKs
-        if: steps.ctx.outputs.mode == 'propagate'
-        working-directory: mediaviz_sdk
-        run: |
-          HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
-          if [ -n "$(git status --porcelain sdk/ admin-sdk/)" ]; then
-            git add -A sdk/ admin-sdk/
-            git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
-            git push origin HEAD:${{ steps.ctx.outputs.branch }}
-          else
-            echo "No SDK changes to commit."
-          fi
-
-      # ── npm + Packagist publish (all propagate runs) ───────────────────────
+      # ── Locate + content-hash gate ─────────────────────────────────────────
+      # Each generator unconditionally archives the prior vN/ and creates a fresh
+      # vN+1/, so every run produces a version-bump diff regardless of whether
+      # the underlying endpoint set actually changed. To avoid no-op commits + npm
+      # republishes (e.g. an admin-only external_api change would otherwise still
+      # bump @mediaviz/sdk with byte-identical dist), we hash dist/ against the
+      # most-recent archive entry and skip whichever side is unchanged.
       - name: Locate freshly-generated SDK dirs
         if: steps.ctx.outputs.mode == 'propagate'
         id: dirs
@@ -153,12 +139,83 @@ jobs:
           echo "Located admin JS: $ADMIN_JS_DIR"
           echo "Version: $VERSION"
 
-      - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
+      - name: Detect content changes (skip no-op publishes)
         if: steps.ctx.outputs.mode == 'propagate'
+        id: changes
+        run: |
+          hash_dist() {
+            local dir="$1"
+            [ -d "$dir" ] || { echo "missing"; return; }
+            find "$dir" -type f | sort | xargs cat 2>/dev/null | sha256sum | awk '{print $1}'
+          }
+          # Public sdk: compare new vN+1/javascript/dist against the most-recent archive entry
+          NEW_PUB="${{ steps.dirs.outputs.js_dir }}/dist"
+          OLD_PUB=$(ls -d mediaviz_sdk/sdk/archive/v*/javascript/dist 2>/dev/null | sort -V | tail -1)
+          if [ -z "$OLD_PUB" ] || [ "$(hash_dist "$NEW_PUB")" != "$(hash_dist "$OLD_PUB")" ]; then
+            echo "public_changed=true" >> $GITHUB_OUTPUT
+            echo "Public dist content changed — will commit + publish sdk/."
+          else
+            echo "public_changed=false" >> $GITHUB_OUTPUT
+            echo "Public dist content unchanged — skipping commit + publish for sdk/."
+          fi
+          # Admin sdk: same comparison against admin-sdk/archive/
+          NEW_ADM="${{ steps.dirs.outputs.admin_js_dir }}/dist"
+          OLD_ADM=$(ls -d mediaviz_sdk/admin-sdk/archive/v*/javascript/dist 2>/dev/null | sort -V | tail -1)
+          if [ -z "$OLD_ADM" ] || [ "$(hash_dist "$NEW_ADM")" != "$(hash_dist "$OLD_ADM")" ]; then
+            echo "admin_changed=true" >> $GITHUB_OUTPUT
+            echo "Admin dist content changed — will commit + publish admin-sdk/."
+          else
+            echo "admin_changed=false" >> $GITHUB_OUTPUT
+            echo "Admin dist content unchanged — skipping commit + publish for admin-sdk/."
+          fi
+
+      - name: Discard unchanged generator output
+        # When a side's hash matches the prior archived version, revert its
+        # working-tree changes so the commit step doesn't pick them up.
+        # The generator deleted the prior tracked vN/ and created untracked vN+1/
+        # (+ untracked archive/vN/ which is gitignored). `restore` brings vN back;
+        # `clean -fd` removes vN+1 and the gitignored archive copy.
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'false' || steps.changes.outputs.admin_changed == 'false')
+        working-directory: mediaviz_sdk
+        run: |
+          if [ "${{ steps.changes.outputs.public_changed }}" = "false" ]; then
+            git restore sdk/
+            git clean -fd sdk/
+            echo "Reverted sdk/ — no public content diff."
+          fi
+          if [ "${{ steps.changes.outputs.admin_changed }}" = "false" ]; then
+            git restore admin-sdk/
+            git clean -fd admin-sdk/
+            echo "Reverted admin-sdk/ — no admin content diff."
+          fi
+
+      - name: Configure git identity
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
+        working-directory: mediaviz_sdk
+        run: |
+          git config user.name "mediaviz-pipeline-bot[bot]"
+          git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
+
+      - name: Commit + push regenerated SDKs
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
+        working-directory: mediaviz_sdk
+        run: |
+          HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
+          if [ -n "$(git status --porcelain sdk/ admin-sdk/)" ]; then
+            git add -A sdk/ admin-sdk/
+            git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
+            git push origin HEAD:${{ steps.ctx.outputs.branch }}
+          else
+            echo "No SDK changes to commit."
+          fi
+
+      # ── npm + Packagist publish (gated per-package on content hash) ────────
+      - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
         run: npm install -g npm@latest
 
       - name: Determine npm dist-tag
-        if: steps.ctx.outputs.mode == 'propagate'
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
         id: npm-meta
         run: |
           case "${{ steps.ctx.outputs.branch }}" in
@@ -168,19 +225,19 @@ jobs:
           esac
 
       - name: Publish @mediaviz/sdk to npm
-        if: steps.ctx.outputs.mode == 'propagate'
+        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'
         working-directory: ${{ steps.dirs.outputs.js_dir }}
         run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
 
       - name: Publish @mediaviz/admin-sdk to npm
-        if: steps.ctx.outputs.mode == 'propagate'
+        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.admin_changed == 'true'
         working-directory: ${{ steps.dirs.outputs.admin_js_dir }}
         # --access restricted matches publishConfig and keeps the admin package private even on main
         run: npm publish --access restricted --tag ${{ steps.npm-meta.outputs.tag }} --provenance
 
-      # ── Packagist publish (main propagate only) ────────────────────────────
+      # ── Packagist publish (main propagate only, gated on public content change) ─
       - name: Checkout mediaviz_php_sdk
-        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
+        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main' && steps.changes.outputs.public_changed == 'true'
         uses: actions/checkout@v4
         with:
           repository: mediaviz/mediaviz-php-sdk
@@ -190,7 +247,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sync PHP SDK → mediaviz_php_sdk + tag + push
-        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
+        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main' && steps.changes.outputs.public_changed == 'true'
         run: |
           rsync -av --delete --exclude=.git "${{ steps.dirs.outputs.php_dir }}/" mediaviz_php_sdk/
           cd mediaviz_php_sdk
@@ -207,7 +264,7 @@ jobs:
           fi
 
       - name: Trigger Packagist refresh
-        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main'
+        if: steps.ctx.outputs.mode == 'propagate' && steps.ctx.outputs.branch == 'main' && steps.changes.outputs.public_changed == 'true'
         env:
           PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
           PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
