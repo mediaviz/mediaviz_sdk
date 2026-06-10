@@ -10,3 +10,7 @@ package-lock.json
 # PHP dependencies
 vendor/
 composer.lock
+
+# Local npm auth — must never be committed
+.npmrc
+**/.npmrc

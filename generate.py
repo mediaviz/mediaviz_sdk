@@ -19,14 +19,18 @@ SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk")
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate MediaViz SDK libraries from endpoint specs.")
-    p.add_argument("--endpoints", default="public_sdk_endpoints", help="Flow name resolved against common_flows/sdk_endpoints/ then api_docs/endpoint_list/ (e.g. 'basic_sdk_flow_endpoints', 'all_endpoints'). Default: 'public_sdk_endpoints' (public-facing SDK).")
+    p.add_argument("--endpoints", default=None, help="Flow name resolved against common_flows/sdk_endpoints/ then api_docs/endpoint_list/ (e.g. 'basic_sdk_flow_endpoints', 'all_endpoints'). Default: 'all_endpoints' when --admin is set, else 'public_sdk_endpoints'.")
     p.add_argument("--branch", default=None, help="Git branch to use for all source repos. Falls back to main if not found.")
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
     p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk.")
+    p.add_argument("--admin", action="store_true", help="Build admin variant: emits @mediaviz/admin-sdk with publishConfig.access=restricted, and implies --endpoints all_endpoints when --endpoints is unset. Intended for use with --frameworks javascript --destination-dir admin-sdk.")
     bump = p.add_mutually_exclusive_group()
     bump.add_argument("--minor-version", action="store_true", help="Increment minor version and reset iteration to 0.")
     bump.add_argument("--major-version", action="store_true", help="Increment major version and reset minor+iteration to 0.")
-    return p.parse_args()
+    args = p.parse_args()
+    if args.endpoints is None:
+        args.endpoints = "all_endpoints" if args.admin else "public_sdk_endpoints"
+    return args
 
 
 def print_test_summary(results: dict[str, TestResult]) -> None:
@@ -149,7 +153,7 @@ def main() -> None:
                 fw_dir = os.path.join(version_dir, framework)
                 os.makedirs(fw_dir, exist_ok=True)
                 gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)
-                gen.generate(endpoints, fw_dir, composites=composites, utilities=utilities)
+                gen.generate(endpoints, fw_dir, composites=composites, utilities=utilities, admin=args.admin)
                 file_counts[framework] = sum(len(files) for _, _, files in os.walk(fw_dir))
 
             print(f"\nSDK v{ver} generated:")

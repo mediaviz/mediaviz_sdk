@@ -27,7 +27,7 @@ def _js_safe(name: str) -> str:
 class JavaScriptBrowserGenerator(BaseGenerator):
     framework_name = "javascript"
 
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False) -> None:
         os.makedirs(output_dir, exist_ok=True)
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
@@ -54,7 +54,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         reexport_files = self.reexport_all_modules(output_dir)
         self.emit_barrel_index(controller_files, output_dir, extra_files=reexport_files)
         self.emit_rollup_config(output_dir)
-        self.emit_package_json(output_dir)
+        self.emit_package_json(output_dir, admin=admin)
         from .licenses import emit_license
         emit_license(output_dir)
         self.build_dist(output_dir)
@@ -501,12 +501,16 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         with open(os.path.join(output_dir, "rollup.config.js"), "w") as f:
             f.write(content)
 
-    def emit_package_json(self, output_dir: str) -> None:
+    def emit_package_json(self, output_dir: str, admin: bool = False) -> None:
         from .licenses import extract_sdk_version
         config = {
-            "name": "@mediaviz/sdk",
+            "name": "@mediaviz/admin-sdk" if admin else "@mediaviz/sdk",
             "version": extract_sdk_version(output_dir),
-            "description": "MediaViz JavaScript SDK — auto-generated public endpoint client.",
+            "description": (
+                "MediaViz JavaScript Admin SDK — auto-generated full endpoint client (private)."
+                if admin else
+                "MediaViz JavaScript SDK — auto-generated public endpoint client."
+            ),
             "license": "MIT",
             "repository": {
                 "type": "git",
@@ -526,7 +530,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             },
             "files": ["dist", "LICENSE", "README.md"],
             "publishConfig": {
-                "access": "public",
+                "access": "restricted" if admin else "public",
             },
             "scripts": {
                 "build": "rollup -c",

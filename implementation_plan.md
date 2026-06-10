@@ -62,13 +62,16 @@
 
 ## Publishing
 
-- **`generate.py:22`** — `--endpoints` defaults to `public_sdk_endpoints` so CI runs (which omit the flag) ship the public-facing SDK. Manual `--endpoints all_endpoints` still works for internal builds.
+- **`generate.py`** — `--endpoints` is unset by default; resolved post-parse to `all_endpoints` when `--admin` is passed, else `public_sdk_endpoints`. Explicit `--endpoints X` always wins. New `--admin` boolean flag switches the JS generator into private-package mode (`@mediaviz/admin-sdk`, `publishConfig.access: restricted`) AND implies `--endpoints all_endpoints`; intended companion flags are `--frameworks javascript --destination-dir admin-sdk`. The flag is threaded through `BaseGenerator.generate(..., admin=False)` and consumed only by the JS generator's `emit_package_json`; PHP/Python accept and ignore it.
 - **`generators/licenses.py`** — shared MIT license text + `emit_license(output_dir)` + `extract_sdk_version(output_dir)`. JS/PHP/Python generators all import these.
 - **`generators/javascript_browser.py:emit_package_json`** — emits live version (via regex), `license: MIT`, `repository`, `publishConfig.access: public`, `files: ["dist", "LICENSE", "README.md"]`. JS generator's `generate()` calls `emit_license()` after manifest.
 - **`generators/javascript_browser.py:prune_package_json_for_publish`** — called by `generate()` right after `build_dist`. Strips build-only fields (`scripts`, `devDependencies` — the Rollup toolchain) from the manifest so the published package carries no build deps; keeps `optionalDependencies` (`sharp`). Consumers `npm install`ing the SDK never pull Rollup.
 - **`generators/php.py:emit_autoload_config`** — emits live `version`, `license: MIT`, `type: library`, `description`. PHP generator's `generate()` calls `emit_license()` after manifest.
 - **`generators/python.py:generate()`** — calls `emit_license()` for symmetry; `pyproject.toml` already carries its own version.
 - **`update-sdk.yml`** propagate-mode publish steps:
-  - **npm** (every dev/qa/main): via Trusted Publishing (OIDC). `permissions: id-token: write`, `npm install -g npm@latest`, `npm publish --access public --tag <dev|qa|latest> --provenance` from `sdk/v*/javascript/`. No `NPM_TOKEN` secret.
+  - **Generate twice**: public (`python generate.py $BUMP`) then admin (`python generate.py --frameworks javascript --destination-dir admin-sdk --admin $BUMP` — `--admin` implies `--endpoints all_endpoints`). Both runs honor `--minor-version` on main so versions stay roughly aligned.
+  - **Commit step** stages both `sdk/` and `admin-sdk/` in a single commit.
+  - **npm public** (every dev/qa/main): via Trusted Publishing (OIDC). `permissions: id-token: write`, `npm install -g npm@latest`, `npm publish --access public --tag <dev|qa|latest> --provenance` from `sdk/v*/javascript/`. No `NPM_TOKEN` secret.
+  - **npm admin** (every dev/qa/main): same dist-tag logic, `npm publish --access restricted --tag <dev|qa|latest> --provenance` from `admin-sdk/v*/javascript/`. Requires a **separate** Trusted Publisher entry at the npm package level for `@mediaviz/admin-sdk` (same org/repo/workflow).
   - **Packagist** (main only): checkout `mediaviz/mediaviz_php_sdk` → rsync php-sdk contents → commit + tag `vX.Y.Z` → push → POST to Packagist `/api/update-package`. Requires `PACKAGIST_USERNAME` + `PACKAGIST_API_TOKEN` secrets.
 - **Companion repo (manual setup)**: `mediaviz/mediaviz_php_sdk` is a dedicated repo with composer.json at the root, the only way Packagist can find the PHP SDK. Workflow syncs into it on every main run; tag history on that repo = release history visible on Packagist.

@@ -103,10 +103,17 @@ jobs:
             echo "flag=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run SDK generator
+      - name: Run SDK generator (public)
         working-directory: mediaviz_sdk
         # --endpoints omitted → uses the public_sdk_endpoints default in generate.py
         run: python generate.py ${{ steps.bump.outputs.flag }}
+
+      - name: Run SDK generator (admin)
+        working-directory: mediaviz_sdk
+        # Admin SDK: JS-only, private package (publishConfig.access=restricted),
+        # output under admin-sdk/ so it versions independently of the public sdk/.
+        # --admin implies --endpoints all_endpoints.
+        run: python generate.py --frameworks javascript --destination-dir admin-sdk --admin ${{ steps.bump.outputs.flag }}
 
       - name: Configure git identity
         if: steps.ctx.outputs.mode == 'propagate'
@@ -115,32 +122,35 @@ jobs:
           git config user.name "mediaviz-pipeline-bot[bot]"
           git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
 
-      - name: Commit + push regenerated SDK
+      - name: Commit + push regenerated SDKs
         if: steps.ctx.outputs.mode == 'propagate'
         working-directory: mediaviz_sdk
         run: |
           HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
-          if [ -n "$(git status --porcelain sdk/)" ]; then
-            git add -A sdk/
+          if [ -n "$(git status --porcelain sdk/ admin-sdk/)" ]; then
+            git add -A sdk/ admin-sdk/
             git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
             git push origin HEAD:${{ steps.ctx.outputs.branch }}
           else
             echo "No SDK changes to commit."
           fi
 
-      # ── npm publish via Trusted Publishing (all propagate runs) ────────────
+      # ── npm + Packagist publish (all propagate runs) ───────────────────────
       - name: Locate freshly-generated SDK dirs
         if: steps.ctx.outputs.mode == 'propagate'
         id: dirs
         run: |
           JS_DIR=$(ls -d mediaviz_sdk/sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           PHP_DIR=$(ls -d mediaviz_sdk/sdk/v*/php 2>/dev/null | grep -v archive | sort -V | tail -1)
+          ADMIN_JS_DIR=$(ls -d mediaviz_sdk/admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           VERSION=$(echo "$JS_DIR" | sed -E 's|.*sdk/v([0-9.]+)/javascript|v\1|')
           echo "js_dir=$JS_DIR" >> $GITHUB_OUTPUT
           echo "php_dir=$PHP_DIR" >> $GITHUB_OUTPUT
+          echo "admin_js_dir=$ADMIN_JS_DIR" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Located JS: $JS_DIR"
           echo "Located PHP: $PHP_DIR"
+          echo "Located admin JS: $ADMIN_JS_DIR"
           echo "Version: $VERSION"
 
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
@@ -157,10 +167,16 @@ jobs:
             main) echo "tag=latest" >> $GITHUB_OUTPUT ;;
           esac
 
-      - name: Publish to npm
+      - name: Publish @mediaviz/sdk to npm
         if: steps.ctx.outputs.mode == 'propagate'
         working-directory: ${{ steps.dirs.outputs.js_dir }}
         run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
+
+      - name: Publish @mediaviz/admin-sdk to npm
+        if: steps.ctx.outputs.mode == 'propagate'
+        working-directory: ${{ steps.dirs.outputs.admin_js_dir }}
+        # --access restricted matches publishConfig and keeps the admin package private even on main
+        run: npm publish --access restricted --tag ${{ steps.npm-meta.outputs.tag }} --provenance
 
       # ── Packagist publish (main propagate only) ────────────────────────────
       - name: Checkout mediaviz_php_sdk
