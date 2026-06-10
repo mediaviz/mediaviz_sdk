@@ -661,6 +661,8 @@ Side effects when a side is unchanged:
 
 Result: admin-only external_api changes still trigger the full SDK pipeline (the hub diff condition still fires `hub-updated`), but only `admin-sdk/` regenerates in git and `@mediaviz/admin-sdk` republishes. `sdk/` and `@mediaviz/sdk` stay pinned at their last meaningful version until a public-facing endpoint actually changes.
 
+**Rollup determinism dependency**: the gate hashes `dist/sdk.{cjs,esm.js,umd.js}` — bundles produced by Rollup 4 with `@rollup/plugin-node-resolve` + `@rollup/plugin-commonjs` (no banner, no `Date.now()` injection). Under that toolchain the same input source produces byte-identical output, so the hash compare is sound. If a future Rollup plugin or config change embeds a build timestamp / random nonce / file-mtime banner into a bundle, every run will hash differently and the gate degrades back to the pre-gate behavior of republishing on every run — safe failure mode, but defeats the optimization. When touching `generators/javascript_browser.py:emit_rollup_config` or `build_dist`, verify two consecutive `generate.py` runs against unchanged inputs produce identical `dist/*` bytes (`diff -r v(N)/javascript/dist v(N-1)/javascript/dist` should be empty).
+
 ### Packagist — `mediaviz/sdk`
 Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedicated companion repo `mediaviz/mediaviz_php_sdk` rather than under `mediaviz_sdk/sdk/v*/php/`. On main propagate runs only, the workflow:
 1. Checks out `mediaviz_php_sdk` with the GitHub App token.
