@@ -14,11 +14,15 @@ class BaseGenerator(ABC):
         self._copied_modules: list[dict] = []
 
     @abstractmethod
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False) -> None:
         """Generate SDK files from resolved endpoints into output_dir.
 
         *utilities* is a list of utility-module dicts (see utilities_resolver.load_utilities);
         each generator decides how to expose them (e.g. as a `utils` namespace on the client).
+
+        *admin* switches the framework to its admin-variant publish manifest
+        (private/restricted package name + access). Only the JS generator
+        currently varies on this flag; others may accept and ignore it.
         """
 
     @abstractmethod
