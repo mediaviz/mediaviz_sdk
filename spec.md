@@ -651,6 +651,16 @@ JS-only sibling package. Same generator code path as the public package — the 
 
 The admin package requires its **own** trusted-publisher entry at the npm package level (separate from `@mediaviz/sdk`). Bootstrap is identical to the public package: one manual `npm publish --access restricted` from a laptop with a temporary classic token, then register the trusted publisher, then revoke the token. After that the workflow OIDC flow takes over.
 
+### Content-hash gate (skip no-op publishes)
+Each `generate.py` invocation archives the prior `vN/` and creates a fresh `vN+1/` unconditionally — so an admin-only upstream change would otherwise still bump and republish `@mediaviz/sdk` with byte-identical `dist/`. The workflow's `changes` step hashes the new `<dir>/javascript/dist/` against the most-recent `<dir>/archive/v*/javascript/dist/` (per-package, sha256 over sorted-file concat) and emits `public_changed` / `admin_changed`.
+
+Side effects when a side is unchanged:
+- A `Discard unchanged generator output` step does `git restore <dir>/ && git clean -fd <dir>/`, reverting both the deleted tracked `vN/` and the untracked `vN+1/` (and the untracked, gitignored `archive/vN/`). Working tree for that side returns to its pre-generate state, so the commit step sees no diff there.
+- `Configure git identity`, `Commit + push regenerated SDKs`, `Upgrade npm CLI`, `Determine npm dist-tag` are gated on `(public_changed || admin_changed)` — if both sides are unchanged the run does nothing past the hash check.
+- `Publish @mediaviz/sdk` and the Packagist sync/refresh steps are gated on `public_changed`. `Publish @mediaviz/admin-sdk` is gated on `admin_changed`. Each package publishes only when its own `dist/` actually moved.
+
+Result: admin-only external_api changes still trigger the full SDK pipeline (the hub diff condition still fires `hub-updated`), but only `admin-sdk/` regenerates in git and `@mediaviz/admin-sdk` republishes. `sdk/` and `@mediaviz/sdk` stay pinned at their last meaningful version until a public-facing endpoint actually changes.
+
 ### Packagist — `mediaviz/sdk`
 Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedicated companion repo `mediaviz/mediaviz_php_sdk` rather than under `mediaviz_sdk/sdk/v*/php/`. On main propagate runs only, the workflow:
 1. Checks out `mediaviz_php_sdk` with the GitHub App token.
