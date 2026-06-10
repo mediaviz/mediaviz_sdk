@@ -19,7 +19,7 @@ mediaviz_sdk/
   resolver.py              # Reads ref-list YAML, resolves refs, outputs flattened YAML
   utilities_resolver.py    # Reads api_docs/utilities YAML, validates, outputs flattened snapshot
   versioning.py            # Version auto-increment logic
-  sdk/                     # Static output directory
+  sdk/                     # Public SDK output (default destination)
     v{major}.{minor}.{iteration}/  # Current version (only one active at a time)
       resolved_*.yaml      # Flattened endpoint / composite / utility snapshots
       javascript/
@@ -30,6 +30,10 @@ mediaviz_sdk/
       v1.0.0/
       v1.0.1/
       ...
+  admin-sdk/               # Admin SDK output (--admin --destination-dir admin-sdk)
+    v{major}.{minor}.{iteration}/
+      javascript/          # JS only — published privately to npm as @mediaviz/admin-sdk
+    archive/
 ```
 
 ## Components
@@ -626,15 +630,24 @@ The hub and SDK propagate workflows trigger only on `repository_dispatch` (not `
 
 ## Publishing
 
-After the SDK is regenerated and committed by `update-sdk.yml` propagate mode, the workflow publishes the JS package to npm on every dev/qa/main run, and the PHP package to Packagist on main runs only.
+After the SDK is regenerated and committed by `update-sdk.yml` propagate mode, the workflow publishes **two parallel JS packages** to npm on every dev/qa/main run (`@mediaviz/sdk` public + `@mediaviz/admin-sdk` private), and the PHP package to Packagist on main runs only.
 
 ### Endpoint set
-The CI workflow runs `python generate.py` with no `--endpoints` argument, so the generator uses its default of `public_sdk_endpoints` (the public-facing endpoint subset that excludes admin/system endpoints — `../mediaviz_intelligence_hub/api_docs/endpoint_list/public_sdk_endpoints.yaml`). Manual runs can still pass `--endpoints all_endpoints` for the internal/full build.
+The CI workflow runs `python generate.py` twice per propagate run:
+- **Public** — no `--endpoints` argument, so the generator uses its default of `public_sdk_endpoints` (the public-facing endpoint subset that excludes admin/system endpoints — `../mediaviz_intelligence_hub/api_docs/endpoint_list/public_sdk_endpoints.yaml`). Outputs to `sdk/`.
+- **Admin** — `--frameworks javascript --destination-dir admin-sdk --admin`. The `--admin` flag implies `--endpoints all_endpoints` (no need to pass it explicitly). Outputs to `admin-sdk/`. JS-only; PHP/Python skipped because the admin variant ships only to npm. The independent `--destination-dir` means `sdk/` and `admin-sdk/` each maintain their own version history (independent `archive/` subdirs, independent `versioning.get_next_version` state), so a generator failure in one path does not corrupt the other.
 
-### npm — `@mediaviz/sdk`
+Resolution rule for `--endpoints`: if unset, it's `all_endpoints` when `--admin` is set, else `public_sdk_endpoints`. Explicit `--endpoints X` always wins, so a manual run can still build any flow into either dir.
+
+### npm — `@mediaviz/sdk` (public)
 Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: live SDK version (extracted from output dir via regex), `license: MIT`, `repository`, `publishConfig.access: public`, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles ship — the framework source files are inputs to the build, not part of the consumer payload.
 
 Auth via **npm Trusted Publishing** (OIDC). The workflow declares `permissions: id-token: write` and runs `npm publish --access public --tag <branch-tag> --provenance` from `sdk/v*/javascript/`. No long-lived `NPM_TOKEN` exists. npm verifies the GitHub-issued OIDC token against the trusted publisher config registered at the npm package level (org=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml).
+
+### npm — `@mediaviz/admin-sdk` (private)
+JS-only sibling package. Same generator code path as the public package — the only difference is that `generate.py --admin` flips `emit_package_json`'s name to `@mediaviz/admin-sdk`, `publishConfig.access` to `restricted`, and the description to "MediaViz JavaScript Admin SDK — auto-generated full endpoint client (private)". Same dist-tag scheme (`dev`/`qa`/`latest`), same Trusted Publishing flow. Published with `--access restricted` so the package stays private even on main; consumers must be members of the `mediaviz` org (or invited as collaborators on the package) to install.
+
+The admin package requires its **own** trusted-publisher entry at the npm package level (separate from `@mediaviz/sdk`). Bootstrap is identical to the public package: one manual `npm publish --access restricted` from a laptop with a temporary classic token, then register the trusted publisher, then revoke the token. After that the workflow OIDC flow takes over.
 
 ### Packagist — `mediaviz/sdk`
 Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedicated companion repo `mediaviz/mediaviz_php_sdk` rather than under `mediaviz_sdk/sdk/v*/php/`. On main propagate runs only, the workflow:
