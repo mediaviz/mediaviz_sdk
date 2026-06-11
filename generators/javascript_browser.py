@@ -78,8 +78,14 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         dts_path = os.path.join(dist_dir, "sdk.d.ts")
         with open(dts_path, "w") as f:
             f.write(dts)
+        # ESM-adjacent copy: tools resolving the ESM bundle (or the non-standard
+        # `module` field) locate types by the sibling name sdk.esm.d.ts. Same
+        # surface as sdk.d.ts, so the content is identical and the type-check on
+        # sdk.d.ts covers both.
+        with open(os.path.join(dist_dir, "sdk.esm.d.ts"), "w") as f:
+            f.write(dts)
         self._typecheck_dts(output_dir, dts_path)
-        print(f"  [javascript] types emitted → {dts_path}")
+        print(f"  [javascript] types emitted → {dts_path} (+ sdk.esm.d.ts)")
 
     def _typecheck_dts(self, output_dir: str, dts_path: str) -> None:
         tsc = os.path.join(output_dir, "node_modules", ".bin", "tsc")
@@ -556,11 +562,16 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "types": "./dist/sdk.d.ts",
             "exports": {
                 # `types` must be the first condition so TypeScript resolves it
-                # ahead of the runtime entries.
+                # ahead of the runtime entries. The `import` condition carries its
+                # own types (sdk.esm.d.ts) so ESM consumers resolve a declaration
+                # file adjacent to the bundle they load.
                 ".": {
                     "types": "./dist/sdk.d.ts",
                     "browser": "./dist/sdk.umd.js",
-                    "import": "./dist/sdk.esm.js",
+                    "import": {
+                        "types": "./dist/sdk.esm.d.ts",
+                        "default": "./dist/sdk.esm.js",
+                    },
                     "require": "./dist/sdk.cjs",
                     "default": "./dist/sdk.cjs",
                 },

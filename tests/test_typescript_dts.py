@@ -180,7 +180,21 @@ def test_package_json_advertises_types(gen, tmp_path):
     # `types` must be the first export condition for TS resolution.
     assert list(pkg["exports"]["."])[0] == "types"
     assert pkg["exports"]["."]["types"] == "./dist/sdk.d.ts"
+    # ESM consumers resolve their own declaration adjacent to the ESM bundle.
+    assert pkg["exports"]["."]["import"]["types"] == "./dist/sdk.esm.d.ts"
+    assert pkg["exports"]["."]["import"]["default"] == "./dist/sdk.esm.js"
     assert "typescript" in pkg["devDependencies"]
+
+
+def test_emit_dts_writes_both_declaration_files(gen, tmp_path):
+    gen._schemas = {}
+    ep = _auth_ep("get_photo", "/p", response={"body": "dict"})
+    gen.emit_dts_file([ep], None, None, str(tmp_path))  # tsc absent → type-check skipped
+    dist = tmp_path / "dist"
+    assert (dist / "sdk.d.ts").exists()
+    assert (dist / "sdk.esm.d.ts").exists()
+    # identical surface
+    assert (dist / "sdk.d.ts").read_text() == (dist / "sdk.esm.d.ts").read_text()
 
 
 def test_typescript_devdep_pruned_for_publish(gen, tmp_path):
