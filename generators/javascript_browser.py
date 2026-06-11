@@ -27,8 +27,9 @@ def _js_safe(name: str) -> str:
 class JavaScriptBrowserGenerator(BaseGenerator):
     framework_name = "javascript"
 
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False, schemas: dict | None = None) -> None:
         os.makedirs(output_dir, exist_ok=True)
+        self._schemas = schemas or {}
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)
         comp_groups = self.group_composites_by_controller(composites)
@@ -58,7 +59,39 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         from .licenses import emit_license
         emit_license(output_dir)
         self.build_dist(output_dir)
+        self.emit_dts_file(endpoints, composites, utilities, output_dir, admin=admin)
         self.prune_package_json_for_publish(output_dir)
+
+    def emit_dts_file(self, endpoints: list[dict], composites: list[dict] | None, utilities: list[dict] | None, output_dir: str, admin: bool = False) -> None:
+        """Write the consolidated TypeScript declarations and type-check them.
+
+        Lives in dist/ alongside the Rollup bundle so the package's `types` field
+        resolves to it. The type-check uses the locally-installed tsc (pulled in
+        as a devDependency by build_dist's npm install, then stripped before
+        publish); when tsc is unavailable (e.g. a dev run with no npm) it is
+        skipped, mirroring build_dist's npm-not-found behaviour.
+        """
+        from .typescript_dts import build_dts
+        dts = build_dts(self, endpoints, composites, utilities, self._schemas, admin=admin)
+        dist_dir = os.path.join(output_dir, "dist")
+        os.makedirs(dist_dir, exist_ok=True)
+        dts_path = os.path.join(dist_dir, "sdk.d.ts")
+        with open(dts_path, "w") as f:
+            f.write(dts)
+        self._typecheck_dts(output_dir, dts_path)
+        print(f"  [javascript] types emitted → {dts_path}")
+
+    def _typecheck_dts(self, output_dir: str, dts_path: str) -> None:
+        tsc = os.path.join(output_dir, "node_modules", ".bin", "tsc")
+        if not os.path.isfile(tsc):
+            print(f"  [javascript] tsc not installed — skipping .d.ts type-check for {output_dir}")
+            return
+        result = subprocess.run(
+            [tsc, "--noEmit", "--strict", "--skipLibCheck", dts_path],
+            cwd=output_dir, capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"sdk.d.ts failed type-check:\n{result.stdout}{result.stderr}")
 
     def build_dist(self, output_dir: str) -> None:
         npm = shutil.which("npm")
@@ -520,8 +553,12 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "main": "./dist/sdk.cjs",
             "module": "./dist/sdk.esm.js",
             "browser": "./dist/sdk.umd.js",
+            "types": "./dist/sdk.d.ts",
             "exports": {
+                # `types` must be the first condition so TypeScript resolves it
+                # ahead of the runtime entries.
                 ".": {
+                    "types": "./dist/sdk.d.ts",
                     "browser": "./dist/sdk.umd.js",
                     "import": "./dist/sdk.esm.js",
                     "require": "./dist/sdk.cjs",
@@ -542,6 +579,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 "rollup": "^4.0.0",
                 "@rollup/plugin-node-resolve": "^16.0.0",
                 "@rollup/plugin-commonjs": "^29.0.0",
+                # Installed for the generator's sdk.d.ts type-check; stripped from
+                # the published manifest by prune_package_json_for_publish.
+                "typescript": "^5.4.0",
             },
         }
         with open(os.path.join(output_dir, "package.json"), "w") as f:
