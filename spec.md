@@ -334,6 +334,20 @@ Copied into `sdk/v{ver}/{framework}/oauth/` directly from the source OAuth SDK f
 
 **PHP PSR-4 normalization:** After copying, the PHP generator splits any multi-class `Types.php` into individual files (one class per file, e.g. `OAuthClientConfig.php`, `TokenResponse.php`) to match PSR-4 autoloading conventions. The `files` autoload entry for `Types.php` is removed from `composer.json` since PSR-4 handles discovery.
 
+### TypeScript Declarations (`dist/sdk.d.ts`)
+
+The JavaScript SDK ships first-class TypeScript types. Because the package publishes a single Rollup bundle (`dist/sdk.{cjs,esm.js,umd.js}`), the types are one hand-emitted, consolidated declaration file — `dist/sdk.d.ts` — describing that flat module surface. It is built by `generators/typescript_dts.py:build_dts(...)`, called from `JavaScriptBrowserGenerator.emit_dts_file` after `build_dist`, and advertised via `package.json`'s `types` field plus a `types`-first `exports["."]` condition.
+
+The declarations are generated from the same resolved endpoint metadata the JS emitters use, so signatures match the JS in lockstep:
+- **Method params** mirror the JS argument order (`path → required headers → body → optional-header bag → query options bag`); request params are camelCase. Expanded request bodies with required fields become positional params (required first, then `?`-optional); all-optional bodies collapse to one `body?: { … }` options bag, matching `_js_body_sig_tokens`. Reserved-word params are escaped (`private` → `private_`) via the shared `_js_safe`.
+- **Return types** are derived from each endpoint's `response.body`: a `$ref` → `Promise<Schema>`, `{type: List[Schema], $ref}` → `Promise<Schema[]>`, `dict` → `Promise<Record<string, any>>`, and missing/unresolvable → `Promise<any>`.
+- **Response interfaces** are emitted only for schemas transitively reachable from a used response (via `resolver._resolved_fields`, which merges `extends`). Members keep the API's **snake_case** keys (the SDK returns raw server JSON untouched) and are `?`-optional when the schema field is not required.
+- **Type mapping** (`_py_to_ts`): `str/EmailStr/datetime/date` → `string`; `int/float` → `number`; `bool` → `boolean`; `List[X]` → `X[]`; `dict/Dict[…]` → `Record<string, any>`; `Optional[X]`/`Annotated[X]` unwrap to `X`; unknown → `any`.
+- **Fixed surface**: `MediaVizConfig`, `TokenResponse`/`AuthorizationUrlResult` (mirrored from the OAuth library's JSDoc), the error classes, `handleResponse`, the re-exported OAuth names, and the `MediaViz` client (typed constructor, auth methods, and one `readonly` property per controller).
+- **Limitation**: composite method **params** are typed but **returns are `Promise<any>`** (a `collect`-mode step returns `Promise<{ results: any[]; errors: Array<{ index: number; error: any }> }>`), since precise composite return typing needs cross-step dataflow analysis.
+
+After writing the file, `_typecheck_dts` runs the locally-installed `tsc --noEmit --strict --skipLibCheck` against it and **aborts generation** on any error. `typescript` is added to `devDependencies` solely for this check (installed by `build_dist`'s `npm install`) and is stripped by `prune_package_json_for_publish`, so it never ships. When `tsc` is absent (a dev run without `npm install`) the check is skipped, mirroring `build_dist`'s npm-not-found behaviour. Output is deterministic (sorted interfaces + controllers) so it does not perturb the content-hash publish gate beyond the one-time addition of the file. Applies identically to both `@mediaviz/sdk` and `@mediaviz/admin-sdk`.
+
 ## Naming Conventions per Framework
 
 | Framework | Function names | File names | Class names |
@@ -640,7 +654,9 @@ The CI workflow runs `python generate.py` twice per propagate run:
 Resolution rule for `--endpoints`: if unset, it's `all_endpoints` when `--admin` is set, else `public_sdk_endpoints`. Explicit `--endpoints X` always wins, so a manual run can still build any flow into either dir.
 
 ### npm — `@mediaviz/sdk` (public)
-Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: live SDK version (extracted from output dir via regex), `license: MIT`, `repository`, `publishConfig.access: public`, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles ship — the framework source files are inputs to the build, not part of the consumer payload.
+Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: live SDK version (extracted from output dir via regex), `license: MIT`, `repository`, `publishConfig.access: public`, `types: "./dist/sdk.d.ts"` (plus a `types`-first `exports["."]` condition) advertising the bundled TypeScript declarations, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles + `dist/sdk.d.ts` ship — the framework source files are inputs to the build, not part of the consumer payload.
+
+The Rollup build toolchain (`scripts.build` + the `rollup`/`@rollup/plugin-*` `devDependencies`) is needed only to produce the dist bundles, so `generate()` calls `prune_package_json_for_publish` immediately after `build_dist`: it removes `scripts` and `devDependencies` from the manifest before publish, leaving the published `package.json` with no build-only fields. `optionalDependencies` (`sharp`) is preserved as a real runtime optional dep. Net effect: a consumer running `npm install @mediaviz/sdk` pulls only the dist bundles + `sharp` (optional) — never Rollup.
 
 Auth via **npm Trusted Publishing** (OIDC). The workflow declares `permissions: id-token: write` and runs `npm publish --access public --tag <branch-tag> --provenance` from `sdk/v*/javascript/`. No long-lived `NPM_TOKEN` exists. npm verifies the GitHub-issued OIDC token against the trusted publisher config registered at the npm package level (org=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml).
 
@@ -658,6 +674,8 @@ Side effects when a side is unchanged:
 - `Publish @mediaviz/sdk` and the Packagist sync/refresh steps are gated on `public_changed`. `Publish @mediaviz/admin-sdk` is gated on `admin_changed`. Each package publishes only when its own `dist/` actually moved.
 
 Result: admin-only external_api changes still trigger the full SDK pipeline (the hub diff condition still fires `hub-updated`), but only `admin-sdk/` regenerates in git and `@mediaviz/admin-sdk` republishes. `sdk/` and `@mediaviz/sdk` stay pinned at their last meaningful version until a public-facing endpoint actually changes.
+
+The gate now also hashes `dist/sdk.d.ts`. Its first appearance changes the hash once (one expected publish per package); thereafter the declaration file is deterministic, so it stays stable across runs with unchanged inputs. A `Verify TypeScript declarations present` workflow step (after both generator runs) independently fails the run if either scoped package is missing `dist/sdk.d.ts` or its `package.json` `types` field — defense in depth on top of the in-generator `tsc` check.
 
 **Rollup determinism dependency**: the gate hashes `dist/sdk.{cjs,esm.js,umd.js}` — bundles produced by Rollup 4 with `@rollup/plugin-node-resolve` + `@rollup/plugin-commonjs` (no banner, no `Date.now()` injection). Under that toolchain the same input source produces byte-identical output, so the hash compare is sound. If a future Rollup plugin or config change embeds a build timestamp / random nonce / file-mtime banner into a bundle, every run will hash differently and the gate degrades back to the pre-gate behavior of republishing on every run — safe failure mode, but defeats the optimization. When touching `generators/javascript_browser.py:emit_rollup_config` or `build_dist`, verify two consecutive `generate.py` runs against unchanged inputs produce identical `dist/*` bytes (`diff -r v(N)/javascript/dist v(N-1)/javascript/dist` should be empty).
 

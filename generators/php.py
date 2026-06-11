@@ -24,7 +24,7 @@ def _php_nullable(t: str) -> str:
 class PhpGenerator(BaseGenerator):
     framework_name = "php"
 
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False, schemas: dict | None = None) -> None:
         os.makedirs(output_dir, exist_ok=True)
         self.emit_errors_file(output_dir)
         groups = self.group_by_controller(endpoints)

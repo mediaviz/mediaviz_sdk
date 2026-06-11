@@ -14,7 +14,7 @@ class BaseGenerator(ABC):
         self._copied_modules: list[dict] = []
 
     @abstractmethod
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False, schemas: dict | None = None) -> None:
         """Generate SDK files from resolved endpoints into output_dir.
 
         *utilities* is a list of utility-module dicts (see utilities_resolver.load_utilities);
@@ -23,6 +23,10 @@ class BaseGenerator(ABC):
         *admin* switches the framework to its admin-variant publish manifest
         (private/restricted package name + access). Only the JS generator
         currently varies on this flag; others may accept and ignore it.
+
+        *schemas* is the resolved Pydantic schema map (see resolver.load_schemas),
+        used to type response bodies. Only the JS generator consumes it (to emit
+        TypeScript declarations); others may accept and ignore it.
         """
 
     @abstractmethod

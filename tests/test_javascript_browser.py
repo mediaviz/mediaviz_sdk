@@ -280,8 +280,32 @@ def test_package_json(gen, tmp_path):
     assert exports["import"] == "./dist/sdk.esm.js"
     assert exports["require"] == "./dist/sdk.cjs"
     assert exports["default"] == "./dist/sdk.cjs"
+    # build-only fields are pruned from the published manifest after dist is built
+    assert "scripts" not in pkg
+    assert "devDependencies" not in pkg
+    # real runtime optional dep survives the prune
+    assert pkg["optionalDependencies"]["sharp"]
+
+
+def test_emit_package_json_includes_build_fields(gen, tmp_path):
+    """Pre-prune manifest carries the rollup build toolchain so build_dist can run."""
+    import json
+    gen.emit_package_json(str(tmp_path))
+    pkg = json.loads((tmp_path / "package.json").read_text())
     assert "build" in pkg["scripts"]
     assert "rollup" in pkg["devDependencies"]
+
+
+def test_prune_package_json_for_publish(gen, tmp_path):
+    """Prune strips build-only fields but keeps consumer-facing ones."""
+    import json
+    gen.emit_package_json(str(tmp_path))
+    gen.prune_package_json_for_publish(str(tmp_path))
+    pkg = json.loads((tmp_path / "package.json").read_text())
+    assert "scripts" not in pkg
+    assert "devDependencies" not in pkg
+    assert pkg["optionalDependencies"]["sharp"] == "^0.33.0"
+    assert pkg["main"] == "./dist/sdk.cjs"
 
 
 # ── body flattening disambiguation ────────────────────────────────────────────
