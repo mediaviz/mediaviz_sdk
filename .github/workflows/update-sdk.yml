@@ -232,8 +232,10 @@ jobs:
       - name: Publish @mediaviz/admin-sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.admin_changed == 'true'
         working-directory: ${{ steps.dirs.outputs.admin_js_dir }}
-        # --access restricted matches publishConfig and keeps the admin package private even on main
-        run: npm publish --access restricted --tag ${{ steps.npm-meta.outputs.tag }} --provenance
+        # --access restricted matches publishConfig and keeps the admin package private even on main.
+        # No --provenance: provenance writes a public Sigstore/Rekor attestation and is incompatible
+        # with restricted (private) packages — npm rejects the combination with EUSAGE.
+        run: npm publish --access restricted --tag ${{ steps.npm-meta.outputs.tag }}
 
       # ── Packagist publish (main propagate only, gated on public content change) ─
       - name: Checkout mediaviz_php_sdk
