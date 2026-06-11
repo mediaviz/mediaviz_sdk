@@ -115,6 +115,25 @@ jobs:
         # --admin implies --endpoints all_endpoints.
         run: python generate.py --frameworks javascript --destination-dir admin-sdk --admin ${{ steps.bump.outputs.flag }}
 
+      # ── Ensure both scoped JS packages shipped TypeScript declarations ─────
+      # generate.py type-checks sdk.d.ts inline (and aborts on failure), but this
+      # guard fails the run loudly if the file or its package.json `types` entry
+      # is ever missing for either scoped package.
+      - name: Verify TypeScript declarations present
+        working-directory: mediaviz_sdk
+        run: |
+          assert_types() {
+            local js_dir="$1" pkg="$2"
+            [ -n "$js_dir" ] || { echo "::error::no generated javascript dir for $pkg"; exit 1; }
+            [ -f "$js_dir/dist/sdk.d.ts" ] || { echo "::error::$pkg missing $js_dir/dist/sdk.d.ts"; exit 1; }
+            grep -q '"types": "./dist/sdk.d.ts"' "$js_dir/package.json" || { echo "::error::$pkg package.json missing types field"; exit 1; }
+            echo "$pkg: sdk.d.ts present and advertised in package.json"
+          }
+          PUB=$(ls -d sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
+          ADM=$(ls -d admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
+          assert_types "$PUB" "@mediaviz/sdk"
+          assert_types "$ADM" "@mediaviz/admin-sdk"
+
       # ── Locate + content-hash gate ─────────────────────────────────────────
       # Each generator unconditionally archives the prior vN/ and creates a fresh
       # vN+1/, so every run produces a version-bump diff regardless of whether

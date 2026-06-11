@@ -153,7 +153,7 @@ def main() -> None:
                 fw_dir = os.path.join(version_dir, framework)
                 os.makedirs(fw_dir, exist_ok=True)
                 gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)
-                gen.generate(endpoints, fw_dir, composites=composites, utilities=utilities, admin=args.admin)
+                gen.generate(endpoints, fw_dir, composites=composites, utilities=utilities, admin=args.admin, schemas=schemas)
                 file_counts[framework] = sum(len(files) for _, _, files in os.walk(fw_dir))
 
             print(f"\nSDK v{ver} generated:")

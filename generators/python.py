@@ -56,7 +56,7 @@ class PythonGenerator(BaseGenerator):
 
     # ── BaseGenerator contract ────────────────────────────────────────────────
 
-    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False) -> None:
+    def generate(self, endpoints: list[dict], output_dir: str, composites: list[dict] | None = None, utilities: list[dict] | None = None, admin: bool = False, schemas: dict | None = None) -> None:
         pkg_dir = os.path.join(output_dir, "mediaviz_sdk")
         os.makedirs(pkg_dir, exist_ok=True)
 
