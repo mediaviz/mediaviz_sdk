@@ -126,8 +126,9 @@ jobs:
             local js_dir="$1" pkg="$2"
             [ -n "$js_dir" ] || { echo "::error::no generated javascript dir for $pkg"; exit 1; }
             [ -f "$js_dir/dist/sdk.d.ts" ] || { echo "::error::$pkg missing $js_dir/dist/sdk.d.ts"; exit 1; }
+            [ -f "$js_dir/dist/sdk.esm.d.ts" ] || { echo "::error::$pkg missing $js_dir/dist/sdk.esm.d.ts"; exit 1; }
             grep -q '"types": "./dist/sdk.d.ts"' "$js_dir/package.json" || { echo "::error::$pkg package.json missing types field"; exit 1; }
-            echo "$pkg: sdk.d.ts present and advertised in package.json"
+            echo "$pkg: sdk.d.ts + sdk.esm.d.ts present and advertised in package.json"
           }
           PUB=$(ls -d sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           ADM=$(ls -d admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
