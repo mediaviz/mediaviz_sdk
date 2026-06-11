@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-06-09T16:39:25Z'
+resolved_at: '2026-06-11T16:50:29Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -1261,6 +1261,50 @@ endpoints:
   - all
   hidden: false
   api_host: null
+- id: post_admin_create_keyword_filtering_list
+  function_name: admin_create_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/keyword/admin
+  summary: admin_create_keyword_filtering_list
+  auth: required
+  params: []
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - name
+    - name: projectList
+      snake: project_list
+      type: List[str]
+      items_type: str
+      required: false
+      kind: list
+      orig_path:
+      - project_list
+    - name: companyId
+      snake: company_id
+      type: int
+      required: true
+      kind: primitive
+      orig_path:
+      - company_id
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#KeywordListDisplayWithProjects
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
 - id: get_get_user_keyword_filtering_lists
   function_name: get_user_keyword_filtering_lists
   controller: Keywords
@@ -1591,6 +1635,29 @@ endpoints:
     in: query
     type: Annotated[any]
     required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_admin_delete_keyword_filtering_list_by_id
+  function_name: admin_delete_keyword_filtering_list_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/keyword/admin/{keyword_list_id}
+  summary: admin_delete_keyword_filtering_list_by_id
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
   request_body: null
   response:
     status: 200

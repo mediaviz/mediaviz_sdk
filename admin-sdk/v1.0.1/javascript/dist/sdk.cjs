@@ -992,6 +992,18 @@ class Keywords {
     return data;
   }
 
+  async adminCreateKeywordFilteringList(name, companyId, projectList = undefined) {
+    this._ctx.requireTokens();
+    const path = `/api/v1/keyword/admin`;
+    const body = stripUndef$4({
+      name: name,
+      project_list: projectList,
+      company_id: companyId,
+    });
+    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken, body);
+    return data;
+  }
+
   async getUserKeywordFilteringLists() {
     this._ctx.requireTokens();
     const path = `/api/v1/keyword/user`;
@@ -1095,6 +1107,13 @@ class Keywords {
     if (projectIds !== undefined) (Array.isArray(projectIds) ? projectIds : [projectIds]).forEach(v => query.append('project_ids', v));
     const qs = query.toString();
     if (qs) path += '?' + qs;
+    const { data } = await this._ctx.client.request(path, 'DELETE', this._ctx.accessToken, this._ctx.refreshToken);
+    return data;
+  }
+
+  async adminDeleteKeywordFilteringListById(keywordListId) {
+    this._ctx.requireTokens();
+    const path = `/api/v1/keyword/admin/${encodeURIComponent(keywordListId)}`;
     const { data } = await this._ctx.client.request(path, 'DELETE', this._ctx.accessToken, this._ctx.refreshToken);
     return data;
   }

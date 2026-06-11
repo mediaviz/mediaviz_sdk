@@ -42,6 +42,46 @@ describe('Keywords', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('adminCreateKeywordFilteringList — exists', () => {
+    const keywords = new Keywords({});
+    expect(typeof keywords.adminCreateKeywordFilteringList).toBe('function');
+  });
+
+  it('adminCreateKeywordFilteringList — HTTP method is POST', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminCreateKeywordFilteringList('test_value', 42, ['item1', 'item2']);
+    expect(spy.last_call().method).toBe('POST');
+  });
+
+  it('adminCreateKeywordFilteringList — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminCreateKeywordFilteringList('test_value', 42, ['item1', 'item2']);
+    expect(spy.last_call().path).toContain('/api/v1/keyword/admin');
+  });
+
+  it('adminCreateKeywordFilteringList — request body', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminCreateKeywordFilteringList('test_value', 42, ['item1', 'item2']);
+    const body = spy.last_call().body;
+    expect(body).toHaveProperty('name');
+    expect(body).toHaveProperty('project_list');
+    expect(body).toHaveProperty('company_id');
+  });
+
+  it('adminCreateKeywordFilteringList — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminCreateKeywordFilteringList('test_value', 42, ['item1', 'item2']);
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('getUserKeywordFilteringLists — exists', () => {
     const keywords = new Keywords({});
     expect(typeof keywords.getUserKeywordFilteringLists).toBe('function');
@@ -454,6 +494,35 @@ describe('Keywords', () => {
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const keywords = new Keywords(ctx);
     await keywords.removeProjectsFromKeywordFilteringList(42, { projectIds: 'test_value' });
+    expect(spy.calls.length).toBe(1);
+  });
+
+  it('adminDeleteKeywordFilteringListById — exists', () => {
+    const keywords = new Keywords({});
+    expect(typeof keywords.adminDeleteKeywordFilteringListById).toBe('function');
+  });
+
+  it('adminDeleteKeywordFilteringListById — HTTP method is DELETE', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminDeleteKeywordFilteringListById(42);
+    expect(spy.last_call().method).toBe('DELETE');
+  });
+
+  it('adminDeleteKeywordFilteringListById — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminDeleteKeywordFilteringListById(42);
+    expect(spy.last_call().path).toContain('/api/v1/keyword/admin/42');
+  });
+
+  it('adminDeleteKeywordFilteringListById — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const keywords = new Keywords(ctx);
+    await keywords.adminDeleteKeywordFilteringListById(42);
     expect(spy.calls.length).toBe(1);
   });
 
