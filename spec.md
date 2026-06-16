@@ -693,14 +693,14 @@ The gate now also hashes `dist/sdk.d.ts`. Its first appearance changes the hash 
 
 **Rollup determinism dependency**: the gate hashes `dist/sdk.{cjs,esm.js,umd.js}` — bundles produced by Rollup 4 with `@rollup/plugin-node-resolve` + `@rollup/plugin-commonjs` (no banner, no `Date.now()` injection). Under that toolchain the same input source produces byte-identical output, so the hash compare is sound. If a future Rollup plugin or config change embeds a build timestamp / random nonce / file-mtime banner into a bundle, every run will hash differently and the gate degrades back to the pre-gate behavior of republishing on every run — safe failure mode, but defeats the optimization. When touching `generators/javascript_browser.py:emit_rollup_config` or `build_dist`, verify two consecutive `generate.py` runs against unchanged inputs produce identical `dist/*` bytes (`diff -r v(N)/javascript/dist v(N-1)/javascript/dist` should be empty).
 
-### Packagist — `mediaviz/sdk`
-Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedicated companion repo `mediaviz/mediaviz_php_sdk` rather than under `mediaviz_sdk/sdk/v*/php/`. On main propagate runs only, the workflow:
+### Packagist — `mediaviz/mediaviz-php-sdk`
+Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedicated companion repo `mediaviz/mediaviz-php-sdk` rather than under `mediaviz_sdk/sdk/v*/php/`. The composer package name **must equal both the companion repo name and the name registered on Packagist** — Packagist keys packages by the `name` in `composer.json`, not by repo URL, and the rsync below overwrites the repo's `composer.json` with the generated one. On main propagate runs only, the workflow:
 1. Checks out `mediaviz_php_sdk` with the GitHub App token.
 2. `rsync`s the freshly-generated `sdk/v*/php/` contents over the php-sdk repo (excluding `.git`).
-3. Commits, tags `vX.Y.Z`, pushes tag + main.
+3. If content changed: commits and pushes `main` **non-fast-forward-safe** (fetch + rebase onto `origin/main`, 3× retry, fail loudly on conflict), then creates the tag on the final pushed commit. The `vX.Y.Z` tag is then ensured **idempotently** — pushed only if `git ls-remote` shows it absent — so a re-run, or a prior run that pushed `main` but died before tagging, still lands the release tag (Packagist keys releases off tags) without a manual fixup.
 4. POSTs to `https://packagist.org/api/update-package` (auth: `PACKAGIST_USERNAME` + `PACKAGIST_API_TOKEN` secrets) to force a refresh.
 
-`composer.json` (emitted by `generators/php.py:emit_autoload_config`) carries: `name: mediaviz/sdk`, `type: library`, `license: MIT`, live `version` (same regex pattern as JS), `description`, and the PSR-4 + files autoload entries.
+`composer.json` (emitted by `generators/php.py:emit_autoload_config`) carries: `name: mediaviz/mediaviz-php-sdk`, `type: library`, `license: MIT`, live `version` (same regex pattern as JS), `description`, and the PSR-4 + files autoload entries. The generated PHP test harness (`test_generators/php.py:emit_composer_json`) requires the SDK by this same name via a `path` repository, so the two must be changed in lockstep.
 
 ### LICENSE
 Shared MIT text and version-extraction helper live in `generators/licenses.py`. The JS, PHP, and Python generators all call `emit_license(output_dir)` at the end of their `generate()` flow, so every framework directory ships a `LICENSE` file alongside its manifest.
