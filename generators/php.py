@@ -493,7 +493,9 @@ class PhpGenerator(BaseGenerator):
     def emit_autoload_config(self, output_dir: str, reexport_files: list[str] | None = None) -> None:
         from .licenses import extract_sdk_version
         config = {
-            "name": "mediaviz/sdk",
+            # Must match the Packagist-registered package + the mediaviz-php-sdk
+            # companion repo name; the publish pipeline rsyncs this over that repo.
+            "name": "mediaviz/mediaviz-php-sdk",
             "description": "MediaViz PHP SDK — auto-generated public endpoint client.",
             "type": "library",
             "license": "MIT",

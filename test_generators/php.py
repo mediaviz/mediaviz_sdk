@@ -119,7 +119,9 @@ class PhpTestGenerator(BaseTestGenerator):
             "minimum-stability": "dev",
             "require-dev": {
                 "phpunit/phpunit": "^11.0",
-                "mediaviz/sdk": "*",
+                # Matches the SDK package name emitted by generators/php.py;
+                # resolved from the path repository below during the inline test run.
+                "mediaviz/mediaviz-php-sdk": "*",
             },
             "repositories": [
                 {"type": "path", "url": rel_sdk},
