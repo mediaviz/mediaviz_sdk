@@ -56,6 +56,9 @@
 
 - `.github/workflows/update-sdk.yml` — triggers on `repository_dispatch: [hub-updated]` (propagate) and `pull_request: [dev, qa, main]` (verify). Propagate mode auto-bumps via `--minor-version` only on main; dev/qa iterate. Auth via `mediaviz-pipeline-bot` GitHub App. Full pipeline shape documented in `spec.md` → "CI / Automation Pipeline".
 - **Concurrency**: group keyed on branch AND mode (`update-sdk-<branch>-<propagate|verify>`); `cancel-in-progress` is an expression — `true` for verify, `false` for propagate. Prevents a PR-verify or a second dispatch from cancelling an in-flight propagate mid-publish-tail (which is non-transactional and would leave a partial publish). Propagate runs serialize per branch.
+- **Verify checks out the PR head** (`ctx.sdk_ref` = `pull_request.head.sha` in verify, branch in propagate) for the `mediaviz_sdk` checkout, so the gate exercises the proposed generator/`generate.py` changes rather than the base branch. Hub + oauth stay on `base_ref`.
+- **Push is non-fast-forward-safe**: the commit step fetches + rebases onto `origin/<branch>` and retries (3×) before pushing, failing loudly on a real conflict — a PR merge / out-of-order dispatch advancing the branch mid-run no longer silently drops the regenerated commit.
+- **Versioning is channel-local** (documented, not changed): dev/qa iterate, main minors, so versions are per-channel monotonic counters with no cross-channel semver meaning — consumers pin exact per dist-tag; traceability is via the `intelligence_hub@<sha>` commit message. See `spec.md` → "Version-bump rule".
 - Companion workflows in upstream repos:
   - `mediaviz_intelligence_hub/.github/workflows/update-intelligence-hub.yml`
   - `mediaviz_external_api/.github/workflows/docker-image.yml` (existing file, extended with `verify_hub`, `verify_sdk`, `notify_downstream` jobs)
