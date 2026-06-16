@@ -6,9 +6,14 @@ on:
   pull_request:
     branches: [dev, qa, main]
 
+# Group is keyed on branch AND mode so a PR-verify can never share a group with
+# (and thus cancel) a propagate. cancel-in-progress is an expression: verify runs
+# cancel stale verify runs (saves CI on PR pushes); propagate runs are NEVER
+# cancelled — a second dispatch queues behind the in-flight one, so a publish tail
+# (git push → npm → admin → PHP → Packagist) can never be torn in half.
 concurrency:
-  group: update-sdk-${{ github.event.client_payload.branch || github.base_ref || github.ref_name }}
-  cancel-in-progress: true
+  group: update-sdk-${{ github.event.client_payload.branch || github.base_ref || github.ref_name }}-${{ github.event_name == 'repository_dispatch' && 'propagate' || 'verify' }}
+  cancel-in-progress: ${{ github.event_name != 'repository_dispatch' }}
 
 permissions:
   contents: write
@@ -127,8 +132,9 @@ jobs:
             [ -n "$js_dir" ] || { echo "::error::no generated javascript dir for $pkg"; exit 1; }
             [ -f "$js_dir/dist/sdk.d.ts" ] || { echo "::error::$pkg missing $js_dir/dist/sdk.d.ts"; exit 1; }
             [ -f "$js_dir/dist/sdk.esm.d.ts" ] || { echo "::error::$pkg missing $js_dir/dist/sdk.esm.d.ts"; exit 1; }
+            [ -f "$js_dir/dist/sdk.d.cts" ] || { echo "::error::$pkg missing $js_dir/dist/sdk.d.cts"; exit 1; }
             grep -q '"types": "./dist/sdk.d.ts"' "$js_dir/package.json" || { echo "::error::$pkg package.json missing types field"; exit 1; }
-            echo "$pkg: sdk.d.ts + sdk.esm.d.ts present and advertised in package.json"
+            echo "$pkg: sdk.d.ts + sdk.esm.d.ts + sdk.d.cts present and advertised in package.json"
           }
           PUB=$(ls -d sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           ADM=$(ls -d admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
@@ -159,6 +165,18 @@ jobs:
           echo "Located admin JS: $ADMIN_JS_DIR"
           echo "Version: $VERSION"
 
+      # Pure branch→dist-tag map, computed before the detect step (ungated) so the
+      # registry-liveness check below can query `npm view @mediaviz/sdk@<tag>`.
+      - name: Determine npm dist-tag
+        if: steps.ctx.outputs.mode == 'propagate'
+        id: npm-meta
+        run: |
+          case "${{ steps.ctx.outputs.branch }}" in
+            dev)  echo "tag=dev"    >> $GITHUB_OUTPUT ;;
+            qa)   echo "tag=qa"     >> $GITHUB_OUTPUT ;;
+            main) echo "tag=latest" >> $GITHUB_OUTPUT ;;
+          esac
+
       - name: Detect content changes (skip no-op publishes)
         if: steps.ctx.outputs.mode == 'propagate'
         id: changes
@@ -175,10 +193,33 @@ jobs:
             echo "public_changed=true" >> $GITHUB_OUTPUT
             echo "Public dist content changed — will commit + publish sdk/."
           else
-            echo "public_changed=false" >> $GITHUB_OUTPUT
-            echo "Public dist content unchanged — skipping commit + publish for sdk/."
+            # Content matches the prior archive, but the registry tag may still be
+            # behind a prior version whose publish failed AFTER the repo was
+            # committed (commit precedes publish). A content-only gate masks that
+            # gap forever; verify the live dist-tag is actually in sync before
+            # skipping. If behind, force publish: the fresh vN+1 (byte-identical to
+            # the committed vN) is committed + published under a new version number,
+            # advancing the dist-tag with no npm version collision.
+            WANT=$(echo "$OLD_PUB" | sed -E 's|.*/archive/v([0-9.]+)/javascript/dist|\1|')
+            LIVE=$(npm view "@mediaviz/sdk@${{ steps.npm-meta.outputs.tag }}" version 2>/dev/null || echo "")
+            if [ -n "$WANT" ] && { [ -z "$LIVE" ] || [ "$(printf '%s\n%s\n' "$WANT" "$LIVE" | sort -V | tail -1)" != "$LIVE" ]; }; then
+              echo "public_changed=true" >> $GITHUB_OUTPUT
+              echo "Public dist content unchanged BUT registry behind (live=${LIVE:-none}, expected≥${WANT}) — forcing publish to reconcile."
+            else
+              echo "public_changed=false" >> $GITHUB_OUTPUT
+              echo "Public dist content unchanged and registry in sync (live=${LIVE}) — skipping commit + publish for sdk/."
+            fi
           fi
-          # Admin sdk: same comparison against admin-sdk/archive/
+          # ── Admin SDK liveness caveat ──────────────────────────────────────────
+          # @mediaviz/admin-sdk is published --access restricted (private). Verifying
+          # its live dist-tag would require `npm view` with a read-authenticated token,
+          # but this workflow authenticates publishes via OIDC Trusted Publishing and
+          # carries no npm read token. So the registry-liveness gate above applies to
+          # the PUBLIC package only; admin_changed below remains a pure content-hash
+          # compare. Consequence: a transient admin publish failure that lands AFTER
+          # the repo is committed is NOT self-healed by a later identical-content run
+          # — it is masked the same way the public gate was before this change. To
+          # close this, add an NPM_READ_TOKEN secret and mirror the public check here.
           NEW_ADM="${{ steps.dirs.outputs.admin_js_dir }}/dist"
           OLD_ADM=$(ls -d mediaviz_sdk/admin-sdk/archive/v*/javascript/dist 2>/dev/null | sort -V | tail -1)
           if [ -z "$OLD_ADM" ] || [ "$(hash_dist "$NEW_ADM")" != "$(hash_dist "$OLD_ADM")" ]; then
@@ -186,7 +227,7 @@ jobs:
             echo "Admin dist content changed — will commit + publish admin-sdk/."
           else
             echo "admin_changed=false" >> $GITHUB_OUTPUT
-            echo "Admin dist content unchanged — skipping commit + publish for admin-sdk/."
+            echo "Admin dist content unchanged — skipping commit + publish for admin-sdk/ (liveness check skipped: no npm read token for restricted package, see caveat above)."
           fi
 
       - name: Discard unchanged generator output
@@ -233,16 +274,6 @@ jobs:
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
         if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
         run: npm install -g npm@latest
-
-      - name: Determine npm dist-tag
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
-        id: npm-meta
-        run: |
-          case "${{ steps.ctx.outputs.branch }}" in
-            dev)  echo "tag=dev"    >> $GITHUB_OUTPUT ;;
-            qa)   echo "tag=qa"     >> $GITHUB_OUTPUT ;;
-            main) echo "tag=latest" >> $GITHUB_OUTPUT ;;
-          esac
 
       - name: Publish @mediaviz/sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'
