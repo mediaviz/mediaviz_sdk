@@ -25,13 +25,21 @@ jobs:
     steps:
       - name: Determine mode + branch
         id: ctx
+        # branch = the channel (dev/qa/main) this run targets — drives the bump
+        # flag, dist-tag, and the hub/oauth checkouts (verify validates the PR
+        # against the channel's current upstream spec).
+        # sdk_ref = what to check out for the mediaviz_sdk repo itself: the branch
+        # in propagate; the PR HEAD in verify, so the gate actually exercises the
+        # proposed generator/generate.py changes rather than the base branch.
         run: |
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "mode=propagate" >> $GITHUB_OUTPUT
             echo "branch=${{ github.event.client_payload.branch }}" >> $GITHUB_OUTPUT
+            echo "sdk_ref=${{ github.event.client_payload.branch }}" >> $GITHUB_OUTPUT
           else
             echo "mode=verify" >> $GITHUB_OUTPUT
             echo "branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+            echo "sdk_ref=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Mint GitHub App token
@@ -47,7 +55,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mediaviz/mediaviz_sdk
-          ref: ${{ steps.ctx.outputs.branch }}
+          # sdk_ref = branch (propagate) or PR head (verify) — see ctx step.
+          ref: ${{ steps.ctx.outputs.sdk_ref }}
           path: mediaviz_sdk
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
@@ -262,13 +271,27 @@ jobs:
         working-directory: mediaviz_sdk
         run: |
           HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
-          if [ -n "$(git status --porcelain sdk/ admin-sdk/)" ]; then
-            git add -A sdk/ admin-sdk/
-            git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
-            git push origin HEAD:${{ steps.ctx.outputs.branch }}
-          else
+          if [ -z "$(git status --porcelain sdk/ admin-sdk/)" ]; then
             echo "No SDK changes to commit."
+            exit 0
           fi
+          git add -A sdk/ admin-sdk/
+          git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
+          # Non-fast-forward guard: a PR merge (e.g. promotion) or out-of-order
+          # dispatch can advance the branch between checkout and push. Rebase our
+          # single auto-commit onto the current tip before each attempt and retry;
+          # fail loudly on a real conflict rather than silently dropping the run.
+          BRANCH="${{ steps.ctx.outputs.branch }}"
+          for attempt in 1 2 3; do
+            git fetch origin "$BRANCH"
+            git rebase "origin/$BRANCH" || { echo "::error::rebase conflict on $BRANCH — manual intervention needed"; exit 1; }
+            if git push origin "HEAD:$BRANCH"; then
+              exit 0
+            fi
+            echo "Push to $BRANCH rejected (attempt ${attempt}/3) — refetching + retrying."
+          done
+          echo "::error::push to $BRANCH failed after 3 attempts"
+          exit 1
 
       # ── npm + Packagist publish (gated per-package on content hash) ────────
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)

@@ -627,7 +627,7 @@ Three-repo propagation chain wired with GitHub Actions: `mediaviz_external_api` 
 - **`mediaviz_sdk/.github/workflows/update-sdk.yml`** (new)
   - Triggered by `repository_dispatch: hub-updated` (propagate mode) or `pull_request: [dev, qa, main]` (verify mode).
   - Propagate mode: checks out hub + oauth_library at the matching branch, runs `python generate.py --endpoints all_endpoints` (with `--minor-version` only when `branch == main`), commits regenerated `sdk/` to the branch.
-  - Verify mode: runs the generator (which runs the test suite); failures fail the PR check; no commit.
+  - Verify mode: checks out the **mediaviz_sdk repo at the PR head** (`ctx.sdk_ref`) so the gate exercises the proposed generator / `generate.py` changes — not the base branch — while hub + oauth stay on `base_ref` (the channel's current upstream spec the change will run against). Runs the generator (which runs the test suite); failures fail the PR check; no commit.
 
 ### Auth
 A single GitHub App `mediaviz-pipeline-bot` installed on all four repos (`mediaviz_external_api`, `mediaviz_intelligence_hub`, `mediaviz_sdk`, `oauth_library`) in the `imaige` org. Permissions: `contents: write`, `metadata: read`, `actions: write` (for `repository_dispatch`). Secrets `MEDIAVIZ_PIPELINE_BOT_APP_ID` and `MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY` are referenced by `actions/create-github-app-token@v1` in each workflow that needs to push or dispatch.
@@ -640,6 +640,12 @@ The hub and SDK propagate workflows trigger only on `repository_dispatch` (not `
 
 ### Version-bump rule
 `update-sdk.yml` passes `--minor-version` to `generate.py` only when `mode == propagate AND branch == main`. dev/qa propagate runs use the default iteration bump. Verify-mode runs never bump (no commit happens).
+
+**Versions are channel-local counters, not a promoted artifact.** Each channel regenerates independently from `hub@<branch>` and bumps its own counter (dev/qa iterate, main minors), so the same upstream change becomes a *different* version number on each channel (e.g. `dev=1.0.70`, `qa=1.0.62`, `latest=1.2.0` are unrelated). Consequences consumers and operators must account for:
+- **No cross-channel semver meaning.** A version is a monotonic per-channel counter; it carries no compatibility signal and numbers do not compare across channels (qa can be numerically behind dev). Consumers must **pin exact** versions per dist-tag — caret/tilde ranges (`^1.0.70`) would resolve across channels (e.g. jump to `1.2.0` on `latest`).
+- **Traceability is by upstream commit, not version.** "Which bytes is qa running" is answered by the `chore(auto): regenerate SDK from intelligence_hub@<sha>` commit message on each channel, not by the version number. There is no guarantee that `qa@1.0.62` was built from the same hub state that passed as `dev@1.0.70`.
+
+This is inherent to the regenerate-per-channel model. Promoting one built artifact across channels (build once, move dist-tags) would give real semver traceability but is a separate architectural change to the dispatch model, not adopted here.
 
 ### Path resolution in CI
 `actions/checkout` with `path: <sibling_name>` replicates the local sibling layout (`$GITHUB_WORKSPACE/{mediaviz_external_api,mediaviz_intelligence_hub,mediaviz_sdk,oauth_library}`), so `github_sources._CODE_ROOT = dirname(dirname(__file__))` and the hub scripts' `../mediaviz_external_api/...` defaults work without any generator-script changes.
