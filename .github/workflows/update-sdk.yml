@@ -329,14 +329,34 @@ jobs:
           cd mediaviz_php_sdk
           git config user.name "mediaviz-pipeline-bot[bot]"
           git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
+          VERSION="${{ steps.dirs.outputs.version }}"
+          # 1. Commit + push main if content changed. Non-fast-forward-safe: rebase
+          #    onto origin/main and retry (a re-run or manual edit may have advanced
+          #    the companion repo); fail loudly on a real conflict. The tag is created
+          #    AFTER the push so it points at the final (post-rebase) commit.
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
-            git commit -m "release ${{ steps.dirs.outputs.version }}"
-            git tag "${{ steps.dirs.outputs.version }}"
-            git push origin main --tags
+            git commit -m "release ${VERSION}"
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main || { echo "::error::rebase conflict on mediaviz-php-sdk main — manual intervention needed"; exit 1; }
+              if git push origin HEAD:main; then pushed=true; break; fi
+              echo "Push to mediaviz-php-sdk main rejected (attempt ${attempt}/3) — refetching + retrying."
+            done
+            [ "$pushed" = true ] || { echo "::error::push to mediaviz-php-sdk main failed after 3 attempts"; exit 1; }
           else
-            echo "No PHP SDK changes to publish."
-            exit 0
+            echo "No PHP SDK content change — main already current; ensuring release tag exists."
+          fi
+          # 2. Ensure the version tag exists on the remote (idempotent). Covers a
+          #    re-run, or a prior run that committed/pushed main but failed before
+          #    tagging — so Packagist still gets the release without a manual fixup.
+          if git ls-remote --exit-code --tags origin "refs/tags/${VERSION}" >/dev/null 2>&1; then
+            echo "Tag ${VERSION} already on remote — nothing to tag."
+          else
+            git tag -f "${VERSION}"
+            git push origin "refs/tags/${VERSION}"
+            echo "Pushed tag ${VERSION}."
           fi
 
       - name: Trigger Packagist refresh
