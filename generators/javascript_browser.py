@@ -79,13 +79,20 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         with open(dts_path, "w") as f:
             f.write(dts)
         # ESM-adjacent copy: tools resolving the ESM bundle (or the non-standard
-        # `module` field) locate types by the sibling name sdk.esm.d.ts. Same
-        # surface as sdk.d.ts, so the content is identical and the type-check on
-        # sdk.d.ts covers both.
+        # `module` field) locate types by the sibling name sdk.esm.d.ts.
         with open(os.path.join(dist_dir, "sdk.esm.d.ts"), "w") as f:
             f.write(dts)
+        # CJS declaration for the `require` condition: the .d.cts extension makes
+        # TypeScript treat it as CommonJS, so require() consumers resolve cleanly
+        # under node16/nodenext (a .d.ts would be read as ESM and rejected). The
+        # declared surface is identical, so the content is the same.
+        cts_path = os.path.join(dist_dir, "sdk.d.cts")
+        with open(cts_path, "w") as f:
+            f.write(dts)
+        # Type-check both module interpretations: sdk.d.ts as ESM, sdk.d.cts as CJS.
         self._typecheck_dts(output_dir, dts_path)
-        print(f"  [javascript] types emitted → {dts_path} (+ sdk.esm.d.ts)")
+        self._typecheck_dts(output_dir, cts_path)
+        print(f"  [javascript] types emitted → {dts_path} (+ sdk.esm.d.ts, sdk.d.cts)")
 
     def _typecheck_dts(self, output_dir: str, dts_path: str) -> None:
         tsc = os.path.join(output_dir, "node_modules", ".bin", "tsc")
@@ -561,18 +568,23 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             "browser": "./dist/sdk.umd.js",
             "types": "./dist/sdk.d.ts",
             "exports": {
-                # `types` must be the first condition so TypeScript resolves it
-                # ahead of the runtime entries. The `import` condition carries its
-                # own types (sdk.esm.d.ts) so ESM consumers resolve a declaration
-                # file adjacent to the bundle they load.
+                # No top-level `types` condition here: it is always active and,
+                # appearing first, would short-circuit every consumer to a single
+                # declaration regardless of module kind. Instead each of `import`
+                # /`require` carries its own `types` (first key) so ESM consumers
+                # resolve sdk.esm.d.ts and CJS consumers resolve sdk.d.cts, matching
+                # the module kind of the bundle they load. The sibling top-level
+                # `types` field above remains as the legacy-resolution fallback.
                 ".": {
-                    "types": "./dist/sdk.d.ts",
                     "browser": "./dist/sdk.umd.js",
                     "import": {
                         "types": "./dist/sdk.esm.d.ts",
                         "default": "./dist/sdk.esm.js",
                     },
-                    "require": "./dist/sdk.cjs",
+                    "require": {
+                        "types": "./dist/sdk.d.cts",
+                        "default": "./dist/sdk.cjs",
+                    },
                     "default": "./dist/sdk.cjs",
                 },
             },
