@@ -176,25 +176,30 @@ def test_mediaviz_client_surface(gen):
 def test_package_json_advertises_types(gen, tmp_path):
     gen.emit_package_json(str(tmp_path))
     pkg = json.loads((tmp_path / "package.json").read_text())
+    # Sibling top-level `types` is the legacy-resolution fallback.
     assert pkg["types"] == "./dist/sdk.d.ts"
-    # `types` must be the first export condition for TS resolution.
-    assert list(pkg["exports"]["."])[0] == "types"
-    assert pkg["exports"]["."]["types"] == "./dist/sdk.d.ts"
-    # ESM consumers resolve their own declaration adjacent to the ESM bundle.
-    assert pkg["exports"]["."]["import"]["types"] == "./dist/sdk.esm.d.ts"
-    assert pkg["exports"]["."]["import"]["default"] == "./dist/sdk.esm.js"
+    exp = pkg["exports"]["."]
+    # No top-level `types` CONDITION inside exports — it would pre-empt the
+    # per-condition types under node16/nodenext.
+    assert "types" not in exp
+    # Per-condition types: ESM → sdk.esm.d.ts, CJS → sdk.d.cts; each first in its block.
+    assert list(exp["import"])[0] == "types" and exp["import"]["types"] == "./dist/sdk.esm.d.ts"
+    assert exp["import"]["default"] == "./dist/sdk.esm.js"
+    assert list(exp["require"])[0] == "types" and exp["require"]["types"] == "./dist/sdk.d.cts"
+    assert exp["require"]["default"] == "./dist/sdk.cjs"
     assert "typescript" in pkg["devDependencies"]
 
 
-def test_emit_dts_writes_both_declaration_files(gen, tmp_path):
+def test_emit_dts_writes_all_declaration_files(gen, tmp_path):
     gen._schemas = {}
     ep = _auth_ep("get_photo", "/p", response={"body": "dict"})
     gen.emit_dts_file([ep], None, None, str(tmp_path))  # tsc absent → type-check skipped
     dist = tmp_path / "dist"
-    assert (dist / "sdk.d.ts").exists()
-    assert (dist / "sdk.esm.d.ts").exists()
-    # identical surface
-    assert (dist / "sdk.d.ts").read_text() == (dist / "sdk.esm.d.ts").read_text()
+    base = (dist / "sdk.d.ts").read_text()
+    assert base  # non-empty
+    # ESM + CJS declarations are byte-identical copies of the consolidated surface.
+    assert (dist / "sdk.esm.d.ts").read_text() == base
+    assert (dist / "sdk.d.cts").read_text() == base
 
 
 def test_typescript_devdep_pruned_for_publish(gen, tmp_path):
