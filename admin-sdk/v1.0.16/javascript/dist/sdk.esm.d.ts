@@ -406,6 +406,7 @@ export class Admin {
   getKeywordGroupsLabelsByKeywordGroup(keywordGroup: string, options?: { subgroup?: string | string[] }): Promise<Record<string, any>>;
   adminCreateCompanyNlpIndexes(options?: { companyIds?: any }): Promise<Record<string, any>>;
   adminCreateLabelVocabIndex(): Promise<Record<string, any>>;
+  adminTriggerNlpPopulateAllActiveProjects(): Promise<Record<string, any>>;
   adminClearNlSearchCache(): Promise<Record<string, any>>;
   adminDeleteCompanyNlpIndexes(options?: { companyIds?: any }): Promise<Record<string, any>>;
   adminDeleteUserProjects(options?: { userIds?: any }): Promise<Record<string, any>>;

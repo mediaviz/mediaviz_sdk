@@ -541,6 +541,13 @@
 	    return data;
 	  }
 
+	  async adminTriggerNlpPopulateAllActiveProjects() {
+	    this._ctx.requireTokens();
+	    const path = `/api/v1/admin/trigger_nlp_populate_all_active_projects/`;
+	    const { data } = await this._ctx.client.request(path, 'POST', this._ctx.accessToken, this._ctx.refreshToken);
+	    return data;
+	  }
+
 	  async adminClearNlSearchCache() {
 	    this._ctx.requireTokens();
 	    const path = `/api/v1/admin/clear_nl_search_cache/`;

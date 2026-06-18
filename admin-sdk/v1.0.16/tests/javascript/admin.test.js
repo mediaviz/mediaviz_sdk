@@ -253,6 +253,35 @@ describe('Admin', () => {
     expect(spy.calls.length).toBe(1);
   });
 
+  it('adminTriggerNlpPopulateAllActiveProjects — exists', () => {
+    const admin = new Admin({});
+    expect(typeof admin.adminTriggerNlpPopulateAllActiveProjects).toBe('function');
+  });
+
+  it('adminTriggerNlpPopulateAllActiveProjects — HTTP method is POST', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminTriggerNlpPopulateAllActiveProjects();
+    expect(spy.last_call().method).toBe('POST');
+  });
+
+  it('adminTriggerNlpPopulateAllActiveProjects — path construction', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminTriggerNlpPopulateAllActiveProjects();
+    expect(spy.last_call().path).toContain('/api/v1/admin/trigger_nlp_populate_all_active_projects/');
+  });
+
+  it('adminTriggerNlpPopulateAllActiveProjects — auth routing', async () => {
+    const spy = new SpyOAuthClient();
+    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
+    const admin = new Admin(ctx);
+    await admin.adminTriggerNlpPopulateAllActiveProjects();
+    expect(spy.calls.length).toBe(1);
+  });
+
   it('adminClearNlSearchCache — exists', () => {
     const admin = new Admin({});
     expect(typeof admin.adminClearNlSearchCache).toBe('function');
