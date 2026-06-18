@@ -4,7 +4,7 @@ Python utility that reads YAML endpoint specifications from `mediaviz_intelligen
 
 Currently supports: **javascript (browser)**, **php**.
 
-See `spec.md` for full architectural detail and `implementation_plan.json` for task-level status.
+See `spec.md` for full architectural detail and `implementation_plan.json` for task-level status. For the CI publishing pipeline (triggers, npm/Packagist, required tokens) see `PUBLISHING.md`.
 
 ## Prerequisites
 
