@@ -1,0 +1,3407 @@
+source: public_sdk_endpoints.yaml
+resolved_at: '2026-06-22T15:29:01Z'
+endpoints:
+- id: get_get_category_labels
+  function_name: get_category_labels
+  controller: Admin
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/admin/category_labels/{category}
+  summary: get_category_labels
+  auth: required
+  params:
+  - name: category
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_model_credit_relationship
+  function_name: get_model_credit_relationship
+  controller: AI Model Credits
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/model_credit/{model_name}
+  summary: get_model_credit_relationship
+  auth: required
+  params:
+  - name: model_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_company_by_id
+  function_name: get_company_by_id
+  controller: Company
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/company/{company_id}
+  summary: get_company_by_id
+  auth: required
+  params:
+  - name: company_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#CompanyDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_confirm_company_credit_balance
+  function_name: confirm_company_credit_balance
+  controller: Company
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/company/credit_balance/{company_id}
+  summary: confirm_company_credit_balance
+  auth: required
+  params:
+  - name: company_id
+    in: path
+    type: int
+    required: true
+  - name: photo_count
+    in: query
+    type: int
+    required: false
+  - name: models_list
+    in: query
+    type: List[str]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#CreditBalanceOutput
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_curated_album
+  function_name: create_curated_album
+  controller: Curated Albums
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/curated_album/project/{project_table_name}
+  summary: create_curated_album
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - name
+    - name: description
+      snake: description
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - description
+    - name: confidenceValue
+      snake: confidence_value
+      type: float
+      required: false
+      kind: primitive
+      orig_path:
+      - confidence_value
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#CuratedAlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_project_curated_albums
+  function_name: get_all_project_curated_albums
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/project/{project_table_name}
+  summary: get_all_project_curated_albums
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[CuratedAlbumDisplay]
+      $ref: api_schemas.yaml#CuratedAlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_curated_album_photos
+  function_name: get_curated_album_photos
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/photos/{album_id}/
+  summary: get_curated_album_photos
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  - name: confidence_value
+    in: query
+    type: Optional[float]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: List[]
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_curated_album_photos_ranked
+  function_name: get_curated_album_photos_ranked
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/photos/ranked/{album_id}/
+  summary: get_curated_album_photos_ranked
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  - name: confidence_value
+    in: query
+    type: Optional[float]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_curated_album_by_id
+  function_name: get_curated_album_by_id
+  controller: Curated Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/curated_album/{album_id}
+  summary: get_curated_album_by_id
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#CuratedAlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_curated_album
+  function_name: update_curated_album
+  controller: Curated Albums
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/curated_album/{album_id}
+  summary: update_curated_album
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - name
+    - name: description
+      snake: description
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - description
+    - name: confidenceValue
+      snake: confidence_value
+      type: float
+      required: false
+      kind: primitive
+      orig_path:
+      - confidence_value
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#CuratedAlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_curated_album
+  function_name: delete_curated_album
+  controller: Curated Albums
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/curated_album/{album_id}
+  summary: delete_curated_album
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_convert_curated_album_to_custom
+  function_name: convert_curated_album_to_custom
+  controller: Curated Albums
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/curated_album/{album_id}/convert
+  summary: convert_curated_album_to_custom
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#CuratedAlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_custom_album_detail_by_id
+  function_name: get_custom_album_detail_by_id
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/{custom_album_id}
+  summary: get_custom_album_detail_by_id
+  auth: required
+  params:
+  - name: custom_album_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#AlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_project_custom_albums
+  function_name: get_all_project_custom_albums
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/project/{project_table_name}
+  summary: get_all_project_custom_albums
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[AlbumDisplay]
+      $ref: api_schemas.yaml#AlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_custom_album_photos_by_id
+  function_name: get_custom_album_photos_by_id
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/photos/{custom_album_id}/
+  summary: get_custom_album_photos_by_id
+  auth: required
+  params:
+  - name: custom_album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_ranked_custom_album_by_id
+  function_name: get_ranked_custom_album_by_id
+  controller: Custom Albums
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/custom_album/photos/ranked/{custom_album_id}/
+  summary: get_ranked_custom_album_by_id
+  auth: required
+  params:
+  - name: custom_album_id
+    in: path
+    type: int
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_project_custom_album
+  function_name: create_project_custom_album
+  controller: Custom Albums
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/custom_album/project/{project_table_name}
+  summary: create_project_custom_album
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - name
+    - name: description
+      snake: description
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - description
+    - name: photoIdInclusionList
+      snake: photo_id_inclusion_list
+      type: List[int]
+      items_type: int
+      required: false
+      kind: list
+      orig_path:
+      - photo_id_inclusion_list
+    - name: photoIdRemovalList
+      snake: photo_id_removal_list
+      type: List[int]
+      items_type: int
+      required: false
+      kind: list
+      orig_path:
+      - photo_id_removal_list
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#AlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_custom_album
+  function_name: update_custom_album
+  controller: Custom Albums
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/custom_album/{album_id}
+  summary: update_custom_album
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - name
+    - name: description
+      snake: description
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - description
+    - name: photoIdInclusionList
+      snake: photo_id_inclusion_list
+      type: List[int]
+      items_type: int
+      required: false
+      kind: list
+      orig_path:
+      - photo_id_inclusion_list
+    - name: photoIdRemovalList
+      snake: photo_id_removal_list
+      type: List[int]
+      items_type: int
+      required: false
+      kind: list
+      orig_path:
+      - photo_id_removal_list
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#AlbumDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_custom_album
+  function_name: delete_custom_album
+  controller: Custom Albums
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/custom_album/{album_id}
+  summary: delete_custom_album
+  auth: required
+  params:
+  - name: album_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_request_email_verification
+  function_name: request_email_verification
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/request-email-verification
+  summary: request_email_verification
+  auth: none
+  params:
+  - name: email
+    in: query
+    type: EmailStr
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_verify_email
+  function_name: verify_email
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/verify-email/{token}
+  summary: verify_email
+  auth: none
+  params:
+  - name: token
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_request_password_reset
+  function_name: request_password_reset
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/request-password-reset
+  summary: request_password_reset
+  auth: none
+  params:
+  - name: email
+    in: query
+    type: EmailStr
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_validate_token
+  function_name: validate_token
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/validate-token
+  summary: validate_token
+  auth: none
+  params: []
+  request_body:
+    _shape: expanded
+    fields:
+    - name: token
+      snake: token
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - token
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_reset_password
+  function_name: reset_password
+  controller: Email Tokens
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/reset-password
+  summary: reset_password
+  auth: none
+  params: []
+  request_body:
+    _shape: expanded
+    fields:
+    - name: token
+      snake: token
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - token
+    - name: newPassword
+      snake: new_password
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - new_password
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_user_email_tokens
+  function_name: delete_user_email_tokens
+  controller: Email Tokens
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/admin/email_tokens/by_user/{user_id}
+  summary: delete_user_email_tokens
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body: Dict[any]
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_health_check
+  function_name: health_check
+  controller: Health
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/health/
+  summary: health_check
+  auth: none
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#HealthCheck
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_liveness_check
+  function_name: liveness_check
+  controller: Health
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/health/live/
+  summary: liveness_check
+  auth: none
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#HealthCheck
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_readiness_check
+  function_name: readiness_check
+  controller: Health
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/health/ready
+  summary: readiness_check
+  auth: none
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#HealthCheck
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_keyword_filtering_list
+  function_name: create_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/keyword/
+  summary: create_keyword_filtering_list
+  auth: required
+  params: []
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - name
+    - name: projectList
+      snake: project_list
+      type: List[str]
+      items_type: str
+      required: false
+      kind: list
+      orig_path:
+      - project_list
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#KeywordListDisplayWithProjects
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user_keyword_filtering_lists
+  function_name: get_user_keyword_filtering_lists
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/user
+  summary: get_user_keyword_filtering_lists
+  auth: required
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[KeywordListDisplayWithProjects]
+      $ref: api_schemas.yaml#KeywordListDisplayWithProjects
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_company_keyword_lists
+  function_name: get_company_keyword_lists
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/company/{company_id}
+  summary: get_company_keyword_lists
+  auth: required
+  params:
+  - name: company_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[CompanyKeywordListOverview]
+      $ref: api_schemas.yaml#CompanyKeywordListOverview
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_keyword_filtering_list_and_projects_by_id
+  function_name: get_keyword_filtering_list_and_projects_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/{keyword_list_id}
+  summary: get_keyword_filtering_list_and_projects_by_id
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#KeywordListDisplayWithProjects
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_keyword_filtering_list_by_id
+  function_name: get_keyword_filtering_list_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/list/{keyword_list_id}
+  summary: get_keyword_filtering_list_by_id
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#KeywordListDisplayWithList
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_existing_keyword_filtering_list_by_project
+  function_name: get_existing_keyword_filtering_list_by_project
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/project/{project_table_name}
+  summary: get_existing_keyword_filtering_list_by_project
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_default_keyword_filtering_list_by_project
+  function_name: get_default_keyword_filtering_list_by_project
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/project/{project_table_name}/default
+  summary: get_default_keyword_filtering_list_by_project
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_keyword_filtering_list_labels
+  function_name: update_keyword_filtering_list_labels
+  controller: Keywords
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/keyword/{keyword_list_id}
+  summary: update_keyword_filtering_list_labels
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: listKeywordsToInclude
+      snake: list_keywords_to_include
+      type: List[int]
+      items_type: int
+      required: true
+      kind: list
+      orig_path:
+      - list_keywords_to_include
+    - name: listKeywordsToExclude
+      snake: list_keywords_to_exclude
+      type: List[int]
+      items_type: int
+      required: true
+      kind: list
+      orig_path:
+      - list_keywords_to_exclude
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#KeywordListDisplayWithList
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_keyword_filtering_list_details
+  function_name: update_keyword_filtering_list_details
+  controller: Keywords
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/keyword/details/{keyword_list_id}
+  summary: update_keyword_filtering_list_details
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - name
+    - name: projectList
+      snake: project_list
+      type: List[str]
+      items_type: str
+      required: false
+      kind: list
+      orig_path:
+      - project_list
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#KeywordListDisplayWithProjects
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_add_projects_to_keyword_filtering_list
+  function_name: add_projects_to_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/keyword/{keyword_list_id}/projects
+  summary: add_projects_to_keyword_filtering_list
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  - name: project_ids
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_keyword_list_export
+  function_name: request_keyword_list_export
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/export/{keyword_list_id}
+  summary: request_keyword_list_export
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_keyword_list_export_status
+  function_name: request_keyword_list_export_status
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/export_status/{keyword_list_id}
+  summary: request_keyword_list_export_status
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#AnalysisStatusResponse
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_keywords_and_ids
+  function_name: get_keywords_and_ids
+  controller: Keywords
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/keyword/all_keywords/id/label
+  summary: get_keywords_and_ids
+  auth: required
+  params: []
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_remove_projects_from_keyword_filtering_list
+  function_name: remove_projects_from_keyword_filtering_list
+  controller: Keywords
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/keyword/{keyword_list_id}/projects
+  summary: remove_projects_from_keyword_filtering_list
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  - name: project_ids
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_keyword_filtering_list_by_id
+  function_name: delete_keyword_filtering_list_by_id
+  controller: Keywords
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/keyword/{keyword_list_id}
+  summary: delete_keyword_filtering_list_by_id
+  auth: required
+  params:
+  - name: keyword_list_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_authorize
+  function_name: authorize
+  controller: OAuth Authorization
+  base_path: /
+  method: GET
+  path: /oauth/authorize
+  summary: authorize
+  auth: none
+  params:
+  - name: response_type
+    in: query
+    type: str
+    required: false
+  - name: client_id
+    in: query
+    type: str
+    required: false
+  - name: redirect_uri
+    in: query
+    type: str
+    required: false
+  - name: state
+    in: query
+    type: str
+    required: false
+  - name: code_challenge
+    in: query
+    type: str
+    required: false
+  - name: code_challenge_method
+    in: query
+    type: str
+    required: false
+  request_body: null
+  response:
+    status: 302
+    source: inferred
+    body: empty
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_consent
+  function_name: get_consent
+  controller: OAuth Authorization
+  base_path: /
+  method: GET
+  path: /oauth/consent/{session_id}
+  summary: get_consent
+  auth: none
+  params:
+  - name: session_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: empty
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_post_approve_consent
+  function_name: post_approve_consent
+  controller: OAuth Authorization
+  base_path: /
+  method: POST
+  path: /oauth/consent/{session_id}/approve
+  summary: post_approve_consent
+  auth: none
+  params:
+  - name: session_id
+    in: path
+    type: str
+    required: true
+  request_body:
+    restart_url:
+      type: str
+      required: true
+  response:
+    status: 302
+    source: inferred
+    body: empty
+  content_type: application/x-www-form-urlencoded
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_post_deny_consent
+  function_name: post_deny_consent
+  controller: OAuth Authorization
+  base_path: /
+  method: POST
+  path: /oauth/consent/{session_id}/deny
+  summary: post_deny_consent
+  auth: none
+  params:
+  - name: session_id
+    in: path
+    type: str
+    required: true
+  request_body:
+    restart_url:
+      type: str
+      required: true
+  response: null
+  content_type: application/x-www-form-urlencoded
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_switch_user
+  function_name: get_switch_user
+  controller: OAuth Authorization
+  base_path: /
+  method: GET
+  path: /oauth/consent/{session_id}/switch-user
+  summary: get_switch_user
+  auth: none
+  params:
+  - name: session_id
+    in: path
+    type: str
+    required: true
+  - name: restart_url
+    in: query
+    type: str
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_login
+  function_name: get_login
+  controller: Oauth Login
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/oauth/login
+  summary: get_login
+  auth: none
+  params:
+  - name: next
+    in: query
+    type: str
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: empty
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_post_login
+  function_name: post_login
+  controller: Oauth Login
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/oauth/login
+  summary: post_login
+  auth: none
+  params: []
+  request_body:
+    email:
+      type: str
+      required: true
+    password:
+      type: str
+      required: true
+    next:
+      type: str
+      required: true
+  response:
+    status: 302
+    source: inferred
+    body: empty
+  content_type: application/x-www-form-urlencoded
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_token
+  function_name: token
+  controller: OAuth Token
+  base_path: /
+  method: POST
+  path: /oauth/token
+  summary: token
+  auth: none
+  params: []
+  request_body:
+    grant_type:
+      type: str
+      required: true
+    code:
+      type: str
+      required: true
+    redirect_uri:
+      type: str
+      required: true
+    client_id:
+      type: str
+      required: true
+    code_verifier:
+      type: str
+      required: true
+    refresh_token:
+      type: str
+      required: true
+    client_secret:
+      type: Optional[str]
+      required: true
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: application/x-www-form-urlencoded
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_admin_revoke_user_tokens
+  function_name: admin_revoke_user_tokens
+  controller: OAuth Token
+  base_path: /
+  method: DELETE
+  path: /oauth/admin/users/{user_id}/revoke-tokens
+  summary: admin_revoke_user_tokens
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_revoke
+  function_name: revoke
+  controller: OAuth Token
+  base_path: /
+  method: POST
+  path: /oauth/revoke
+  summary: revoke
+  auth: none
+  params: []
+  request_body:
+    token:
+      type: str
+      required: true
+    token_type_hint:
+      type: Optional[str]
+      required: true
+    client_id:
+      type: Optional[str]
+      required: true
+  response:
+    status: 200
+    source: inferred
+    body: empty
+  content_type: application/x-www-form-urlencoded
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_person
+  function_name: update_person
+  controller: Person
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/person/{project_table_name}/{person_id}
+  summary: update_person
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: person_id
+    in: path
+    type: str
+    required: true
+  - name: person_name
+    in: query
+    type: str
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_combine_persons
+  function_name: combine_persons
+  controller: Person
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/person/{project_table_name}/combine/{destination_person_id}/{old_person_id}
+  summary: combine_persons
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: destination_person_id
+    in: path
+    type: str
+    required: true
+  - name: old_person_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#PhotoPersonLight
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_split_persons
+  function_name: split_persons
+  controller: Person
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/person/{project_table_name}/split/{id}/
+  summary: split_persons
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: id
+    in: path
+    type: int
+    required: true
+  - name: new_name
+    in: query
+    type: Optional[str]
+    required: false
+  - name: destination_person_id
+    in: query
+    type: Optional[str]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#PhotoPersonLight
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_persons_from_project
+  function_name: get_all_persons_from_project
+  controller: Person
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/person/{project_table_name}/
+  summary: get_all_persons_from_project
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[PhotoPersonWithS3Link]
+      $ref: api_schemas.yaml#PhotoPersonWithS3Link
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_person_names_from_project
+  function_name: get_all_person_names_from_project
+  controller: Person
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/person/{project_table_name}/names
+  summary: get_all_person_names_from_project
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_persons_from_photo
+  function_name: get_all_persons_from_photo
+  controller: Person
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/person/{project_table_name}/photo/{photo_id}
+  summary: get_all_persons_from_photo
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[PhotoPersonLight]
+      $ref: api_schemas.yaml#PhotoPersonLight
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_photo_from_project
+  function_name: get_photo_from_project
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/{photo_id}
+  summary: get_photo_from_project
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  - name: keyword_list_id
+    in: query
+    type: int
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#PhotoDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_photo_face_details_from_project
+  function_name: get_photo_face_details_from_project
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/face_details/{table_name}/{photo_id}
+  summary: get_photo_face_details_from_project
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[PhotoFace]
+      $ref: api_schemas.yaml#PhotoFace
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_photo_ids_by_table_name
+  function_name: get_project_photo_ids_by_table_name
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/{table_name}/
+  summary: get_project_photo_ids_by_table_name
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  - name: include_all
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: start_date
+    in: query
+    type: Optional[str]
+    required: false
+  - name: end_date
+    in: query
+    type: Optional[str]
+    required: false
+  - name: no_date_taken
+    in: query
+    type: Optional[bool]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_ranked_project_photo_ids_by_table_name
+  function_name: get_ranked_project_photo_ids_by_table_name
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos/ranked/{table_name}/
+  summary: get_ranked_project_photo_ids_by_table_name
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: asc_or_desc
+    in: query
+    type: str
+    required: false
+  - name: last_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: limit
+    in: query
+    type: Optional[int]
+    required: false
+  - name: start_date
+    in: query
+    type: Optional[str]
+    required: false
+  - name: end_date
+    in: query
+    type: Optional[str]
+    required: false
+  - name: no_date_taken
+    in: query
+    type: Optional[bool]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_month_years_with_photos
+  function_name: get_project_month_years_with_photos
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photo_month_years/{table_name}
+  summary: get_project_month_years_with_photos
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_thumbnail
+  function_name: get_project_thumbnail
+  controller: Photos
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/photos_project/{table_name}
+  summary: get_project_thumbnail
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_photo_in_project
+  function_name: update_photo_in_project
+  controller: Photos
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/photos_update
+  summary: update_photo_in_project
+  auth: required
+  params:
+  - name: table_name
+    in: query
+    type: str
+    required: false
+  - name: photo_id
+    in: query
+    type: int
+    required: false
+  - name: photo_data
+    in: query
+    type: dict
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#PhotoDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_photo_ranking
+  function_name: update_photo_ranking
+  controller: Photos
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/photos_update/{table_name}/id/{photo_id}/rank/{new_category}
+  summary: update_photo_ranking
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_id
+    in: path
+    type: int
+    required: true
+  - name: new_category
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_photo_from_project
+  function_name: delete_photo_from_project
+  controller: Photos
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/photos/{table_name}/delete/
+  summary: delete_photo_from_project
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: photo_ids
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_project_and_run
+  function_name: create_project_and_run
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/project_outcome/
+  summary: create_project_and_run
+  auth: required
+  params:
+  - name: outcomes
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: models
+    in: query
+    type: Annotated[any]
+    required: false
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - name
+    - name: private
+      snake: private
+      type: bool
+      required: false
+      kind: primitive
+      orig_path:
+      - private
+    - name: type
+      snake: type
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - type
+    - name: description
+      snake: description
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - description
+    - name: directory
+      snake: directory
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - directory
+    - name: photoUploadVector
+      snake: photo_upload_vector
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - photo_upload_vector
+    - name: thumbnail
+      snake: thumbnail
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - thumbnail
+    - name: runName
+      snake: run_name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - run_name
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#ProjectRunDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_mark_project_upload_complete
+  function_name: mark_project_upload_complete
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/project/{project_table_name}/upload_complete/
+  summary: mark_project_upload_complete
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: skipped_file_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_check_project_status
+  function_name: check_project_status
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/project/status/{project_table_name}
+  summary: check_project_status
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_prelim_model_request_template
+  function_name: get_project_prelim_model_request_template
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/project_outcome/{project_table_name}
+  summary: get_project_prelim_model_request_template
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user_projects
+  function_name: get_user_projects
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/user
+  summary: get_user_projects
+  auth: required
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[ProjectRunDisplay]
+      $ref: api_schemas.yaml#ProjectRunDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_admin_projects
+  function_name: get_admin_projects
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/admin
+  summary: get_admin_projects
+  auth: required
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      type: List[ProjectRunDisplay]
+      $ref: api_schemas.yaml#ProjectRunDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_by_id
+  function_name: get_project_by_id
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/{project_id}
+  summary: get_project_by_id
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#ProjectRunDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_by_directory
+  function_name: get_project_by_directory
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/directory/{directory}
+  summary: get_project_by_directory
+  auth: required
+  params:
+  - name: directory
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#ProjectRunDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_project
+  function_name: update_project
+  controller: Projects
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/projects/{project_id}
+  summary: update_project
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: private
+      snake: private
+      type: bool
+      required: false
+      kind: primitive
+      orig_path:
+      - private
+    - name: type
+      snake: type
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - type
+    - name: description
+      snake: description
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - description
+    - name: directory
+      snake: directory
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - directory
+    - name: name
+      snake: name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - name
+    - name: thumbnail
+      snake: thumbnail
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - thumbnail
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#ProjectRunDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_project_photo_count
+  function_name: update_project_photo_count
+  controller: Projects
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/projects_photos/{table_name}/
+  summary: update_project_photo_count
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: files_failed_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_project_create_upload_report
+  function_name: update_project_create_upload_report
+  controller: Projects
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/project_upload_report/{table_name}/
+  summary: update_project_create_upload_report
+  auth: required
+  params:
+  - name: table_name
+    in: path
+    type: str
+    required: true
+  - name: files_failed_count
+    in: query
+    type: Optional[int]
+    required: false
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_project_similarity_queue
+  function_name: request_project_similarity_queue
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects_similarity_queue/{project_table_name}/level/{level}
+  summary: request_project_similarity_queue
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: level
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_project_evidence_queue
+  function_name: request_project_evidence_queue
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects_evidence_queue/{project_table_name}
+  summary: request_project_evidence_queue
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_project_personhood_queue
+  function_name: request_project_personhood_queue
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects_personhood_queue/{project_table_name}
+  summary: request_project_personhood_queue
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_insights_queue
+  function_name: request_insights_queue
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/insights_queue/analysis_level/{analysis_level}/identifier/{identifier}
+  summary: request_insights_queue
+  auth: required
+  params:
+  - name: analysis_level
+    in: path
+    type: str
+    required: true
+  - name: identifier
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_request_project_export
+  function_name: request_project_export
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects_export/{project_table_name}
+  summary: request_project_export
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_data_export_upload_status
+  function_name: get_project_data_export_upload_status
+  controller: Projects
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/projects/{project_table_name}/upload_status/{model_name}
+  summary: get_project_data_export_upload_status
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: model_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#AnalysisStatusResponse
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_add_project_event
+  function_name: add_project_event
+  controller: Projects
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/projects/{project_table_name}/event
+  summary: add_project_event
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: event
+      snake: event
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - event
+    - name: detail
+      snake: detail
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - detail
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_project
+  function_name: delete_project
+  controller: Projects
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/projects/{project_id}
+  summary: delete_project
+  auth: required
+  params:
+  - name: project_id
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_search_project_photos
+  function_name: search_project_photos
+  controller: Search
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/search/{project_table_name}/
+  summary: search_project_photos
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: and_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: and_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: or_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: or_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: not_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: not_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: date_min
+    in: query
+    type: Optional[str]
+    required: false
+  - name: date_max
+    in: query
+    type: Optional[str]
+    required: false
+  - name: date_null_and
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: date_null_or
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: date_order
+    in: query
+    type: Optional[str]
+    required: false
+  - name: custom_album_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: best_of_similar_sets_only
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: curated_album_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: split_by_tier
+    in: query
+    type: Optional[bool]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_search_project_photos_text
+  function_name: search_project_photos_text
+  controller: Search
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/search/text/{project_table_name}/
+  summary: search_project_photos_text
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_search_project_photos_natural_language
+  function_name: search_project_photos_natural_language
+  controller: Search
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/search/nl/{project_table_name}/
+  summary: search_project_photos_natural_language
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_search_project_photos_natural_language_hybrid
+  function_name: search_project_photos_natural_language_hybrid
+  controller: Search
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/search/nl_hybrid/{project_table_name}/
+  summary: search_project_photos_natural_language_hybrid
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: blend
+    in: query
+    type: str
+    required: false
+  - name: min_cosine
+    in: query
+    type: float
+    required: false
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_search_project_photos_natural_language_auto
+  function_name: search_project_photos_natural_language_auto
+  controller: Search
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/search/auto/{project_table_name}/
+  summary: search_project_photos_natural_language_auto
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: blend
+    in: query
+    type: str
+    required: false
+  - name: min_cosine
+    in: query
+    type: float
+    required: false
+  request_body:
+    _shape: expanded
+    fields:
+    - name: searchText
+      snake: search_text
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - search_text
+    - name: size
+      snake: size
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - size
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_project_saved_searches
+  function_name: get_project_saved_searches
+  controller: Search
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/search/saved/{project_table_name}/
+  summary: get_project_saved_searches
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  request_body: null
+  response: null
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_saved_search_by_id
+  function_name: get_saved_search_by_id
+  controller: Search
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/search/{search_id}
+  summary: get_saved_search_by_id
+  auth: required
+  params:
+  - name: search_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body:
+      $ref: api_schemas.yaml#SearchDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_save_project_photos_search
+  function_name: save_project_photos_search
+  controller: Search
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/search/{project_table_name}/
+  summary: save_project_photos_search
+  auth: required
+  params:
+  - name: project_table_name
+    in: path
+    type: str
+    required: true
+  - name: search_name
+    in: query
+    type: str
+    required: false
+  - name: and_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: and_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: or_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: or_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: not_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: not_string_params
+    in: query
+    type: Annotated[any]
+    required: false
+  - name: date_min
+    in: query
+    type: Optional[str]
+    required: false
+  - name: date_max
+    in: query
+    type: Optional[str]
+    required: false
+  - name: date_null_and
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: date_null_or
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: date_order
+    in: query
+    type: Optional[str]
+    required: false
+  - name: custom_album_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: best_of_similar_sets_only
+    in: query
+    type: Optional[bool]
+    required: false
+  - name: curated_album_id
+    in: query
+    type: Optional[int]
+    required: false
+  - name: split_by_tier
+    in: query
+    type: Optional[bool]
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_saved_search_by_id
+  function_name: delete_saved_search_by_id
+  controller: Search
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/search/{search_id}
+  summary: delete_saved_search_by_id
+  auth: required
+  params:
+  - name: search_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_user
+  function_name: create_user
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/users/
+  summary: create_user
+  auth: required
+  params: []
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - name
+    - name: email
+      snake: email
+      type: EmailStr
+      required: true
+      kind: primitive
+      orig_path:
+      - email
+    - name: companyId
+      snake: company_id
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - company_id
+    - name: profilePicture
+      snake: profile_picture
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - profile_picture
+    - name: paymentPlanType
+      snake: payment_plan_type
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - payment_plan_type
+    - name: accountType
+      snake: account_type
+      type: int
+      required: true
+      kind: primitive
+      orig_path:
+      - account_type
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#UserDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_create_user_and_company
+  function_name: create_user_and_company
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/users/new_company/
+  summary: create_user_and_company
+  auth: none
+  params:
+  - name: invite_token
+    in: query
+    type: Optional[str]
+    required: false
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - name
+    - name: email
+      snake: email
+      type: EmailStr
+      required: true
+      kind: primitive
+      orig_path:
+      - email
+    - name: companyId
+      snake: company_id
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - company_id
+    - name: profilePicture
+      snake: profile_picture
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - profile_picture
+    - name: paymentPlanType
+      snake: payment_plan_type
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - payment_plan_type
+    - name: password
+      snake: password
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - password
+    - name: companyName
+      snake: company_name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - company_name
+    - name: credits
+      snake: credits
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - credits
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#UserDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_change_password
+  function_name: change_password
+  controller: Users
+  base_path: /api/v1
+  method: POST
+  path: /api/v1/user/change_password
+  summary: change_password
+  auth: required
+  params: []
+  request_body:
+    _shape: expanded
+    fields:
+    - name: oldPassword
+      snake: old_password
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - old_password
+    - name: newPassword
+      snake: new_password
+      type: str
+      required: true
+      kind: primitive
+      orig_path:
+      - new_password
+  response:
+    status: 200
+    source: response_model
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user_id
+  function_name: get_user_id
+  controller: Users
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/users
+  summary: get_user_id
+  auth: required
+  params: []
+  request_body: null
+  response:
+    status: 200
+    source: inferred
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_user
+  function_name: get_user
+  controller: Users
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/users/{user_id}
+  summary: get_user
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#UserDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: get_get_all_users_by_company
+  function_name: get_all_users_by_company
+  controller: Users
+  base_path: /api/v1
+  method: GET
+  path: /api/v1/users/company/{company_id}
+  summary: get_all_users_by_company
+  auth: required
+  params:
+  - name: company_id
+    in: path
+    type: int
+    required: true
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body:
+      type: List[UserDisplay]
+      $ref: api_schemas.yaml#UserDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: put_update_user
+  function_name: update_user
+  controller: Users
+  base_path: /api/v1
+  method: PUT
+  path: /api/v1/users/{user_id}
+  summary: update_user
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  request_body:
+    _shape: expanded
+    fields:
+    - name: name
+      snake: name
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - name
+    - name: email
+      snake: email
+      type: EmailStr
+      required: false
+      kind: primitive
+      orig_path:
+      - email
+    - name: password
+      snake: password
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - password
+    - name: companyId
+      snake: company_id
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - company_id
+    - name: accountType
+      snake: account_type
+      type: int
+      required: false
+      kind: primitive
+      orig_path:
+      - account_type
+    - name: profilePicture
+      snake: profile_picture
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - profile_picture
+    - name: location
+      snake: location
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - location
+    - name: phoneNumber
+      snake: phone_number
+      type: str
+      required: false
+      kind: primitive
+      orig_path:
+      - phone_number
+    - name: birthday
+      snake: birthday
+      type: date
+      required: false
+      kind: primitive
+      orig_path:
+      - birthday
+  response:
+    status: 200
+    source: response_model
+    body:
+      $ref: api_schemas.yaml#UserDisplay
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: delete_delete_user
+  function_name: delete_user
+  controller: Users
+  base_path: /api/v1
+  method: DELETE
+  path: /api/v1/users/delete/{user_id}
+  summary: delete_user
+  auth: required
+  params:
+  - name: user_id
+    in: path
+    type: int
+    required: true
+  - name: new_company_owner_id
+    in: query
+    type: int
+    required: false
+  request_body: null
+  response:
+    status: 200
+    source: response_model
+    body: dict
+  content_type: null
+  tags:
+  - all
+  hidden: false
+  api_host: null
+- id: post_upload_photo
+  function_name: upload_photo_to_mediaviz
+  controller: PhotoUpload
+  base_path: /
+  method: POST
+  path: /photo_upload
+  summary: Upload a preprocessed photo with metadata via headers
+  auth: required
+  params:
+  - name: x-company-id
+    in: header
+    type: string
+    required: true
+  - name: x-user-id
+    in: header
+    type: string
+    required: true
+  - name: x-project-table-name
+    in: header
+    type: string
+    required: true
+  - name: x-client-side-id
+    in: header
+    type: string
+    required: false
+  - name: x-title
+    in: header
+    type: string (original filename)
+    required: true
+  - name: x-blur
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-colors
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-face-recognition
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-describe
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-classification
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-image-comparison
+    in: header
+    type: string (bool)
+    required: false
+  - name: x-size
+    in: header
+    type: string (WxH original dimensions)
+    required: false
+  - name: x-source-resolution-x
+    in: header
+    type: string (EXIF x resolution)
+    required: false
+  - name: x-source-resolution-y
+    in: header
+    type: string (EXIF y resolution)
+    required: false
+  - name: x-date-taken
+    in: header
+    type: string (EXIF DateTimeOriginal)
+    required: false
+  - name: x-latitude
+    in: header
+    type: string (EXIF GPS latitude)
+    required: false
+  - name: x-longitude
+    in: header
+    type: string (EXIF GPS longitude)
+    required: false
+  - name: x-ocr
+    in: header
+    type: string
+    required: false
+  request_body:
+    file_content:
+      type: string (base64-encoded image)
+      required: true
+    mimetype:
+      type: string (e.g. image/jpeg)
+      required: true
+    file_path:
+      type: string (original filesystem path)
+      required: true
+  response: null
+  content_type: application/json
+  tags:
+  - top
+  hidden: false
+  api_host: photo_upload
