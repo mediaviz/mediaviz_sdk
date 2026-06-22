@@ -1,6 +1,6 @@
 {
   "name": "@mediaviz/admin-sdk",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "MediaViz JavaScript Admin SDK \u2014 auto-generated full endpoint client (private).",
   "license": "MIT",
   "repository": {

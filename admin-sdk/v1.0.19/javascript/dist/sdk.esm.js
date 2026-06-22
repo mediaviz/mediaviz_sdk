@@ -1,5 +1,3 @@
-'use strict';
-
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -1249,12 +1247,13 @@ function stripUndef$3(o) { const r = {}; for (const k in o) if (o[k] !== undefin
 class OauthClients {
   constructor(ctx) { this._ctx = ctx; }
 
-  async createClient(clientName, clientType, redirectUris, isFirstParty, companyId = undefined) {
+  async createClient(clientName, clientType, grantTypes, isFirstParty, redirectUris = undefined, companyId = undefined) {
     this._ctx.requireTokens();
     const path = `/oauth/clients`;
     const body = stripUndef$3({
       client_name: clientName,
       client_type: clientType,
+      grant_types: grantTypes,
       redirect_uris: redirectUris,
       is_first_party: isFirstParty,
       company_id: companyId,
@@ -2087,31 +2086,4 @@ class MediaViz {
   get refreshToken() { return this._refreshToken; }
 }
 
-exports.Admin = Admin;
-exports.AiModelCredits = AiModelCredits;
-exports.ApiError = ApiError;
-exports.Company = Company;
-exports.CuratedAlbums = CuratedAlbums;
-exports.CustomAlbums = CustomAlbums;
-exports.EmailTokens = EmailTokens;
-exports.Health = Health;
-exports.Keywords = Keywords;
-exports.MediaViz = MediaViz;
-exports.NotFoundError = NotFoundError;
-exports.OAuthClient = OAuthClient;
-exports.OAuthError = OAuthError;
-exports.OAuthErrorCode = OAuthErrorCode;
-exports.OauthAuthorization = OauthAuthorization;
-exports.OauthClients = OauthClients;
-exports.OauthLogin = OauthLogin;
-exports.OauthToken = OauthToken;
-exports.Person = Person;
-exports.Photos = Photos;
-exports.Photoupload = Photoupload;
-exports.Projects = Projects;
-exports.RateLimitError = RateLimitError;
-exports.Search = Search;
-exports.ServerError = ServerError;
-exports.Users = Users;
-exports.ValidationError = ValidationError;
-exports.handleResponse = handleResponse;
+export { Admin, AiModelCredits, ApiError, Company, CuratedAlbums, CustomAlbums, EmailTokens, Health, Keywords, MediaViz, NotFoundError, OAuthClient, OAuthError, OAuthErrorCode, OauthAuthorization, OauthClients, OauthLogin, OauthToken, Person, Photos, Photoupload, Projects, RateLimitError, Search, ServerError, Users, ValidationError, handleResponse };

@@ -3,12 +3,13 @@ function stripUndef(o) { const r = {}; for (const k in o) if (o[k] !== undefined
 export class OauthClients {
   constructor(ctx) { this._ctx = ctx; }
 
-  async createClient(clientName, clientType, redirectUris, isFirstParty, companyId = undefined) {
+  async createClient(clientName, clientType, grantTypes, isFirstParty, redirectUris = undefined, companyId = undefined) {
     this._ctx.requireTokens();
     const path = `/oauth/clients`;
     const body = stripUndef({
       client_name: clientName,
       client_type: clientType,
+      grant_types: grantTypes,
       redirect_uris: redirectUris,
       is_first_party: isFirstParty,
       company_id: companyId,

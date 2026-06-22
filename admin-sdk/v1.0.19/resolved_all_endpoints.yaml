@@ -1,5 +1,5 @@
 source: all_endpoints.yaml
-resolved_at: '2026-06-22T14:15:40Z'
+resolved_at: '2026-06-22T14:43:35Z'
 endpoints:
 - id: get_insert_label_category_matrix
   function_name: insert_label_category_matrix
@@ -2018,11 +2018,19 @@ endpoints:
       kind: primitive
       orig_path:
       - client_type
+    - name: grantTypes
+      snake: grant_types
+      type: list[str]
+      items_type: str
+      required: true
+      kind: list
+      orig_path:
+      - grant_types
     - name: redirectUris
       snake: redirect_uris
       type: list[str]
       items_type: str
-      required: true
+      required: false
       kind: list
       orig_path:
       - redirect_uris

@@ -494,7 +494,7 @@ export class OauthAuthorization {
 }
 
 export class OauthClients {
-  createClient(clientName: string, clientType: string, redirectUris: any, isFirstParty: boolean, companyId?: number): Promise<Record<string, any>>;
+  createClient(clientName: string, clientType: string, grantTypes: any, isFirstParty: boolean, redirectUris?: any, companyId?: number): Promise<Record<string, any>>;
 }
 
 export class OauthToken {
