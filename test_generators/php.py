@@ -75,7 +75,7 @@ class PhpTestGenerator(BaseTestGenerator):
             "        string $url,",
             "        string $method,",
             "        string $accessToken,",
-            "        string $refreshToken,",
+            "        ?string $refreshToken,",
             "        mixed $body = null,",
             "        ?callable $onRefreshSuccess = null,",
             "    ): AuthenticatedResponse {",
