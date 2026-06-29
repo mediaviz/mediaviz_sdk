@@ -85,19 +85,32 @@ endpoints:
 
 ### 2. Versioning (`versioning.py`)
 
-Scans `sdk/` for existing `v{major}.{minor}.{iteration}` directories to determine the next version.
+Determines the next version from the **max** of the on-disk `v{major}.{minor}.{iteration}`
+directories **and** a tracked `VERSION` manifest file in the output dir.
 
 **Logic:**
-- Look at `sdk/` for existing `v{major}.{minor}.{iteration}` directories (ignores `archive/`).
-- If no version directories exist, start at `v1.0.0`.
-- Otherwise, determine the bump type (`iteration`, `minor`, or `major`) from CLI flags and increment accordingly:
+- Look at the output dir for existing `v{major}.{minor}.{iteration}` directories (ignores `archive/`).
+- Also read `<output_dir>/VERSION` (e.g. `sdk/VERSION`, `admin-sdk/VERSION`) if present.
+- The floor is the **max** of those two sources. If neither exists, start at `v1.0.0`.
+- Determine the bump type (`iteration`, `minor`, or `major`) from CLI flags and increment accordingly:
   - `iteration` (default): increment the iteration number (e.g., `1.0.2` → `1.0.3`)
   - `minor` (`--minor-version`): increment the minor number, reset iteration to 0 (e.g., `1.2.5` → `1.3.0`)
   - `major` (`--major-version`): increment the major number, reset minor and iteration to 0 (e.g., `2.1.3` → `3.0.0`)
 - The same version number is used for the resolved YAML and all framework outputs in a single run.
+- On a successful run, `generate.py` writes the chosen version back to `<output_dir>/VERSION`.
+
+**Why the VERSION manifest:** the generated `vN/` dirs are gitignored and only persist
+because CI force-adds them. A merge/rebase/fresh-checkout that drops them would otherwise
+silently reset versioning to `1.0.0` and collide with the immutable npm/PyPI registries
+(this caused a real admin-sdk publish failure: `403 — cannot publish over 1.0.0`). The
+tracked, non-gitignored `VERSION` file is a durable floor that survives the throwaway tree;
+`max()` with the dir scan also makes branch promotions safe — a lower promoted manifest can
+never regress a branch above its own published version.
 
 **Functions:**
-- `get_next_version(output_dir, bump="iteration")` — returns `(major, minor, iteration)` tuple
+- `get_next_version(output_dir, bump="iteration")` — returns `(major, minor, iteration)` tuple, floored by the VERSION manifest
+- `read_version_manifest(output_dir)` — parse `<output_dir>/VERSION` → tuple or `None`
+- `write_version_manifest(output_dir, version)` — persist the released version floor
 - `version_str(major, minor, iteration)` — returns `"major.minor.iteration"` string
 
 ### 3. Base Generator (`generators/base.py`)

@@ -37,6 +37,13 @@
 - `main()` wraps the resolve / generate / test phases in a single try/except. On any uncaught exception, `restore_archived_versions()` removes the partial `sdk/v{next}/` directory and moves the previously-active version back from `sdk/archive/` to `sdk/`, then exits non-zero with the error message.
 - This guarantees the working tree always contains a valid SDK — either the new one (if generation succeeds end-to-end) or the previous one (if it doesn't). Never a partial/malformed mix.
 
+## Durable Version Floor (`VERSION` manifest)
+
+- The generated `vN/` dirs are gitignored and only persist because CI force-adds them. Versioning previously derived the next version *solely* from those dirs, so any merge/rebase/fresh-checkout that dropped them silently reset the counter to `1.0.0` — colliding with the immutable npm/PyPI registries. Real failure: a merge dropped dev's tracked `vN/` dirs, the next run regenerated `admin-sdk@1.0.0`, and npm rejected it (`403 — cannot publish over previously published versions: 1.0.0`).
+- Fix: a tracked, non-gitignored `<output_dir>/VERSION` file (`sdk/VERSION`, `admin-sdk/VERSION`) records the last released version. `get_next_version()` floors on `max(dir scan, VERSION manifest)`; `generate.py` writes the chosen version back via `write_version_manifest()` only after tests pass.
+- `max()` makes branch promotions safe: a lower promoted manifest can never regress a branch above its own published version (e.g. dev `1.0.x` promoted onto main `1.3.x` keeps main ahead). Seeded on dev at `sdk=1.0.79` / `admin-sdk=1.0.19` (the last-good tracked versions before the drop).
+- The CI no-op gate (`git restore`/`clean` of the output dir) reverts an un-published bump, so no version numbers are consumed on content-identical runs.
+
 ## Composite Cache Keys
 
 - `steps[].cache.key` is a template string with `{...}` placeholders; each placeholder is a dot-path expression (`params.*`, `params.<obj>.<prop>`, `steps.<id>.*`) and the surrounding literals namespace the entry. Bare dot-paths (no `{}`) are rejected in `resolver._resolve_step` with `ValueError`.

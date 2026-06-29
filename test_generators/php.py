@@ -17,7 +17,7 @@ class PhpTestGenerator(BaseTestGenerator):
 
     def generate(self, endpoints: list[dict], sdk_dir: str, test_dir: str) -> None:
         os.makedirs(test_dir, exist_ok=True)
-        self.emit_helpers(test_dir)
+        self.emit_helpers(test_dir, sdk_dir)
         self.emit_composer_json(test_dir, sdk_dir)
         self.emit_phpunit_xml(test_dir)
         self.emit_errors_test(sdk_dir, test_dir)
@@ -60,7 +60,20 @@ class PhpTestGenerator(BaseTestGenerator):
 
     # ── file emitters ─────────────────────────────────────────────────────────
 
-    def emit_helpers(self, test_dir: str) -> None:
+    def emit_helpers(self, test_dir: str, sdk_dir: str | None = None) -> None:
+        # SpyOAuthClient extends OAuthClient, so PHP enforces that its request()
+        # override stay signature-compatible at class-load. Derive the parameter
+        # list from the actual OAuthClient.php shipped in the SDK rather than
+        # hardcoding it, so an upstream change (e.g. a param made nullable) can
+        # never desync the spy into an incompatible-signature fatal error.
+        params, return_type, names = _parent_request_signature(sdk_dir)
+        record = ", ".join(
+            f"'{label}' => ${name}"
+            for label, name in zip(("path", "method", "accessToken", "refreshToken"), names)
+        )
+        body_name = "body" if "body" in names else (names[4] if len(names) > 4 else None)
+        if body_name:
+            record += f", 'body' => ${body_name}"
         lines = [
             "<?php",
             "// Auto-generated — do not edit",
@@ -72,14 +85,9 @@ class PhpTestGenerator(BaseTestGenerator):
             "    public function __construct() {}",
             "",
             "    public function request(",
-            "        string $url,",
-            "        string $method,",
-            "        string $accessToken,",
-            "        string $refreshToken,",
-            "        mixed $body = null,",
-            "        ?callable $onRefreshSuccess = null,",
-            "    ): AuthenticatedResponse {",
-            "        $this->calls[] = ['path' => $url, 'method' => $method, 'accessToken' => $accessToken, 'refreshToken' => $refreshToken, 'body' => $body];",
+            *(f"        {p}," for p in params),
+            f"    ): {return_type} {{",
+            f"        $this->calls[] = [{record}];",
             "        return new AuthenticatedResponse(data: null, updatedTokens: null);",
             "    }",
             "",
@@ -412,6 +420,45 @@ def _php_literal(value: object) -> str:
         items = ", ".join(_php_literal(v) for v in value)
         return f"[{items}]"
     return str(value)
+
+
+# Fallback SpyOAuthClient::request signature, mirroring the current
+# OAuthSdk\OAuthClient::request contract. Used when the shipped OAuthClient.php
+# can't be located or parsed, so the spy is always emitted.
+_DEFAULT_REQUEST_PARAMS = [
+    "string $url",
+    "string $method",
+    "string $accessToken",
+    "?string $refreshToken",
+    "mixed $body = null",
+    "?callable $onRefreshSuccess = null",
+]
+_DEFAULT_REQUEST_RETURN = "AuthenticatedResponse"
+_DEFAULT_REQUEST_NAMES = ["url", "method", "accessToken", "refreshToken", "body", "onRefreshSuccess"]
+
+_REQUEST_SIG_RE = re.compile(
+    r"public\s+function\s+request\s*\((?P<params>.*?)\)\s*:\s*(?P<ret>[\\\w]+)\s*\{",
+    re.DOTALL,
+)
+
+
+def _parent_request_signature(sdk_dir: str | None) -> tuple[list[str], str, list[str]]:
+    """Parse OAuthClient::request's signature from the SDK's bundled OAuthClient.php.
+
+    Returns (param declarations, return type, param variable names). Falls back to
+    the known-good default contract when sdk_dir is None or the file is missing/
+    unparseable, so the spy is always emitted.
+    """
+    if sdk_dir:
+        path = os.path.join(sdk_dir, "oauth", "src", "OAuthClient.php")
+        if os.path.isfile(path):
+            m = _REQUEST_SIG_RE.search(open(path).read())
+            if m:
+                params = [p.strip() for p in m.group("params").split(",") if p.strip()]
+                names = [n.group(1) for p in params if (n := re.search(r"\$(\w+)", p))]
+                if params and len(names) == len(params):
+                    return params, m.group("ret").lstrip("\\"), names
+    return _DEFAULT_REQUEST_PARAMS, _DEFAULT_REQUEST_RETURN, _DEFAULT_REQUEST_NAMES
 
 
 def _parse_phpunit_counts(output: str) -> tuple[int, int, int]:

@@ -242,20 +242,21 @@ jobs:
       - name: Discard unchanged generator output
         # When a side's hash matches the prior archived version, revert its
         # working-tree changes so the commit step doesn't pick them up.
-        # The generator deleted the prior tracked vN/ and created untracked vN+1/
-        # (+ untracked archive/vN/ which is gitignored). `restore` brings vN back;
-        # `clean -fd` removes vN+1 and the gitignored archive copy.
+        # The generator moved the prior tracked vN/ into the gitignored archive/ and
+        # created a fresh vN+1/ (also gitignored). `restore` brings the prior tracked
+        # vN/ back; `clean -fdx` removes the ignored vN+1/ and archive/ — plain
+        # `clean -fd` would skip them now that v*/ is gitignored.
         if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'false' || steps.changes.outputs.admin_changed == 'false')
         working-directory: mediaviz_sdk
         run: |
           if [ "${{ steps.changes.outputs.public_changed }}" = "false" ]; then
             git restore sdk/
-            git clean -fd sdk/
+            git clean -fdx sdk/
             echo "Reverted sdk/ — no public content diff."
           fi
           if [ "${{ steps.changes.outputs.admin_changed }}" = "false" ]; then
             git restore admin-sdk/
-            git clean -fd admin-sdk/
+            git clean -fdx admin-sdk/
             echo "Reverted admin-sdk/ — no admin content diff."
           fi
 
@@ -271,11 +272,16 @@ jobs:
         working-directory: mediaviz_sdk
         run: |
           HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
-          if [ -z "$(git status --porcelain sdk/ admin-sdk/)" ]; then
+          # sdk/v*/ and admin-sdk/v*/ are gitignored (never tracked locally), so the
+          # fresh version must be force-added — this workflow is the only writer of
+          # record. -A also stages deletion of the prior tracked version, which the
+          # generator moved into the gitignored archive/. The old `git status
+          # --porcelain` guard is blind to ignored paths, so gate on the staged diff.
+          git add -Af sdk/ admin-sdk/
+          if git diff --cached --quiet -- sdk/ admin-sdk/; then
             echo "No SDK changes to commit."
             exit 0
           fi
-          git add -A sdk/ admin-sdk/
           git commit -m "chore(auto): regenerate SDK from intelligence_hub@${HUB_SHORT_SHA}"
           # Non-fast-forward guard: a PR merge (e.g. promotion) or out-of-order
           # dispatch can advance the branch between checkout and push. Rebase our
