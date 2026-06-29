@@ -666,7 +666,7 @@ This is inherent to the regenerate-per-channel model. Promoting one built artifa
 
 ## Publishing
 
-After the SDK is regenerated and committed by `update-sdk.yml` propagate mode, the workflow publishes **two parallel JS packages** to npm on every dev/qa/main run (`@mediaviz/sdk` public + `@mediaviz/admin-sdk` private), and the PHP package to Packagist on main runs only.
+After the SDK is regenerated and committed by `update-sdk.yml` propagate mode, the workflow publishes **two parallel JS packages** to npm on every dev/qa/main run (`@mediaviz/sdk` public + `@mediaviz/admin-sdk` private), the **`mediaviz-sdk` Python package** to PyPI on every dev/qa/main run (as PEP 440 pre-releases), and the PHP package to Packagist on main runs only.
 
 ### Endpoint set
 The CI workflow runs `python generate.py` twice per propagate run:
@@ -714,6 +714,19 @@ Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedic
 4. POSTs to `https://packagist.org/api/update-package` (auth: `PACKAGIST_USERNAME` + `PACKAGIST_API_TOKEN` secrets) to force a refresh.
 
 `composer.json` (emitted by `generators/php.py:emit_autoload_config`) carries: `name: mediaviz/mediaviz-php-sdk`, `type: library`, `license: MIT`, live `version` (same regex pattern as JS), `description`, and the PSR-4 + files autoload entries. The generated PHP test harness (`test_generators/php.py:emit_composer_json`) requires the SDK by this same name via a `path` repository, so the two must be changed in lockstep.
+
+### PyPI — `mediaviz-sdk` (public)
+Single package on pypi.org, published on **every** dev/qa/main propagate run (unlike PHP, which is main-only). PyPI has no dist-tag mechanism, so the npm `dev`/`qa`/`latest` model cannot translate; instead the three branches share one package as [PEP 440](https://peps.python.org/pep-0440/) pre-releases that pip orders automatically:
+
+- `main` → final release `X.Y.Z`
+- `qa` → release candidate `X.Y.ZrcN`
+- `dev` → dev release `X.Y.Z.devN`
+
+The channel is chosen in the workflow's **Decide Python pre-release channel** step (branch → `--prerelease dev`/`rc`/none) and passed to `generate.py`. `generate.py` sets `gen.prerelease` on every generator instance; only `PythonGenerator` consumes it — `emit_pyproject_toml` appends the suffix from `_PRERELEASE_SUFFIX` (`dev` → `.dev0`, `rc` → `rc0`, `None` → no suffix) to the version regex-extracted from the output dir. The suffix is **constant**; uniqueness/monotonicity comes from the version base, which `versioning.get_next_version` bumps every run. Consequence: `pip install mediaviz-sdk` always resolves to the latest **final** (main) release; `--pre` or an exact pin is required for rc/dev builds. `pyproject.toml` declares `packages = ["mediaviz_sdk", "oauth_sdk"]`, so the bundled OAuth wrapper ships in the same wheel.
+
+Auth via **PyPI Trusted Publishing** (OIDC) using `pypa/gh-action-pypi-publish@release/v1`, reusing the job's existing `permissions: id-token: write`. No long-lived PyPI token. PyPI supports *pending publishers*, so the trusted-publisher entry (owner=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml) can be registered before the first publish — no manual-token bootstrap (unlike npm). The build step runs `python -m build` in `sdk/v*/python/`; publish points at `sdk/v*/python/dist` with `skip-existing: true` for re-run idempotency (every run emits a unique bumped version, so this never masks a real publish).
+
+**Python content-hash gate + PyPI liveness.** Mirrors the JS gate. The `pychanges` step hashes the Python package **excluding `pyproject.toml`** (only its version line changes each run, which would otherwise defeat the no-op gate) against the most-recent `sdk/archive/v*/python/`, emitting `python_changed`. When content matches the prior archive, it reconciles against PyPI: `GET https://pypi.org/pypi/mediaviz-sdk/<old-base><suffix>/json` — if the last committed version+suffix is **not** live (a publish that failed after the commit), it forces `python_changed=true`, and this run's freshly-bumped (byte-identical) version is published under a new unique number with no duplicate-version error. Because `sdk/` holds JS, PHP **and** Python, the `Discard unchanged generator output` step only reverts `sdk/` when **both** `public_changed` and `python_changed` are false — a Python-only forced publish keeps `sdk/` so its bump is committed (JS/PHP do not republish; those stay gated on `public_changed`/branch). The `Configure git identity` and `Commit + push` steps fire on `public_changed || admin_changed || python_changed`.
 
 ### LICENSE
 Shared MIT text and version-extraction helper live in `generators/licenses.py`. The JS, PHP, and Python generators all call `emit_license(output_dir)` at the end of their `generate()` flow, so every framework directory ships a `LICENSE` file alongside its manifest.
