@@ -1,4 +1,10 @@
 **/archive/
+
+# Generated SDK output: committed only by CI via `git add -f`, never tracked locally.
+# Local regeneration (testing) stays invisible to git, merges, and commits.
+/sdk/v*/
+/admin-sdk/v*/
+
 __pycache__/
 *.pyc
 .pytest_cache/
