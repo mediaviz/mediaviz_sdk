@@ -519,9 +519,11 @@ class PythonGenerator(BaseGenerator):
             f.write("\n".join(lines))
 
     def emit_pyproject_toml(self, output_dir: str) -> None:
-        m = re.search(r'v(\d+\.\d+\.\d+)', output_dir)
-        version = m.group(1) if m else "0.1.0"
-        version += _PRERELEASE_SUFFIX.get(self.prerelease, "")
+        if self.sdk_version is not None:
+            version = self.sdk_version.pypi()
+        else:  # unit tests emit directly without a channel-aware version
+            m = re.search(r'v(\d+\.\d+\.\d+)', output_dir)
+            version = (m.group(1) if m else "0.1.0") + _PRERELEASE_SUFFIX.get(self.prerelease, "")
         content = (
             f'[project]\n'
             f'name = "mediaviz-sdk"\n'

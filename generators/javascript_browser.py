@@ -551,7 +551,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         from .licenses import extract_sdk_version
         config = {
             "name": "@mediaviz/admin-sdk" if admin else "@mediaviz/sdk",
-            "version": extract_sdk_version(output_dir),
+            "version": self.sdk_version.npm() if self.sdk_version else extract_sdk_version(output_dir),
             "description": (
                 "MediaViz JavaScript Admin SDK — auto-generated full endpoint client (private)."
                 if admin else

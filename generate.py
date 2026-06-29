@@ -12,7 +12,7 @@ from resolver import (
 from test_generators import discover_test_generators
 from test_generators.base import TestResult
 from utilities_resolver import load_utilities, write_flattened_utilities_yaml
-from versioning import get_next_version, version_str, write_version_manifest
+from versioning import next_version, parse_version, write_version_manifest
 
 SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk")
 
@@ -24,7 +24,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
     p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk.")
     p.add_argument("--admin", action="store_true", help="Build admin variant: emits @mediaviz/admin-sdk with publishConfig.access=restricted, and implies --endpoints all_endpoints when --endpoints is unset. Intended for use with --frameworks javascript --destination-dir admin-sdk.")
-    p.add_argument("--prerelease", choices=["dev", "rc"], default=None, help="PEP 440 pre-release channel for the Python package version: 'dev' → X.Y.Z.dev0, 'rc' → X.Y.ZrcN. Omit for a final release. Only the Python generator consumes it; maps dev/qa/main branches onto one PyPI package.")
+    p.add_argument("--prerelease", choices=["dev", "rc"], default=None, help="Pre-release channel for dev/qa. Pins the version one minor ahead of main and appends a per-channel counter: npm 1.{main+1}.0-{dev|rc}.N, PyPI 1.0.{main+1}.N{.dev0|rcN}. Omit for a final (main) release.")
+    p.add_argument("--base-version", default=None, dest="base_version", help="main's current version (e.g. '1.3.0'); dev/qa pin their minor to its minor + 1 so the number stays aligned with main. Ignored for main releases. Sourced by CI from origin/main's VERSION file.")
     bump = p.add_mutually_exclusive_group()
     bump.add_argument("--minor-version", action="store_true", help="Increment minor version and reset iteration to 0.")
     bump.add_argument("--major-version", action="store_true", help="Increment major version and reset minor+iteration to 0.")
@@ -117,11 +118,17 @@ def main() -> None:
         controllers_dir = sources.controllers_dir
 
         bump = "major" if args.major_version else "minor" if args.minor_version else "iteration"
-        version = get_next_version(output_dir, bump)
+        channel = args.prerelease  # None (main) | "dev" | "rc" (qa)
+        base_minor = None
+        if channel and args.base_version:
+            bv = parse_version(args.base_version)
+            if bv:
+                base_minor = bv.minor + 1  # dev/qa pin one minor ahead of main
+        version = next_version(output_dir, bump, channel=channel, base_minor=base_minor)
         archived = archive_existing_versions(output_dir)
 
-        ver = version_str(*version)
-        version_dir = os.path.join(output_dir, f"v{ver}")
+        ver = version.npm()
+        version_dir = os.path.join(output_dir, version.dir_name())
 
         try:
             schemas = load_schemas(sources.schemas_path)
@@ -152,6 +159,7 @@ def main() -> None:
             for framework in requested:
                 gen = registry[framework]()
                 gen.prerelease = args.prerelease
+                gen.sdk_version = version
                 fw_dir = os.path.join(version_dir, framework)
                 os.makedirs(fw_dir, exist_ok=True)
                 gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)

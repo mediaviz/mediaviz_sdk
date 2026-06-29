@@ -85,33 +85,43 @@ endpoints:
 
 ### 2. Versioning (`versioning.py`)
 
-Determines the next version from the **max** of the on-disk `v{major}.{minor}.{iteration}`
-directories **and** a tracked `VERSION` manifest file in the output dir.
+Computes a channel-aware `SdkVersion` for each run, floored by the on-disk
+`v…/` directories **and** a tracked `VERSION` manifest file in the output dir.
+
+**Channel scheme.** `main` releases a plain 3-part version; `dev`/`qa` are pinned
+one minor ahead of main (`minor = main_minor + 1`) with a per-channel counter, so
+the number stays aligned with main while each channel tracks separately. Each
+registry renders the same `SdkVersion` differently:
+
+| Channel | npm | PyPI | PHP/composer | dir |
+|---|---|---|---|---|
+| main | `1.4.0` | `1.4.0` | `1.4.0` | `v1.4.0` |
+| dev | `1.4.0-dev.{C}` | `1.0.4.{C}.dev0` | `1.4.0` | `v1.4.0-dev.{C}` |
+| qa | `1.4.0-rc.{C}` | `1.0.4.{C}rc0` | `1.4.0` | `v1.4.0-rc.{C}` |
+
+npm uses semver pre-releases (sort below the final `1.4.0`); PyPI uses a 4-part
+release segment + PEP 440 suffix (one shared `mediaviz-sdk` package, `.dev0`/`rc0`
+keep dev↔qa distinct); PHP ships only from main, so it always gets the composer-safe
+3-part base.
 
 **Logic:**
-- Look at the output dir for existing `v{major}.{minor}.{iteration}` directories (ignores `archive/`).
-- Also read `<output_dir>/VERSION` (e.g. `sdk/VERSION`, `admin-sdk/VERSION`) if present.
-- The floor is the **max** of those two sources. If neither exists, start at `v1.0.0`.
-- Determine the bump type (`iteration`, `minor`, or `major`) from CLI flags and increment accordingly:
-  - `iteration` (default): increment the iteration number (e.g., `1.0.2` → `1.0.3`)
-  - `minor` (`--minor-version`): increment the minor number, reset iteration to 0 (e.g., `1.2.5` → `1.3.0`)
-  - `major` (`--major-version`): increment the major number, reset minor and iteration to 0 (e.g., `2.1.3` → `3.0.0`)
-- The same version number is used for the resolved YAML and all framework outputs in a single run.
-- On a successful run, `generate.py` writes the chosen version back to `<output_dir>/VERSION`.
+- `main` (channel `None`): floor = max of release-shaped `v…/` dirs + the VERSION manifest; bump per CLI flag — `iteration` (`1.0.2`→`1.0.3`), `minor` (`--minor-version`, `1.2.5`→`1.3.0`), `major` (`--major-version`, `2.1.3`→`3.0.0`). First release is `1.0.0`.
+- `dev`/`qa` (channel `dev`/`rc`): `minor` = `base_minor` (= main's minor + 1, from `--base-version`; falls back to the manifest's stored minor for local regen). `counter` = one above the highest counter seen for *this channel* in the dirs/manifest (channel-isolated, so a dev manifest never seeds qa's counter).
+- The same `SdkVersion` is used for the resolved YAML and all framework outputs; on success `generate.py` writes its npm form back to `<output_dir>/VERSION`.
 
-**Why the VERSION manifest:** the generated `vN/` dirs are gitignored and only persist
+**Why the VERSION manifest:** the generated `v…/` dirs are gitignored and only persist
 because CI force-adds them. A merge/rebase/fresh-checkout that drops them would otherwise
-silently reset versioning to `1.0.0` and collide with the immutable npm/PyPI registries
-(this caused a real admin-sdk publish failure: `403 — cannot publish over 1.0.0`). The
-tracked, non-gitignored `VERSION` file is a durable floor that survives the throwaway tree;
-`max()` with the dir scan also makes branch promotions safe — a lower promoted manifest can
-never regress a branch above its own published version.
+silently reset versioning and collide with the immutable npm/PyPI registries (this caused a
+real admin-sdk publish failure: `403 — cannot publish over 1.0.0`). The tracked,
+non-gitignored `VERSION` file is a durable floor that survives the throwaway tree, and for
+`main` the `max()` with the dir scan also makes promotions safe — a lower promoted manifest
+can never regress a branch above its own published version.
 
-**Functions:**
-- `get_next_version(output_dir, bump="iteration")` — returns `(major, minor, iteration)` tuple, floored by the VERSION manifest
-- `read_version_manifest(output_dir)` — parse `<output_dir>/VERSION` → tuple or `None`
-- `write_version_manifest(output_dir, version)` — persist the released version floor
-- `version_str(major, minor, iteration)` — returns `"major.minor.iteration"` string
+**API:**
+- `SdkVersion(major, minor, patch=0, channel=None, counter=0)` — `.npm()` / `.pypi()` / `.base()` (composer) / `.dir_name()` renderers.
+- `next_version(output_dir, bump="iteration", *, channel=None, base_minor=None)` — returns the next `SdkVersion`.
+- `parse_version(text)` — parse `1.4.0` / `v1.4.0-dev.81` → `SdkVersion` or `None`.
+- `read_version_manifest(output_dir)` / `write_version_manifest(output_dir, version)` — durable floor I/O (npm form).
 
 ### 3. Base Generator (`generators/base.py`)
 
@@ -654,11 +664,12 @@ The hub and SDK propagate workflows trigger only on `repository_dispatch` (not `
 ### Version-bump rule
 `update-sdk.yml` passes `--minor-version` to `generate.py` only when `mode == propagate AND branch == main`. dev/qa propagate runs use the default iteration bump. Verify-mode runs never bump (no commit happens).
 
-**Versions are channel-local counters, not a promoted artifact.** Each channel regenerates independently from `hub@<branch>` and bumps its own counter (dev/qa iterate, main minors), so the same upstream change becomes a *different* version number on each channel (e.g. `dev=1.0.70`, `qa=1.0.62`, `latest=1.2.0` are unrelated). Consequences consumers and operators must account for:
-- **No cross-channel semver meaning.** A version is a monotonic per-channel counter; it carries no compatibility signal and numbers do not compare across channels (qa can be numerically behind dev). Consumers must **pin exact** versions per dist-tag — caret/tilde ranges (`^1.0.70`) would resolve across channels (e.g. jump to `1.2.0` on `latest`).
-- **Traceability is by upstream commit, not version.** "Which bytes is qa running" is answered by the `chore(auto): regenerate SDK from intelligence_hub@<sha>` commit message on each channel, not by the version number. There is no guarantee that `qa@1.0.62` was built from the same hub state that passed as `dev@1.0.70`.
+**Versions are channel-local pre-releases pinned to next-main, not a promoted artifact.** Each channel regenerates independently from `hub@<branch>`. dev/qa pin their base to **main's minor + 1** (read live from `origin/main`'s `VERSION` via `--base-version`) and append a per-channel counter, so the number stays *aligned with main* (`dev=1.4.0-dev.81`, `qa=1.4.0-rc.5`, `latest=1.3.0`) while each channel tracks separately. Consequences consumers and operators must account for:
+- **dev/qa are semver/PEP 440 pre-releases of the next main release.** `1.4.0-dev.81` sorts below the eventual `1.4.0`, so `npm install @mediaviz/sdk` (latest) and `pip install mediaviz-sdk` resolve to the final main release; the `dev`/`qa` dist-tag (npm) or `--pre`/exact pin (PyPI) is required to get a channel build. The counter is still a monotonic per-channel value with no compatibility meaning — pin exact per dist-tag.
+- **base re-aligns automatically when main bumps.** When main releases `1.4.0`, the next dev/qa runs read the new baseline and jump to `1.5.0-dev.{C}` / `1.5.0-rc.{C}`; the counter carries across the base change (it floors on the highest counter seen for the channel, independent of the base).
+- **Traceability is by upstream commit, not version.** "Which bytes is qa running" is answered by the `chore(auto): regenerate SDK from intelligence_hub@<sha>` commit message on each channel.
 
-This is inherent to the regenerate-per-channel model. Promoting one built artifact across channels (build once, move dist-tags) would give real semver traceability but is a separate architectural change to the dispatch model, not adopted here.
+This is inherent to the regenerate-per-channel model. Promoting one built artifact across channels (build once, move dist-tags) would give real same-bytes traceability but is a separate architectural change to the dispatch model, not adopted here.
 
 ### Path resolution in CI
 `actions/checkout` with `path: <sibling_name>` replicates the local sibling layout (`$GITHUB_WORKSPACE/{mediaviz_external_api,mediaviz_intelligence_hub,mediaviz_sdk,oauth_library}`), so `github_sources._CODE_ROOT = dirname(dirname(__file__))` and the hub scripts' `../mediaviz_external_api/...` defaults work without any generator-script changes.
@@ -676,7 +687,7 @@ The CI workflow runs `python generate.py` twice per propagate run:
 Resolution rule for `--endpoints`: if unset, it's `all_endpoints` when `--admin` is set, else `public_sdk_endpoints`. Explicit `--endpoints X` always wins, so a manual run can still build any flow into either dir.
 
 ### npm — `@mediaviz/sdk` (public)
-Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: live SDK version (extracted from output dir via regex), `license: MIT`, `repository`, `publishConfig.access: public`, `types: "./dist/sdk.d.ts"` (plus a `types`-first `exports["."]` condition) advertising the bundled TypeScript declarations, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles + `dist/sdk.d.ts` ship — the framework source files are inputs to the build, not part of the consumer payload.
+Single package on npmjs.com, branch-mapped dist-tags (`dev`, `qa`, `latest`). `package.json` (emitted by `generators/javascript_browser.py:emit_package_json`) carries: the channel-aware version (`SdkVersion.npm()` — e.g. `1.4.0` on main, `1.4.0-dev.{C}` on dev), `license: MIT`, `repository`, `publishConfig.access: public`, `types: "./dist/sdk.d.ts"` (plus a `types`-first `exports["."]` condition) advertising the bundled TypeScript declarations, and `files: ["dist", "LICENSE", "README.md"]` so only the pre-built Rollup bundles + `dist/sdk.d.ts` ship — the framework source files are inputs to the build, not part of the consumer payload.
 
 The Rollup build toolchain (`scripts.build` + the `rollup`/`@rollup/plugin-*` `devDependencies`) is needed only to produce the dist bundles, so `generate()` calls `prune_package_json_for_publish` immediately after `build_dist`: it removes `scripts` and `devDependencies` from the manifest before publish, leaving the published `package.json` with no build-only fields. `optionalDependencies` (`sharp`) is preserved as a real runtime optional dep. Net effect: a consumer running `npm install @mediaviz/sdk` pulls only the dist bundles + `sharp` (optional) — never Rollup.
 
@@ -713,16 +724,16 @@ Packagist publishes from the root of a git repo, so the PHP SDK lives in a dedic
 3. If content changed: commits and pushes `main` **non-fast-forward-safe** (fetch + rebase onto `origin/main`, 3× retry, fail loudly on conflict), then creates the tag on the final pushed commit. The `vX.Y.Z` tag is then ensured **idempotently** — pushed only if `git ls-remote` shows it absent — so a re-run, or a prior run that pushed `main` but died before tagging, still lands the release tag (Packagist keys releases off tags) without a manual fixup.
 4. POSTs to `https://packagist.org/api/update-package` (auth: `PACKAGIST_USERNAME` + `PACKAGIST_API_TOKEN` secrets) to force a refresh.
 
-`composer.json` (emitted by `generators/php.py:emit_autoload_config`) carries: `name: mediaviz/mediaviz-php-sdk`, `type: library`, `license: MIT`, live `version` (same regex pattern as JS), `description`, and the PSR-4 + files autoload entries. The generated PHP test harness (`test_generators/php.py:emit_composer_json`) requires the SDK by this same name via a `path` repository, so the two must be changed in lockstep.
+`composer.json` (emitted by `generators/php.py:emit_autoload_config`) carries: `name: mediaviz/mediaviz-php-sdk`, `type: library`, `license: MIT`, `version` (`SdkVersion.base()` — the composer-safe 3-part, since PHP ships only from main and composer rejects npm's pre-release form), `description`, and the PSR-4 + files autoload entries. The generated PHP test harness (`test_generators/php.py:emit_composer_json`) requires the SDK by this same name via a `path` repository, so the two must be changed in lockstep.
 
 ### PyPI — `mediaviz-sdk` (public)
 Single package on pypi.org, published on **every** dev/qa/main propagate run (unlike PHP, which is main-only). PyPI has no dist-tag mechanism, so the npm `dev`/`qa`/`latest` model cannot translate; instead the three branches share one package as [PEP 440](https://peps.python.org/pep-0440/) pre-releases that pip orders automatically:
 
-- `main` → final release `X.Y.Z`
-- `qa` → release candidate `X.Y.ZrcN`
-- `dev` → dev release `X.Y.Z.devN`
+- `main` → final release `1.4.0`
+- `qa` → release candidate `1.0.4.{C}rc0`
+- `dev` → dev release `1.0.4.{C}.dev0`
 
-The channel is chosen in the workflow's **Decide Python pre-release channel** step (branch → `--prerelease dev`/`rc`/none) and passed to `generate.py`. `generate.py` sets `gen.prerelease` on every generator instance; only `PythonGenerator` consumes it — `emit_pyproject_toml` appends the suffix from `_PRERELEASE_SUFFIX` (`dev` → `.dev0`, `rc` → `rc0`, `None` → no suffix) to the version regex-extracted from the output dir. The suffix is **constant**; uniqueness/monotonicity comes from the version base, which `versioning.get_next_version` bumps every run. Consequence: `pip install mediaviz-sdk` always resolves to the latest **final** (main) release; `--pre` or an exact pin is required for rc/dev builds. `pyproject.toml` declares `packages = ["mediaviz_sdk", "oauth_sdk"]`, so the bundled OAuth wrapper ships in the same wheel.
+The channel comes from the workflow's **Decide Python pre-release channel** step (branch → `--prerelease dev`/`rc`/none) and `--base-version` (main's current version, read from `origin/main`'s `VERSION`). `generate.py` builds a channel-aware `SdkVersion` and sets it on every generator; `emit_pyproject_toml` renders `self.sdk_version.pypi()` — a 4-part release segment (`1.0.{main_minor+1}.{counter}`) plus the PEP 440 `.dev0`/`rc0` suffix that keeps dev↔qa distinct on the one shared package. (The legacy `_PRERELEASE_SUFFIX` + dir-regex path remains only as a fallback for unit tests that emit without an `SdkVersion`.) The base re-aligns automatically when main bumps; the counter is monotonic per channel. Consequence: `pip install mediaviz-sdk` always resolves to the latest **final** (main) release; `--pre` or an exact pin is required for rc/dev builds. `pyproject.toml` declares `packages = ["mediaviz_sdk", "oauth_sdk"]`, so the bundled OAuth wrapper ships in the same wheel.
 
 Auth via **PyPI Trusted Publishing** (OIDC) using `pypa/gh-action-pypi-publish@release/v1`, reusing the job's existing `permissions: id-token: write`. No long-lived PyPI token. PyPI supports *pending publishers*, so the trusted-publisher entry (owner=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml) can be registered before the first publish — no manual-token bootstrap (unlike npm). The build step runs `python -m build` in `sdk/v*/python/`; publish points at `sdk/v*/python/dist` with `skip-existing: true` for re-run idempotency (every run emits a unique bumped version, so this never masks a real publish).
 
