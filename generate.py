@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--frameworks", default=None, help="Comma-separated frameworks to generate. Default: all registered.")
     p.add_argument("--destination-dir", default=None, dest="destination_dir", help="Output folder name in package root. Created if missing. Default: sdk.")
     p.add_argument("--admin", action="store_true", help="Build admin variant: emits @mediaviz/admin-sdk with publishConfig.access=restricted, and implies --endpoints all_endpoints when --endpoints is unset. Intended for use with --frameworks javascript --destination-dir admin-sdk.")
+    p.add_argument("--prerelease", choices=["dev", "rc"], default=None, help="PEP 440 pre-release channel for the Python package version: 'dev' → X.Y.Z.dev0, 'rc' → X.Y.ZrcN. Omit for a final release. Only the Python generator consumes it; maps dev/qa/main branches onto one PyPI package.")
     bump = p.add_mutually_exclusive_group()
     bump.add_argument("--minor-version", action="store_true", help="Increment minor version and reset iteration to 0.")
     bump.add_argument("--major-version", action="store_true", help="Increment major version and reset minor+iteration to 0.")
@@ -150,6 +151,7 @@ def main() -> None:
             file_counts: dict[str, int] = {}
             for framework in requested:
                 gen = registry[framework]()
+                gen.prerelease = args.prerelease
                 fw_dir = os.path.join(version_dir, framework)
                 os.makedirs(fw_dir, exist_ok=True)
                 gen.copy_auth_wrapper(oauth_sdk_root, fw_dir)

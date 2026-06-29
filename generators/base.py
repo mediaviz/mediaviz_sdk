@@ -10,6 +10,11 @@ from naming import snake_to_camel as _snake_to_camel, snake_to_pascal as _snake_
 class BaseGenerator(ABC):
     framework_name: str
 
+    # PEP 440 pre-release channel ("dev" | "rc" | None) set per-run by generate.py.
+    # Only the Python generator consumes it (to suffix the PyPI package version so
+    # dev/qa/main publish to one package as pre-releases); others ignore it.
+    prerelease: str | None = None
+
     def __init__(self):
         self._copied_modules: list[dict] = []
 

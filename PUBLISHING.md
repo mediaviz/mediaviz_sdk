@@ -4,7 +4,7 @@ High-level operator guide to the CI workflow that regenerates and publishes the 
 
 ## Where it lives
 
-`.github/workflows/update-sdk.yml` (in this repo, `mediaviz_sdk`). It is the single workflow that regenerates the SDK and pushes the artifacts to npm and Packagist.
+`.github/workflows/update-sdk.yml` (in this repo, `mediaviz_sdk`). It is the single workflow that regenerates the SDK and pushes the artifacts to npm, PyPI, and Packagist.
 
 ## What it produces
 
@@ -12,9 +12,22 @@ High-level operator guide to the CI workflow that regenerates and publishes the 
 |----------|----------|------------|----------|
 | `@mediaviz/sdk` | npm | public | dev, qa, main (dist-tags `dev`/`qa`/`latest`) |
 | `@mediaviz/admin-sdk` | npm | **private** (`--access restricted`) | dev, qa, main |
+| `mediaviz-sdk` | PyPI | public | dev, qa, main (PEP 440 pre-releases) |
 | `mediaviz/mediaviz-php-sdk` | Packagist | public | **main only** |
 
 PHP/Packagist publishes only on `main`; the admin package is JavaScript-only.
+
+### PyPI branching — pre-releases, not dist-tags
+
+PyPI has no dist-tag concept, so the three branches cannot share one package the way npm does. Instead all three publish to the single `mediaviz-sdk` package as [PEP 440](https://peps.python.org/pep-0440/) versions that pip orders for us:
+
+| Branch | Emitted version | `pip install` behaviour |
+|--------|-----------------|-------------------------|
+| `main` | `X.Y.Z` (final) | `pip install mediaviz-sdk` |
+| `qa` | `X.Y.ZrcN` (release candidate) | `pip install --pre mediaviz-sdk` or pin |
+| `dev` | `X.Y.Z.devN` (dev release) | pin exact version, e.g. `mediaviz-sdk==1.6.0.dev0` |
+
+The channel is chosen in the **Decide Python pre-release channel** step (branch → `--prerelease dev`/`rc`/none) and baked into the generated `pyproject.toml` version by the Python generator. The suffix is constant (`.dev0`/`rc0`); uniqueness comes from the version base, which auto-increments every run. A plain `pip install mediaviz-sdk` always resolves to the latest **final** (main) release and never to a dev/rc build.
 
 ## What triggers it
 
@@ -44,7 +57,12 @@ All secrets are configured as GitHub **Actions secrets** on the `mediaviz_sdk` r
 - **Set up by:** an **npm org admin / package maintainer**, who registers a **Trusted Publisher** entry *per package* (`@mediaviz/sdk` and `@mediaviz/admin-sdk` each need their own), scoped to org `mediaviz`, repo `mediaviz_sdk`, workflow `update-sdk.yml`. Bootstrap once per package: a manual `npm publish` from a laptop with a temporary classic token, register the trusted publisher, then revoke the token.
 - **Paid npm plan — required.** `@mediaviz/admin-sdk` is published `--access restricted` (private). **Private npm packages are a paid feature**, so the `mediaviz` npm org needs a **paid plan** (npm Teams/org) with a seat for the publishing account. The public `@mediaviz/sdk` needs no paid plan. This is a billing/seat requirement, not a token — managed by the npm org owner.
 
-### 3. Packagist — `mediaviz/mediaviz-php-sdk`
+### 3. PyPI — Trusted Publishing (OIDC)
+- **Secrets:** none. Auth uses GitHub OIDC (`permissions: id-token: write`, already set on the job) via `pypa/gh-action-pypi-publish`; there is **no long-lived PyPI token** and nothing to refresh.
+- **Set up by:** a **PyPI project owner** for `mediaviz-sdk`, who registers a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) scoped to owner `mediaviz`, repo `mediaviz_sdk`, workflow `update-sdk.yml`. PyPI supports **pending publishers**, so this can be registered *before* the first publish — no manual-token bootstrap is needed (unlike npm). The project is public/free; no paid plan required.
+- **Refresh:** nothing — OIDC tokens are minted per run.
+
+### 4. Packagist — `mediaviz/mediaviz-php-sdk`
 - **Secrets:** `PACKAGIST_USERNAME`, `PACKAGIST_API_TOKEN`
 - **Purpose:** after pushing a release tag to the `mediaviz-php-sdk` repo, the workflow POSTs to the Packagist update API to force a re-crawl.
 - **Created by:** a **Packagist account that maintains the package** (token from packagist.org → Profile → Show API Token). The package itself is public/free; the token user must be a package maintainer.
@@ -58,4 +76,5 @@ All secrets are configured as GitHub **Actions secrets** on the `mediaviz_sdk` r
 | GitHub App private key | `MEDIAVIZ_PIPELINE_BOT_APP_ID`, `MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY` | mediaviz GitHub org owner | none | 60 days |
 | npm publish auth | none (OIDC) | npm org admin (Trusted Publisher per package) | per run | n/a |
 | npm paid plan (private pkg) | n/a (billing) | npm org owner | n/a | n/a |
+| PyPI publish auth | none (OIDC) | PyPI project owner (Trusted Publisher) | per run | n/a |
 | Packagist API token | `PACKAGIST_USERNAME`, `PACKAGIST_API_TOKEN` | Packagist package maintainer | none | 60 days |
