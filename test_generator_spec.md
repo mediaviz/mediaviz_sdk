@@ -139,6 +139,7 @@ For unauth endpoints, a similar spy replaces `fetch` (JS) or intercepts `curl_in
 
 - SpyOAuthClient: class implementing the same interface, records calls
 - For unauth functions: they use `curl_init` — test uses `namespace MediaVizSdk;` function override or a thin wrapper. Alternatively, since contract tests focus on the constructed path/body, the test can instantiate the class, call the method with a spy client, and inspect recorded args
+- **Signature is derived, not hardcoded.** `SpyOAuthClient extends OAuthClient`, so PHP enforces at class-load that its `request()` override stay signature-compatible (a parameter may not be *narrower* than the parent's). `PhpTestGenerator.emit_helpers` parses the `request(...)` parameter list and return type straight from the SDK's bundled `oauth/src/OAuthClient.php` and emits the spy to match exactly, falling back to the known-good default contract if that file is missing/unparseable. This prevents the spy from desyncing when the upstream OAuth library changes the signature — e.g. making `?string $refreshToken` nullable previously broke the build with a fatal `Declaration … must be compatible` error.
 
 ## Test Value Generation
 
