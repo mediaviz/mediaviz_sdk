@@ -77,6 +77,58 @@ class TestEmitHelpers:
         content = open(os.path.join(tmp, "helpers.php")).read()
         assert "class SpyAuthContext" in content
 
+
+class TestSpySignatureDerivation:
+    """The spy extends OAuthClient, so its request() override must stay
+    signature-compatible. emit_helpers derives the parameter list from the
+    SDK's bundled OAuthClient.php so an upstream change can't desync it."""
+
+    def _write_oauth_client(self, sdk_dir, params: str, ret: str = "AuthenticatedResponse"):
+        src = os.path.join(sdk_dir, "oauth", "src")
+        os.makedirs(src, exist_ok=True)
+        with open(os.path.join(src, "OAuthClient.php"), "w") as f:
+            f.write(
+                "<?php\nnamespace OAuthSdk;\nclass OAuthClient {\n"
+                f"    public function request({params}): {ret} {{ return new AuthenticatedResponse(); }}\n"
+                "}\n"
+            )
+
+    def test_mirrors_parent_nullability(self, gen, tmp_path):
+        sdk_dir, test_dir = str(tmp_path / "sdk"), str(tmp_path / "tests")
+        os.makedirs(test_dir, exist_ok=True)
+        # accessToken nullable here but not in the hardcoded default — must be mirrored.
+        self._write_oauth_client(
+            sdk_dir,
+            "string $url, string $method, ?string $accessToken, ?string $refreshToken, "
+            "mixed $body = null, ?callable $onRefreshSuccess = null",
+        )
+        gen.emit_helpers(test_dir, sdk_dir)
+        content = open(os.path.join(test_dir, "helpers.php")).read()
+        assert "?string $accessToken," in content
+        assert "?string $refreshToken," in content
+
+    def test_mirrors_added_parameter(self, gen, tmp_path):
+        sdk_dir, test_dir = str(tmp_path / "sdk"), str(tmp_path / "tests")
+        os.makedirs(test_dir, exist_ok=True)
+        self._write_oauth_client(
+            sdk_dir,
+            "string $url, string $method, string $accessToken, ?string $refreshToken, "
+            "mixed $body = null, ?int $timeout = null, ?callable $onRefreshSuccess = null",
+        )
+        gen.emit_helpers(test_dir, sdk_dir)
+        content = open(os.path.join(test_dir, "helpers.php")).read()
+        assert "?int $timeout = null," in content
+        # body still captured in the call record despite the inserted param
+        assert "'body' => $body" in content
+
+    def test_falls_back_when_oauth_client_missing(self, gen, tmp_path):
+        sdk_dir, test_dir = str(tmp_path / "sdk"), str(tmp_path / "tests")
+        os.makedirs(test_dir, exist_ok=True)  # no oauth/src/OAuthClient.php
+        gen.emit_helpers(test_dir, sdk_dir)
+        content = open(os.path.join(test_dir, "helpers.php")).read()
+        assert "?string $refreshToken," in content
+        assert "): AuthenticatedResponse {" in content
+
     def test_spy_auth_context_has_client_property(self, gen, tmp):
         gen.emit_helpers(tmp)
         content = open(os.path.join(tmp, "helpers.php")).read()
