@@ -15,6 +15,12 @@ class BaseGenerator(ABC):
     # dev/qa/main publish to one package as pre-releases); others ignore it.
     prerelease: str | None = None
 
+    # Channel-aware version (versioning.SdkVersion) set per-run by generate.py. Each
+    # framework renders its registry-appropriate string from it (npm()/pypi()).
+    # None in unit tests that emit manifests directly — emitters fall back to the
+    # version parsed from output_dir.
+    sdk_version = None
+
     def __init__(self):
         self._copied_modules: list[dict] = []
 

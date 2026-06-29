@@ -499,7 +499,7 @@ class PhpGenerator(BaseGenerator):
             "description": "MediaViz PHP SDK — auto-generated public endpoint client.",
             "type": "library",
             "license": "MIT",
-            "version": extract_sdk_version(output_dir),
+            "version": self.sdk_version.base() if self.sdk_version else extract_sdk_version(output_dir),
             "require": {},
             "autoload": {
                 "psr-4": {"MediaVizSdk\\": "./"}
