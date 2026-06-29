@@ -49,7 +49,7 @@ jobs:
           app-id: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_APP_ID }}
           private-key: ${{ secrets.MEDIAVIZ_PIPELINE_BOT_PRIVATE_KEY }}
           owner: mediaviz
-          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library,mediaviz-php-sdk
+          repositories: mediaviz_sdk,mediaviz_intelligence_hub,oauth_library,mediaviz-php-sdk,mediaviz_docs
 
       - name: Checkout mediaviz_sdk
         uses: actions/checkout@v4
@@ -117,10 +117,24 @@ jobs:
             echo "flag=" >> $GITHUB_OUTPUT
           fi
 
+      - name: Decide Python pre-release channel
+        id: pyver
+        # PyPI has no dist-tags, so the npm dev/qa/latest model can't translate.
+        # Instead all three branches publish to ONE `mediaviz-sdk` package as PEP 440
+        # versions: dev → X.Y.Z.dev0, qa → X.Y.ZrcN, main → final X.Y.Z. `flag` is
+        # passed to generate.py (bakes the suffix into the emitted pyproject.toml);
+        # `suffix` mirrors it for the PyPI liveness check below.
+        run: |
+          case "${{ steps.ctx.outputs.branch }}" in
+            dev)  echo "flag=--prerelease dev" >> $GITHUB_OUTPUT; echo "suffix=.dev0" >> $GITHUB_OUTPUT ;;
+            qa)   echo "flag=--prerelease rc"  >> $GITHUB_OUTPUT; echo "suffix=rc0"   >> $GITHUB_OUTPUT ;;
+            main) echo "flag="                 >> $GITHUB_OUTPUT; echo "suffix="      >> $GITHUB_OUTPUT ;;
+          esac
+
       - name: Run SDK generator (public)
         working-directory: mediaviz_sdk
         # --endpoints omitted → uses the public_sdk_endpoints default in generate.py
-        run: python generate.py ${{ steps.bump.outputs.flag }}
+        run: python generate.py ${{ steps.bump.outputs.flag }} ${{ steps.pyver.outputs.flag }}
 
       - name: Run SDK generator (admin)
         working-directory: mediaviz_sdk
@@ -163,14 +177,17 @@ jobs:
         run: |
           JS_DIR=$(ls -d mediaviz_sdk/sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           PHP_DIR=$(ls -d mediaviz_sdk/sdk/v*/php 2>/dev/null | grep -v archive | sort -V | tail -1)
+          PY_DIR=$(ls -d mediaviz_sdk/sdk/v*/python 2>/dev/null | grep -v archive | sort -V | tail -1)
           ADMIN_JS_DIR=$(ls -d mediaviz_sdk/admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           VERSION=$(echo "$JS_DIR" | sed -E 's|.*sdk/v([0-9.]+)/javascript|v\1|')
           echo "js_dir=$JS_DIR" >> $GITHUB_OUTPUT
           echo "php_dir=$PHP_DIR" >> $GITHUB_OUTPUT
+          echo "py_dir=$PY_DIR" >> $GITHUB_OUTPUT
           echo "admin_js_dir=$ADMIN_JS_DIR" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Located JS: $JS_DIR"
           echo "Located PHP: $PHP_DIR"
+          echo "Located Python: $PY_DIR"
           echo "Located admin JS: $ADMIN_JS_DIR"
           echo "Version: $VERSION"
 
@@ -239,6 +256,39 @@ jobs:
             echo "Admin dist content unchanged — skipping commit + publish for admin-sdk/ (liveness check skipped: no npm read token for restricted package, see caveat above)."
           fi
 
+      - name: Detect Python content changes (skip no-op PyPI republishes)
+        if: steps.ctx.outputs.mode == 'propagate'
+        id: pychanges
+        run: |
+          # Hash the Python package EXCLUDING pyproject.toml — only its version line
+          # changes each run (the rest is static), so it would defeat the no-op gate.
+          hash_pkg() {
+            local dir="$1"
+            [ -d "$dir" ] || { echo "missing"; return; }
+            find "$dir" -type f ! -name pyproject.toml | sort | xargs cat 2>/dev/null | sha256sum | awk '{print $1}'
+          }
+          NEW="${{ steps.dirs.outputs.py_dir }}"
+          OLD=$(ls -d mediaviz_sdk/sdk/archive/v*/python 2>/dev/null | sort -V | tail -1)
+          if [ -z "$OLD" ] || [ "$(hash_pkg "$NEW")" != "$(hash_pkg "$OLD")" ]; then
+            echo "python_changed=true" >> $GITHUB_OUTPUT
+            echo "Python content changed — will build + publish mediaviz-sdk to PyPI."
+          else
+            # Content matches the prior archive, but a prior publish may have failed
+            # AFTER the repo was committed (commit precedes publish). Reconcile against
+            # PyPI: if the last committed version+suffix isn't live, force a publish.
+            # The forced publish ships THIS run's freshly-bumped (byte-identical) version
+            # under a new, unique number — so there's never a PyPI duplicate-version error.
+            OLD_BASE=$(echo "$OLD" | sed -E 's|.*/archive/v([0-9.]+)/python|\1|')
+            WANT="${OLD_BASE}${{ steps.pyver.outputs.suffix }}"
+            if curl -fsS "https://pypi.org/pypi/mediaviz-sdk/${WANT}/json" >/dev/null 2>&1; then
+              echo "python_changed=false" >> $GITHUB_OUTPUT
+              echo "Python content unchanged and ${WANT} live on PyPI — skipping."
+            else
+              echo "python_changed=true" >> $GITHUB_OUTPUT
+              echo "Python content unchanged BUT ${WANT} missing on PyPI — forcing publish to reconcile."
+            fi
+          fi
+
       - name: Discard unchanged generator output
         # When a side's hash matches the prior archived version, revert its
         # working-tree changes so the commit step doesn't pick them up.
@@ -249,10 +299,14 @@ jobs:
         if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'false' || steps.changes.outputs.admin_changed == 'false')
         working-directory: mediaviz_sdk
         run: |
-          if [ "${{ steps.changes.outputs.public_changed }}" = "false" ]; then
+          # sdk/ holds JS, PHP AND Python — only revert it when BOTH the public (JS/PHP)
+          # and Python gates are no-ops. A Python-only forced publish must keep sdk/ so
+          # its freshly-bumped version is committed (JS/PHP won't republish — those are
+          # gated separately on public_changed/branch downstream).
+          if [ "${{ steps.changes.outputs.public_changed }}" = "false" ] && [ "${{ steps.pychanges.outputs.python_changed }}" = "false" ]; then
             git restore sdk/
             git clean -fdx sdk/
-            echo "Reverted sdk/ — no public content diff."
+            echo "Reverted sdk/ — no public or Python content diff."
           fi
           if [ "${{ steps.changes.outputs.admin_changed }}" = "false" ]; then
             git restore admin-sdk/
@@ -261,14 +315,14 @@ jobs:
           fi
 
       - name: Configure git identity
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.pychanges.outputs.python_changed == 'true')
         working-directory: mediaviz_sdk
         run: |
           git config user.name "mediaviz-pipeline-bot[bot]"
           git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
 
       - name: Commit + push regenerated SDKs
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.pychanges.outputs.python_changed == 'true')
         working-directory: mediaviz_sdk
         run: |
           HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
@@ -316,6 +370,26 @@ jobs:
         # No --provenance: provenance writes a public Sigstore/Rekor attestation and is incompatible
         # with restricted (private) packages — npm rejects the combination with EUSAGE.
         run: npm publish --access restricted --tag ${{ steps.npm-meta.outputs.tag }}
+
+      # ── PyPI publish (all branches; gated on Python content hash) ──────────────
+      # Branched onto ONE `mediaviz-sdk` package via PEP 440 pre-releases (see the
+      # "Decide Python pre-release channel" step): dev → .dev0, qa → rcN, main → final.
+      # Auth is Trusted Publishing (OIDC) — no token; relies on the job's id-token:write.
+      - name: Build Python package
+        if: steps.ctx.outputs.mode == 'propagate' && steps.pychanges.outputs.python_changed == 'true'
+        working-directory: ${{ steps.dirs.outputs.py_dir }}
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish mediaviz-sdk to PyPI
+        if: steps.ctx.outputs.mode == 'propagate' && steps.pychanges.outputs.python_changed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ${{ steps.dirs.outputs.py_dir }}/dist
+          # Idempotent on job re-run: a version already on PyPI is skipped, not fatal.
+          # Each run emits a freshly-bumped (unique) version, so this never masks a real publish.
+          skip-existing: true
 
       # ── Packagist publish (main propagate only, gated on public content change) ─
       - name: Checkout mediaviz_php_sdk
@@ -374,3 +448,17 @@ jobs:
           curl -fsS -XPOST -H 'content-type:application/json' \
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}" \
             -d '{"repository":{"url":"https://github.com/mediaviz/mediaviz-php-sdk"}}'
+
+      # ── Propagate to the docs site ─────────────────────────────────────────
+      # The docs generators read the public JS SDK (sdk/vN/javascript + sdk.d.ts)
+      # off this branch, so rebuild docs whenever the public SDK content changed.
+      # Gated on public_changed only — admin/python-only diffs don't affect docs.
+      - name: Dispatch sdk-updated to mediaviz_docs
+        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: mediaviz/mediaviz_docs
+          event-type: sdk-updated
+          client-payload: |
+            {"branch":"${{ steps.ctx.outputs.branch }}"}

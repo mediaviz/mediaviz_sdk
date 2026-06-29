@@ -32,6 +32,12 @@ _TYPE_MAP: dict[str, str] = {
 }
 
 
+# PEP 440 pre-release suffix per channel; None/unknown → final release (no suffix).
+# Suffix is constant because the version base auto-increments each run, keeping every
+# emitted version unique and monotonic within a channel.
+_PRERELEASE_SUFFIX: dict[str | None, str] = {"dev": ".dev0", "rc": "rc0"}
+
+
 def _python_type(t) -> str:
     return _TYPE_MAP.get(str(t).lower() if t else "", "Any")
 
@@ -515,6 +521,7 @@ class PythonGenerator(BaseGenerator):
     def emit_pyproject_toml(self, output_dir: str) -> None:
         m = re.search(r'v(\d+\.\d+\.\d+)', output_dir)
         version = m.group(1) if m else "0.1.0"
+        version += _PRERELEASE_SUFFIX.get(self.prerelease, "")
         content = (
             f'[project]\n'
             f'name = "mediaviz-sdk"\n'
