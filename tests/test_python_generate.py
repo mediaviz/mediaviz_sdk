@@ -220,6 +220,19 @@ def test_client_controller_properties():
         assert "from .photos import Photos" in src
 
 
+def test_pyproject_prerelease_suffix():
+    cases = {"dev": 'version = "2.3.4.dev0"', None: 'version = "2.3.4"', "rc": 'version = "2.3.4rc0"'}
+    for channel, expected in cases.items():
+        g = PythonGenerator()
+        g.prerelease = channel
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = os.path.join(tmpdir, "sdk", "v2.3.4", "python")
+            os.makedirs(output_dir)
+            g.generate([_AUTH_EP], output_dir)
+            content = open(os.path.join(output_dir, "pyproject.toml")).read()
+            assert expected in content, f"channel={channel}"
+
+
 def test_pyproject_no_version_fallback():
     g = PythonGenerator()
     with tempfile.TemporaryDirectory() as tmpdir:
