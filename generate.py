@@ -12,7 +12,7 @@ from resolver import (
 from test_generators import discover_test_generators
 from test_generators.base import TestResult
 from utilities_resolver import load_utilities, write_flattened_utilities_yaml
-from versioning import get_next_version, version_str
+from versioning import get_next_version, version_str, write_version_manifest
 
 SDK_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sdk")
 
@@ -184,6 +184,11 @@ def main() -> None:
             if any(not r.success for r in test_results.values()):
                 print("\nError: generation failed — one or more test suites failed", file=sys.stderr)
                 sys.exit(1)
+
+            # Persist the released version to the tracked VERSION floor only after
+            # tests pass — survives the gitignored vN/ tree being dropped so the
+            # next run can never regress below what was just shipped.
+            write_version_manifest(output_dir, version)
         except Exception as e:
             print(f"\nError: generation aborted — {type(e).__name__}: {e}", file=sys.stderr)
             restore_archived_versions(version_dir, archived)

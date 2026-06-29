@@ -337,7 +337,7 @@ class PhpGenerator(BaseGenerator):
         lines.append("        $this->inner = $inner;")
         lines.append("    }")
         lines.append("")
-        lines.append("    public function request(string $url, string $method, string $accessToken, string $refreshToken, mixed $body = null): mixed {")
+        lines.append("    public function request(string $url, string $method, string $accessToken, ?string $refreshToken, mixed $body = null): mixed {")
         lines.append("        $mv = $this->mv;")
         lines.append("        $onRefreshSuccess = function ($newTokens) use ($mv): void {")
         lines.append("            $mv->setTokens($newTokens->accessToken, $newTokens->refreshToken);")
@@ -429,7 +429,7 @@ class PhpGenerator(BaseGenerator):
 
         # setTokens
         lines.append("")
-        lines.append("    public function setTokens(string $accessToken, string $refreshToken): void {")
+        lines.append("    public function setTokens(string $accessToken, ?string $refreshToken): void {")
         lines.append("        $this->accessToken = $accessToken;")
         lines.append("        $this->refreshToken = $refreshToken;")
         lines.append("    }")
