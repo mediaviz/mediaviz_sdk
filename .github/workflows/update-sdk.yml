@@ -131,17 +131,35 @@ jobs:
             main) echo "flag="                 >> $GITHUB_OUTPUT; echo "suffix="      >> $GITHUB_OUTPUT ;;
           esac
 
+      - name: Read main version baselines (dev/qa pin one minor ahead)
+        id: base
+        if: steps.ctx.outputs.branch != 'main'
+        working-directory: mediaviz_sdk
+        # dev/qa derive their minor from main's current version (minor + 1) so the
+        # published number stays aligned with main while each channel keeps its own
+        # counter. Read straight off origin/main's tracked VERSION files (public uses
+        # sdk/VERSION, admin uses admin-sdk/VERSION — they version independently).
+        run: |
+          git fetch origin main --depth=1 -q 2>/dev/null || true
+          PUB=$(git show origin/main:sdk/VERSION 2>/dev/null | tr -d '[:space:]')
+          ADM=$(git show origin/main:admin-sdk/VERSION 2>/dev/null | tr -d '[:space:]')
+          echo "public=${PUB:-1.0.0}" >> $GITHUB_OUTPUT
+          echo "admin=${ADM:-1.0.0}" >> $GITHUB_OUTPUT
+          echo "main baselines → public=${PUB:-1.0.0} admin=${ADM:-1.0.0}"
+
       - name: Run SDK generator (public)
         working-directory: mediaviz_sdk
-        # --endpoints omitted → uses the public_sdk_endpoints default in generate.py
-        run: python generate.py ${{ steps.bump.outputs.flag }} ${{ steps.pyver.outputs.flag }}
+        # --endpoints omitted → uses the public_sdk_endpoints default in generate.py.
+        # --base-version (dev/qa only) pins the minor to main's minor + 1.
+        run: python generate.py ${{ steps.bump.outputs.flag }} ${{ steps.pyver.outputs.flag }} ${{ steps.base.outputs.public && format('--base-version {0}', steps.base.outputs.public) || '' }}
 
       - name: Run SDK generator (admin)
         working-directory: mediaviz_sdk
         # Admin SDK: JS-only, private package (publishConfig.access=restricted),
         # output under admin-sdk/ so it versions independently of the public sdk/.
-        # --admin implies --endpoints all_endpoints.
-        run: python generate.py --frameworks javascript --destination-dir admin-sdk --admin ${{ steps.bump.outputs.flag }}
+        # --admin implies --endpoints all_endpoints. Carries the channel flag too so
+        # admin is versioned per-channel (e.g. 1.3.0-dev.N), and its own --base-version.
+        run: python generate.py --frameworks javascript --destination-dir admin-sdk --admin ${{ steps.bump.outputs.flag }} ${{ steps.pyver.outputs.flag }} ${{ steps.base.outputs.admin && format('--base-version {0}', steps.base.outputs.admin) || '' }}
 
       # ── Ensure both scoped JS packages shipped TypeScript declarations ─────
       # generate.py type-checks sdk.d.ts inline (and aborts on failure), but this
