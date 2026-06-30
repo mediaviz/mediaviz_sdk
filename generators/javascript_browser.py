@@ -1229,7 +1229,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             parts = expr.split(".", 2)
             if len(parts) == 2:
                 return parts[1]  # steps.template -> template
-            return f"{parts[1]}.{parts[2]}"  # steps.template.bucket_name -> template.bucket_name
+            # null-safe: step outputs are runtime responses that may omit fields
+            return f"{parts[1]}?.{parts[2]}"  # steps.template.blur -> template?.blur
         return expr
 
     def _resolve_js_cache_key(self, expr: str, comp: dict) -> str:

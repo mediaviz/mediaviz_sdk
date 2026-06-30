@@ -947,7 +947,8 @@ class PythonGenerator(BaseGenerator):
             parts = expr.split(".", 2)
             if len(parts) == 2:
                 return parts[1]
-            return f"{parts[1]}['{parts[2]}']"
+            # null-safe: step outputs are runtime responses that may omit fields
+            return f"({parts[1]} or {{}}).get('{parts[2]}')"
         return repr(expr)
 
     def _resolve_python_cache_key(self, expr: str, comp: dict) -> str:
