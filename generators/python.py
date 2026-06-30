@@ -529,7 +529,12 @@ class PythonGenerator(BaseGenerator):
             f'name = "mediaviz-sdk"\n'
             f'version = "{version}"\n'
             f'requires-python = ">=3.12"\n'
-            f'dependencies = ["httpx>=0.27"]\n'
+            # Cap below httpx 1.0: it removed the `data=` kwarg that the generated
+            # form-encoded (auth/token) calls rely on. The cap is also load-bearing for
+            # `pip install --pre mediaviz-sdk` (required while only pre-releases ship) —
+            # --pre enables pre-releases for *all* deps, so an uncapped `>=0.27` resolves
+            # to httpx 1.0.devN. Per PEP 440, exclusive `<1` excludes pre-releases of 1.0.
+            f'dependencies = ["httpx>=0.27,<1"]\n'
             f'\n'
             f'[build-system]\n'
             f'requires = ["setuptools>=68"]\n'
