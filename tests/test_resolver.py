@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from resolver import parse_ref, resolve_refs, write_flattened_yaml
+from resolver import parse_ref, resolve_refs, validate_composite_endpoints, write_flattened_yaml
 
 
 @pytest.fixture
@@ -188,3 +188,35 @@ def test_write_flattened_yaml_creates_version_dir(docs, tmp_path):
     version_dir = str(tmp_path / "v1")
     write_flattened_yaml(endpoints, docs.top, version_dir)
     assert os.path.isdir(tmp_path / "v1")
+
+
+def _composite_with_input_map(input_map):
+    ep = {
+        "id": "post_x",
+        "params": [{"name": "x-blur", "in": "header"}],
+        "request_body": {"file_content": {"type": "str", "required": True}},
+    }
+    comp = {"id": "c", "steps": [{"step_id": "s", "endpoint": ep, "input_map": input_map}]}
+    return [comp], [ep]
+
+
+def test_validate_composite_accepts_declared_input_map_keys():
+    composites, endpoints = _composite_with_input_map(
+        {"x-blur": "steps.t.blur", "file_content": "params.p.file_content"}
+    )
+    validate_composite_endpoints(composites, endpoints)  # param + body field — no raise
+
+
+def test_validate_composite_rejects_undeclared_input_map_key():
+    composites, endpoints = _composite_with_input_map(
+        {"x-bucket-name": "steps.t.bucket_name"}
+    )
+    with pytest.raises(ValueError, match="x-bucket-name"):
+        validate_composite_endpoints(composites, endpoints)
+
+
+def test_validate_composite_skips_opaque_body():
+    composites, endpoints = _composite_with_input_map({"anything": "params.x"})
+    endpoints[0]["request_body"] = "opaque"  # non-dict body → field names unknown
+    composites[0]["steps"][0]["endpoint"]["request_body"] = "opaque"
+    validate_composite_endpoints(composites, endpoints)  # key check skipped — no raise

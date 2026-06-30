@@ -416,23 +416,44 @@ def resolve_composite_files(
 
 
 def validate_composite_endpoints(composites: list[dict], endpoints: list[dict]) -> None:
-    """Verify every composite endpoint step references an endpoint in the resolved list.
+    """Verify composite endpoint steps are wired to real, fully-declared endpoints.
 
-    Utility steps are auto-included from ``api_docs/utilities/`` and skip this check.
+    Two checks, both fail-fast:
+      1. every endpoint step references an endpoint in the resolved list, and
+      2. every ``input_map`` key matches a param or request_body field the endpoint
+         actually declares — generators build calls strictly from declared params,
+         so an unmatched key is silently dropped (the upload-template bug class).
+
+    Utility steps are auto-included from ``api_docs/utilities/`` and skip both checks.
     """
     endpoint_ids = {ep["id"] for ep in endpoints}
     missing = []
+    unmapped = []
     for comp in composites:
         for step in comp["steps"]:
             if "utility" in step:
                 continue
-            ep_id = step["endpoint"]["id"]
-            if ep_id not in endpoint_ids:
-                missing.append(f"  composite '{comp['id']}' step '{step['step_id']}' requires endpoint '{ep_id}'")
+            ep = step["endpoint"]
+            if ep["id"] not in endpoint_ids:
+                missing.append(f"  composite '{comp['id']}' step '{step['step_id']}' requires endpoint '{ep['id']}'")
+                continue
+            allowed = _declared_input_keys(ep)
+            if allowed is None:  # opaque body — field names unknown, can't validate
+                continue
+            for key in step.get("input_map", {}):
+                if key not in allowed:
+                    unmapped.append(
+                        f"  composite '{comp['id']}' step '{step['step_id']}' input_map key "
+                        f"'{key}' matches no param or body field on endpoint '{ep['id']}' (would be silently dropped)"
+                    )
+
+    errors = []
     if missing:
-        raise ValueError(
-            "Composite steps reference endpoints not in the provided endpoint list:\n" + "\n".join(missing)
-        )
+        errors.append("Composite steps reference endpoints not in the provided endpoint list:\n" + "\n".join(missing))
+    if unmapped:
+        errors.append("Composite input_map keys do not match any endpoint param or body field:\n" + "\n".join(unmapped))
+    if errors:
+        raise ValueError("\n\n".join(errors))
 
 
 def write_flattened_yaml(
@@ -475,3 +496,25 @@ def write_flattened_composites_yaml(
         yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
     return out_path
+
+
+def _declared_input_keys(ep: dict) -> set[str] | None:
+    """Input_map keys an endpoint can consume: declared param names + body fields.
+
+    Returns ``None`` when the request_body is an opaque/generic shape whose fields
+    can't be enumerated, signalling the caller to skip key validation for that step.
+    """
+    keys = {p["name"] for p in ep.get("params", [])}
+    body = ep.get("request_body")
+    if body is None:
+        return keys
+    if not isinstance(body, dict):
+        return None  # generic opaque body — field names not enumerable
+    shape = body.get("_shape")
+    if shape == "scalar":
+        keys.add(body.get("param_name"))
+    elif shape == "expanded":
+        keys.update(f["name"] for f in body.get("fields", []))
+    else:  # flat_dict
+        keys.update(k for k in body if k != "_shape")
+    return keys

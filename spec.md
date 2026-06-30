@@ -214,7 +214,7 @@ Output is written to the folder specified by `--destination-dir` (default `./sdk
 3. Determine next version number by scanning `sdk/` for `v{major}.{minor}.{iteration}` directories, applying the requested bump type
 4. Archive all existing `sdk/v*` directories to `sdk/archive/`
 5. Resolve refs: endpoint refs (contain `#`) are resolved into flattened endpoints; composite refs (no `#`) are collected as file paths
-6. If composites are present, resolve composite files and validate that every composite step endpoint exists in the endpoint list (fail if not)
+6. If composites are present, resolve composite files and validate (fail if not) that (a) every composite step endpoint exists in the endpoint list, and (b) every step `input_map` key matches a param or request_body field the endpoint declares
 7. For each requested framework:
    a. Instantiate generator
    b. Create `sdk/v{ver}/{framework}/`
@@ -478,7 +478,7 @@ returns: "steps.upload_result"
 | `steps[].ref` | Points to an existing endpoint (`controllers/<file>.yaml#<endpoint_id>`) or utility (`utilities/<module>.yaml#<util_id>`). Utility steps are auto-included from `api_docs/utilities/` — no separate ref-list enumeration is required. |
 | `steps[].execution` | `once` or `for_each` (supported for both endpoint and utility steps) |
 | `steps[].cache` | Static/module-level cache — `key` is a template string with `{...}` placeholders, e.g. `"upload_template:{params.project_table_name}"`. Each placeholder is a dot-path expression (`params.*`, `params.<obj>.<prop>`, `steps.<id>.*`); literals between placeholders namespace the entry for self-describing keys. Bare dot-paths (no `{}`) are rejected at composite-resolve time. Supported for both endpoint and utility steps; evaluated verbatim (no content hashing). |
-| `steps[].input_map` | Maps endpoint params or utility params to dot-path expressions: `params.*`, `params.<obj>.<prop>`, `steps.<id>.*`. For utility steps, the keys are utility param names (canonical snake_case from the utility YAML) and the call is positional in declaration order. |
+| `steps[].input_map` | Maps endpoint params or utility params to dot-path expressions: `params.*`, `params.<obj>.<prop>`, `steps.<id>.*`. For utility steps, the keys are utility param names (canonical snake_case from the utility YAML) and the call is positional in declaration order. Field access on a prior step's output (`steps.<id>.<field>`) is emitted **null-safe** in every generator — `template?.field` (JS), `($template['field'] ?? null)` (PHP, via the optional-header guard), `(template or {}).get('field')` (Python) — since step outputs are runtime responses that may omit fields; caller-supplied `params.*` keep strict access. |
 | `steps[].output_as` | Name to store step response under for later steps |
 | `steps[].on_error` | `abort` (throw), `continue` (skip), `collect` (accumulate errors alongside results) — supported for both endpoint and utility steps |
 
@@ -491,7 +491,11 @@ returns: "steps.upload_result"
 
 The resolved output (`resolved_composites.yaml`) is self-contained: the utility snippet bodies are embedded into each step that references them, so the snapshot can be replayed without consulting `resolved_utilities.yaml` or the source `utilities/` directory.
 
-`validate_composite_endpoints()` enforces that every endpoint step's `id` is present in the resolved `--endpoints` list. Utility steps are skipped — utilities are auto-discovered (`load_utilities(sources.utilities_dir)` in `generate.py`) and are not subject to the endpoint-ref-list enumeration rule.
+`validate_composite_endpoints()` enforces two contracts, both fail-fast:
+1. Every endpoint step's `id` is present in the resolved `--endpoints` list.
+2. Every step `input_map` key matches a param name or request_body field the step's endpoint declares (computed by `_declared_input_keys()`). Generators build calls strictly from declared params, so an `input_map` key with no matching declaration is **silently dropped** — this check turns that class of source/composite drift into a build failure. (It is exactly what allowed the upload-photo composite to fetch the project template yet never apply its model toggles to the upload.) Endpoints with an opaque/generic body shape skip the key check, since their field names aren't enumerable.
+
+Utility steps are skipped for both — utilities are auto-discovered (`load_utilities(sources.utilities_dir)` in `generate.py`) and are not subject to the endpoint-ref-list enumeration rule.
 
 ### Generator Behavior
 

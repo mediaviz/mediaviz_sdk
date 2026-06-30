@@ -31,6 +31,12 @@
 - Resolved snapshot inlines the full utility (including `snippet_body.<fw>` and `async.<fw>`) into each step. `resolved_composites.yaml` is self-contained.
 - Each framework's composite emitter dispatches on `"utility" in step`, calls through a new `_Context.utils` accessor (emitted only when at least one utility is registered), and supports `once` / `for_each` / `cache` / `on_error` symmetrically with endpoint steps. JS prefixes the call with `await` when `async.javascript: true`.
 
+## Composite input_map Validation
+
+- `validate_composite_endpoints` (resolver.py) also checks every endpoint step's `input_map` keys against `_declared_input_keys(ep)` — the union of declared param names and request_body field keys. A key matching nothing fails the build, because generators build calls strictly from declared params and would otherwise drop the mapping silently.
+- This guards the upload-photo composite class of bug: the step fetched the project template but mapped its model toggles (`x-blur`, `x-colors`, …) to headers the generator never emitted. Toggles are now sourced from `steps.template.*` (applied to every upload); the stale `x-bucket-name`/`x-photo-index`/`x-resized-dimensions` keys were removed from the composite.
+- Opaque/generic-body endpoints skip the key check (field names aren't enumerable); utility steps skip it too.
+
 ## Failure Recovery
 
 - `generate.archive_existing_versions()` returns the list of `(original_path, archived_path)` pairs it moved into `sdk/archive/`.
