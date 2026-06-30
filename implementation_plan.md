@@ -66,7 +66,7 @@
 
 ## Python Framework Notes
 
-- Runtime: Python 3.12+, `httpx` (sync only; async out of scope)
+- Runtime: Python 3.12+, `httpx>=0.27,<1` (sync only; async out of scope). Capped below 1.0, which removed the `data=` kwarg the form-encoded auth/token calls use; the cap also keeps `pip install --pre` from resolving httpx 1.0.devN.
 - Output package: `mediaviz_sdk/` + bundled `oauth_sdk/` as sibling package
 - Installed via `pyproject.toml` (PEP 621, setuptools backend)
 - **Pre-release versioning**: `emit_pyproject_toml` renders `self.sdk_version.pypi()` — a 4-part release segment (`1.0.{main_minor+1}.{counter}`) + PEP 440 `.dev0`/`rc0` suffix that keeps dev↔qa distinct on the one shared `mediaviz-sdk` PyPI package (no dist-tags). The `_PRERELEASE_SUFFIX` + dir-regex path survives only as a fallback for unit tests that emit without an `SdkVersion`. See `spec.md` → "PyPI — `mediaviz-sdk`" and "Channel-aware versioning".

@@ -143,7 +143,9 @@ def test_generate_emits_pyproject_toml():
         assert 'version = "2.3.4"' in content
         assert 'mediaviz_sdk' in content
         assert 'oauth_sdk' in content
-        assert 'httpx' in content
+        # httpx must be capped <1: 1.0 removed the `data=` kwarg the auth path uses,
+        # and `pip install --pre` would otherwise pull httpx 1.0.devN.
+        assert 'httpx>=0.27,<1' in content
 
 
 def _assert_valid_python(filepath: str) -> None:
