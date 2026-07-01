@@ -1,5 +1,5 @@
 source: public_sdk_endpoints.yaml
-resolved_at: '2026-06-29T15:39:22Z'
+resolved_at: '2026-06-30T13:20:26Z'
 endpoints:
 - id: get_get_category_labels
   function_name: get_category_labels
@@ -2774,13 +2774,13 @@ endpoints:
   - all
   hidden: false
   api_host: null
-- id: get_recall_project_photo_ids
-  function_name: recall_project_photo_ids
+- id: get_recall_project_photos
+  function_name: recall_project_photos
   controller: Search
   base_path: /api/v1
   method: GET
   path: /api/v1/search/recall/{project_table_name}/
-  summary: recall_project_photo_ids
+  summary: recall_project_photos
   auth: required
   params:
   - name: project_table_name

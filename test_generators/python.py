@@ -382,7 +382,9 @@ def _read_dependencies(sdk_dir: str) -> list[str]:
         pass
     with open(path) as f:
         m = re.search(r"dependencies\s*=\s*\[(.*?)\]", f.read(), re.DOTALL)
-    return [d.strip().strip("'\"") for d in m.group(1).split(",") if d.strip()] if m else []
+    # Extract each quoted entry wholesale — never split on commas, which also
+    # appear inside version specifiers (e.g. "httpx>=0.27,<1").
+    return re.findall(r"""['"]([^'"]+)['"]""", m.group(1)) if m else []
 
 
 def _parse_pytest_counts(output: str) -> tuple[int, int, int]:

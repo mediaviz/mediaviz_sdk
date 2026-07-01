@@ -663,7 +663,7 @@ class PhpGenerator(BaseGenerator):
         # Build headers array
         lines.append("        $headers = [")
         lines.append(f"            'Content-Type: {content_type}',")
-        lines.append("            'Authorization: ' . $accessToken,")
+        lines.append("            'Authorization: Bearer ' . $accessToken,")
         for p in required_headers:
             param = self.header_to_param(p["name"])
             lines.append(f"            '{p['name']}: ' . ${param},")
@@ -877,7 +877,7 @@ class PhpGenerator(BaseGenerator):
 
         lines.append(f"{indent}$_headers = [")
         lines.append(f"{indent}    'Content-Type: {content_type}',")
-        lines.append(f"{indent}    'Authorization: ' . $this->ctx->accessToken,")
+        lines.append(f"{indent}    'Authorization: Bearer ' . $this->ctx->accessToken,")
         for p in header_params:
             if p.get("required"):
                 mapped = input_map.get(p["name"])
@@ -1039,6 +1039,10 @@ class PhpGenerator(BaseGenerator):
         return f"({expr} ?? null) !== null"
 
     def _resolve_php_expr(self, expr: str, comp: dict) -> str:
+        if expr.startswith("model_flag:"):
+            step_var, header_key = self._parse_model_flag(expr)
+            ref = f"(${step_var}['headers']['{header_key}'] ?? null)"
+            return f"(({ref} === true || {ref} === 'true') ? 'true' : null)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
             parts = param_name.split(".", 1)

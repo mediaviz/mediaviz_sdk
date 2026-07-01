@@ -108,32 +108,32 @@ describe('Search', () => {
     expect(spy.calls.length).toBe(1);
   });
 
-  it('recallProjectPhotoIds — exists', () => {
+  it('recallProjectPhotos — exists', () => {
     const search = new Search({});
-    expect(typeof search.recallProjectPhotoIds).toBe('function');
+    expect(typeof search.recallProjectPhotos).toBe('function');
   });
 
-  it('recallProjectPhotoIds — HTTP method is GET', async () => {
+  it('recallProjectPhotos — HTTP method is GET', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.recallProjectPhotoIds('test_value', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
+    await search.recallProjectPhotos('test_value', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
     expect(spy.last_call().method).toBe('GET');
   });
 
-  it('recallProjectPhotoIds — path construction', async () => {
+  it('recallProjectPhotos — path construction', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.recallProjectPhotoIds('hello world', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
+    await search.recallProjectPhotos('hello world', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
     expect(spy.last_call().path).toContain('/api/v1/search/recall/hello%20world/');
   });
 
-  it('recallProjectPhotoIds — query params', async () => {
+  it('recallProjectPhotos — query params', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.recallProjectPhotoIds('test_value', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
+    await search.recallProjectPhotos('test_value', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
     const path = spy.last_call().path;
     expect(path).toContain('asc_or_desc=');
     expect(path).toContain('best_of_similar_sets_only=');
@@ -141,11 +141,11 @@ describe('Search', () => {
     expect(path).toContain('limit=');
   });
 
-  it('recallProjectPhotoIds — auth routing', async () => {
+  it('recallProjectPhotos — auth routing', async () => {
     const spy = new SpyOAuthClient();
     const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };
     const search = new Search(ctx);
-    await search.recallProjectPhotoIds('test_value', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
+    await search.recallProjectPhotos('test_value', { ascOrDesc: 'test_value', bestOfSimilarSetsOnly: 'test_value', lastId: 'test_value', limit: 42 });
     expect(spy.calls.length).toBe(1);
   });
 
