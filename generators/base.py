@@ -109,6 +109,20 @@ class BaseGenerator(ABC):
         return "generic"
 
     @staticmethod
+    def _parse_model_flag(expr: str) -> tuple[str, str]:
+        """Parse a ``model_flag:<step_var>:<header_key>`` input_map expression.
+
+        Returns ``(step_var, header_key)``. Colon-separated so hyphenated header
+        keys (``x-blur``) survive. Used to read a model toggle out of a fetched
+        template's ``headers`` map and coerce it to the string ``"true"`` (or omit),
+        which the plain dot-path input_map syntax cannot express.
+        """
+        parts = expr.split(":", 2)
+        if len(parts) != 3 or not parts[1] or not parts[2]:
+            raise ValueError(f"malformed model_flag expression: {expr!r} (expected 'model_flag:<step>:<header>')")
+        return parts[1], parts[2]
+
+    @staticmethod
     def _expanded_fields(request_body: dict) -> list[dict]:
         return request_body.get("fields", [])
 

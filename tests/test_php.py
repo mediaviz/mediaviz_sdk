@@ -434,3 +434,9 @@ def test_split_types_discover_finds_split_classes(gen, tmp_path):
     for e in exports:
         if e["name"] in ("OAuthClientConfig", "TokenResponse", "ClientRegistrationRequest"):
             assert e["psr4"] is True
+
+
+def test_model_flag_reads_template_headers(gen):
+    expr = gen._resolve_php_expr("model_flag:template:x-ocr", {})
+    assert "$template['headers']['x-ocr']" in expr
+    assert "'true'" in expr and "null" in expr
