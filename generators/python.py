@@ -942,11 +942,17 @@ class PythonGenerator(BaseGenerator):
     # ── expression resolvers ──────────────────────────────────────────────────
 
     def _resolve_python_expr(self, expr: str, comp: dict) -> str:
+        if expr.startswith("model_flag:"):
+            step_var, header_key = self._parse_model_flag(expr)
+            ref = f"(({step_var} or {{}}).get('headers') or {{}}).get('{header_key}')"
+            return f"('true' if {ref} in (True, 'true') else None)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
             parts = param_name.split(".", 1)
             if len(parts) == 2:
-                return f"{parts[0]}['{parts[1]}']"
+                # null-safe (parity with JS obj.prop yielding undefined): a caller
+                # may pass a minimal photo dict without the optional keys
+                return f"({parts[0]} or {{}}).get('{parts[1]}')"
             return parts[0]
         if expr.startswith("steps."):
             parts = expr.split(".", 2)

@@ -3,7 +3,7 @@
         'name' => 'mediaviz/sdk-tests',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '5aa24a89d28ae8d8765eca5a31b09283c51e8ba5',
+        'reference' => 'bc4aa521ff22e910ffb6c6e541cbb21007b6c1de',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -22,7 +22,7 @@
         'mediaviz/sdk-tests' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '5aa24a89d28ae8d8765eca5a31b09283c51e8ba5',
+            'reference' => 'bc4aa521ff22e910ffb6c6e541cbb21007b6c1de',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

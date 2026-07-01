@@ -751,7 +751,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         # Build headers object
         lines.append("    const headers = {")
         lines.append(f"      'Content-Type': '{content_type}',")
-        lines.append("      'Authorization': this._ctx.accessToken,")
+        lines.append("      'Authorization': `Bearer ${this._ctx.accessToken}`,")
         for p in required_headers:
             param = self.header_to_param(p["name"])
             lines.append(f"      '{p['name']}': {param},")
@@ -999,7 +999,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         # build headers
         lines.append(f"{indent}const _headers_{var} = {{")
         lines.append(f"{indent}  'Content-Type': '{content_type}',")
-        lines.append(f"{indent}  'Authorization': this._ctx.accessToken,")
+        lines.append(f"{indent}  'Authorization': `Bearer ${{this._ctx.accessToken}}`,")
         for p in header_params:
             if p.get("required"):
                 mapped = input_map.get(p["name"])
@@ -1164,7 +1164,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
         lines.append(f"{indent}const _hdrs = {{")
         lines.append(f"{indent}  'Content-Type': '{content_type}',")
-        lines.append(f"{indent}  'Authorization': this._ctx.accessToken,")
+        lines.append(f"{indent}  'Authorization': `Bearer ${{this._ctx.accessToken}}`,")
         for p in header_params:
             if p.get("required"):
                 mapped = input_map.get(p["name"])
@@ -1219,6 +1219,10 @@ class JavaScriptBrowserGenerator(BaseGenerator):
 
     def _resolve_js_expr(self, expr: str, comp: dict) -> str:
         """Convert dot-path expression to JS variable reference."""
+        if expr.startswith("model_flag:"):
+            step_var, header_key = self._parse_model_flag(expr)
+            ref = f"{step_var}?.headers?.['{header_key}']"
+            return f"(({ref} === true || {ref} === 'true') ? 'true' : undefined)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
             parts = param_name.split(".", 1)

@@ -1810,7 +1810,7 @@ class Search {
     return data;
   }
 
-  async recallProjectPhotoIds(projectTableName, { ascOrDesc, bestOfSimilarSetsOnly, lastId, limit } = {}) {
+  async recallProjectPhotos(projectTableName, { ascOrDesc, bestOfSimilarSetsOnly, lastId, limit } = {}) {
     this._ctx.requireTokens();
     let path = `/api/v1/search/recall/${encodeURIComponent(projectTableName)}/`;
     const query = new URLSearchParams();

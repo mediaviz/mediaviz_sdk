@@ -333,3 +333,15 @@ def test_composite_method_emitted(tmp_path):
     assert "def fetch_projects_with_photos" in src
     assert "require_tokens" in src
     _assert_valid_python(os.path.join(output_dir, "mediaviz_sdk", "projects.py"))
+
+
+def test_model_flag_reads_template_headers():
+    g = PythonGenerator()
+    expr = g._resolve_python_expr("model_flag:template:x-colors", {})
+    assert "(template or {}).get('headers') or {}).get('x-colors')" in expr
+    assert "'true'" in expr and "None" in expr
+
+
+def test_python_optional_photo_field_is_null_safe():
+    g = PythonGenerator()
+    assert g._resolve_python_expr("params.photo.size", {}) == "(photo or {}).get('size')"

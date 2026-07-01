@@ -388,3 +388,14 @@ def test_barrel_index_includes_reexport_files(gen, tmp_path):
     index_src = (tmp_path / "index.js").read_text()
     assert "export * from './_oauth.js';" in index_src
     assert "export * from './photos.js';" in index_src
+
+
+def test_model_flag_reads_template_headers(gen):
+    expr = gen._resolve_js_expr("model_flag:template:x-blur", {})
+    assert "template?.headers?.['x-blur']" in expr
+    assert "'true'" in expr and "undefined" in expr
+
+
+def test_model_flag_malformed_raises(gen):
+    with pytest.raises(ValueError, match="model_flag"):
+        gen._resolve_js_expr("model_flag:template", {})
