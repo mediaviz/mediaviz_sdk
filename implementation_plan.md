@@ -37,6 +37,13 @@
 - This guards the upload-photo composite class of bug: the step fetched the project template but mapped its model toggles (`x-blur`, `x-colors`, …) to headers the generator never emitted. Toggles are now sourced from `steps.template.*` (applied to every upload); the stale `x-bucket-name`/`x-photo-index`/`x-resized-dimensions` keys were removed from the composite.
 - Opaque/generic-body endpoints skip the key check (field names aren't enumerable); utility steps skip it too.
 
+## Header→Body Upload Migration
+
+- The photo-upload contract moved all `x-*` metadata headers into the JSON request body (only `Authorization`/`Content-Type` remain headers). `x-user-id` became the `user_id` body field, kept for contract continuity even though the lambda ignores it (the JWT is authoritative); `x-title` was dropped entirely (title derives from `file_path`'s basename). Source YAMLs: `mediaviz_intelligence_hub/api_docs/photo_upload/photo_upload.yaml` (header params → `request_body` fields) and `composites/upload_photos.yaml` (input_map keys are now body field names). Plan of record: `mediaviz_serverless_image_upload/header_to_body_migration_plan.json`.
+- `model_flag:<step>:<field>` resolves body-first with a legacy-header fallback in all three generators — `template?.body?.['blur'] ?? template?.headers?.['x-blur']` (JS), `$template['body']['blur'] ?? $template['headers']['x-blur'] ?? null` (PHP), `.get('body')…/.get('headers')…` (Python) — via `BaseGenerator._legacy_flag_header`, so a regenerated SDK keeps working against an external API that still returns the old template shape.
+- Flat-dict request bodies honor per-field `required`: `BaseGenerator._flat_body_fields` yields `(snake, camel, required)` in declaration order and fails generation if a required field is declared after an optional one. PHP/Python emit `= null`/`= None` defaults for optionals; bodies with optionals are null-filtered on the wire (`array_filter` / dict-comprehension; JS relies on `JSON.stringify` dropping `undefined`). PHP composite inline-curl body values are emitted as `(expr) ?? null` inside an `array_filter`, killing undefined-array-key warnings for absent optional photo keys.
+- `typescript_dts._py_to_ts` maps union type spellings (`bool|string (model toggle)`, `number|string (…)`) to TS unions instead of `any`.
+
 ## Failure Recovery
 
 - `generate.archive_existing_versions()` returns the list of `(original_path, archived_path)` pairs it moved into `sdk/archive/`.

@@ -49,6 +49,9 @@ def _auth_ep(ep_id, path, controller="Photos", params=None, request_body=None, r
     ("List[int]", "number[]"), ("List[str]", "string[]"), ("Optional[List[int]]", "number[]"),
     ("List[]", "any[]"), ("dict", "Record<string, any>"), ("Dict[any]", "Record<string, any>"),
     ("null", "any"), (None, "any"), ("UnknownAlias", "any"),
+    ("bool|string (model toggle)", "boolean | string"),
+    ("number|string (EXIF x resolution)", "number | string"),
+    ("bool|string", "boolean | string"),
 ])
 def test_py_to_ts(py, ts):
     assert _py_to_ts(py, {}, set()) == ts

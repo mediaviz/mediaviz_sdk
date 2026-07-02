@@ -92,8 +92,9 @@ def test_auth_method_query_params(gen):
     lines = gen._emit_method(ep)
     src = "\n".join(lines)
     assert "async getPhotosSort(tableName, sortOrder, { limit, lastId } = {})" in src
-    assert "query.set('limit', limit)" in src
-    assert "query.set('last_id', lastId)" in src
+    # array-aware serialization: repeated keys via append, never comma-joined
+    assert "(Array.isArray(limit) ? limit : [limit]).forEach(v => query.append('limit', v))" in src
+    assert "(Array.isArray(lastId) ? lastId : [lastId]).forEach(v => query.append('last_id', v))" in src
     assert "URLSearchParams" in src
     assert "if (qs) path += '?' + qs;" in src
 
@@ -277,8 +278,9 @@ def test_package_json(gen, tmp_path):
     assert pkg["browser"] == "./dist/sdk.umd.js"
     exports = pkg["exports"]["."]
     assert exports["browser"] == "./dist/sdk.umd.js"
-    assert exports["import"] == "./dist/sdk.esm.js"
-    assert exports["require"] == "./dist/sdk.cjs"
+    # import/require each carry a types-first condition object (see emit_package_json)
+    assert exports["import"] == {"types": "./dist/sdk.esm.d.ts", "default": "./dist/sdk.esm.js"}
+    assert exports["require"] == {"types": "./dist/sdk.d.cts", "default": "./dist/sdk.cjs"}
     assert exports["default"] == "./dist/sdk.cjs"
     # build-only fields are pruned from the published manifest after dist is built
     assert "scripts" not in pkg
@@ -390,8 +392,9 @@ def test_barrel_index_includes_reexport_files(gen, tmp_path):
     assert "export * from './photos.js';" in index_src
 
 
-def test_model_flag_reads_template_headers(gen):
-    expr = gen._resolve_js_expr("model_flag:template:x-blur", {})
+def test_model_flag_reads_template_body_with_header_fallback(gen):
+    expr = gen._resolve_js_expr("model_flag:template:blur", {})
+    assert "template?.body?.['blur']" in expr
     assert "template?.headers?.['x-blur']" in expr
     assert "'true'" in expr and "undefined" in expr
 

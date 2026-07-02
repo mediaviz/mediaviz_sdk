@@ -1220,8 +1220,9 @@ class JavaScriptBrowserGenerator(BaseGenerator):
     def _resolve_js_expr(self, expr: str, comp: dict) -> str:
         """Convert dot-path expression to JS variable reference."""
         if expr.startswith("model_flag:"):
-            step_var, header_key = self._parse_model_flag(expr)
-            ref = f"{step_var}?.headers?.['{header_key}']"
+            step_var, field_key = self._parse_model_flag(expr)
+            legacy_key = self._legacy_flag_header(field_key)
+            ref = f"({step_var}?.body?.['{field_key}'] ?? {step_var}?.headers?.['{legacy_key}'])"
             return f"(({ref} === true || {ref} === 'true') ? 'true' : undefined)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]

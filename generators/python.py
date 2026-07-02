@@ -924,13 +924,16 @@ class PythonGenerator(BaseGenerator):
         body_kwarg = ""
         if self._body_shape(request_body) == "flat_dict":
             fields = [k for k in request_body if not k.startswith("_")]
-            lines.append(f"{indent}_body = {{")
+            # Absent optional inputs resolve to None — drop them so the JSON only
+            # carries supplied fields (parity with JS, where JSON.stringify drops
+            # undefined).
+            lines.append(f"{indent}_body = {{k: v for k, v in {{")
             for k in fields:
                 mapped = input_map.get(k)
                 if mapped:
                     val = self._resolve_python_expr_loop(mapped, comp, loop_var) if loop_var else self._resolve_python_expr(mapped, comp)
                     lines.append(f"{indent}    '{k}': {val},")
-            lines.append(f"{indent}}}")
+            lines.append(f"{indent}}}.items() if v is not None}}")
             kwarg = "data" if content_type == "application/x-www-form-urlencoded" else "json"
             body_kwarg = f", {kwarg}=_body"
 
@@ -943,9 +946,11 @@ class PythonGenerator(BaseGenerator):
 
     def _resolve_python_expr(self, expr: str, comp: dict) -> str:
         if expr.startswith("model_flag:"):
-            step_var, header_key = self._parse_model_flag(expr)
-            ref = f"(({step_var} or {{}}).get('headers') or {{}}).get('{header_key}')"
-            return f"('true' if {ref} in (True, 'true') else None)"
+            step_var, field_key = self._parse_model_flag(expr)
+            legacy_key = self._legacy_flag_header(field_key)
+            body_ref = f"(({step_var} or {{}}).get('body') or {{}}).get('{field_key}')"
+            hdr_ref = f"(({step_var} or {{}}).get('headers') or {{}}).get('{legacy_key}')"
+            return f"('true' if ({body_ref} if {body_ref} is not None else {hdr_ref}) in (True, 'true') else None)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
             parts = param_name.split(".", 1)
@@ -1045,8 +1050,10 @@ class PythonGenerator(BaseGenerator):
                     tokens.append(f"{name}: {_python_nullable(t)} = None")
             return tokens
         if shape == "flat_dict":
-            fields = self._flatten_body(request_body)
-            return [f"{camel}: Any" for _, camel in fields]
+            return [
+                f"{camel}: Any" if required else f"{camel}: Any = None"
+                for _, camel, required in self._flat_body_fields(request_body)
+            ]
         if shape == "generic":
             return ["body: dict | None = None"]
         return []
@@ -1065,11 +1072,14 @@ class PythonGenerator(BaseGenerator):
             rendered[0] = f"{indent}body = " + rendered[0].lstrip()
             return rendered, "body"
         if shape == "flat_dict":
-            fields = self._flatten_body(request_body)
-            lines = [f"{indent}body = {{"]
-            for snake_key, camel in fields:
+            fields = self._flat_body_fields(request_body)
+            has_optional = any(not required for _, _, required in fields)
+            # Optional fields left at their None default are dropped so the JSON
+            # only carries what the caller supplied. All-required bodies stay plain.
+            lines = [f"{indent}body = {{k: v for k, v in {{" if has_optional else f"{indent}body = {{"]
+            for snake_key, camel, _ in fields:
                 lines.append(f"{indent}    '{snake_key}': {camel},")
-            lines.append(f"{indent}}}")
+            lines.append(f"{indent}}}.items() if v is not None}}" if has_optional else f"{indent}}}")
             return lines, "body"
         if shape == "generic":
             return [], "body"

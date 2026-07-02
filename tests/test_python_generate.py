@@ -335,9 +335,10 @@ def test_composite_method_emitted(tmp_path):
     _assert_valid_python(os.path.join(output_dir, "mediaviz_sdk", "projects.py"))
 
 
-def test_model_flag_reads_template_headers():
+def test_model_flag_reads_template_body_with_header_fallback():
     g = PythonGenerator()
-    expr = g._resolve_python_expr("model_flag:template:x-colors", {})
+    expr = g._resolve_python_expr("model_flag:template:colors", {})
+    assert "(template or {}).get('body') or {}).get('colors')" in expr
     assert "(template or {}).get('headers') or {}).get('x-colors')" in expr
     assert "'true'" in expr and "None" in expr
 
@@ -345,3 +346,50 @@ def test_model_flag_reads_template_headers():
 def test_python_optional_photo_field_is_null_safe():
     g = PythonGenerator()
     assert g._resolve_python_expr("params.photo.size", {}) == "(photo or {}).get('size')"
+
+
+# ── flat-dict bodies with optional fields (header→body upload migration) ─────
+
+_FLAT_BODY = {
+    "file_content": {"type": "string", "required": True},
+    "client_side_id": {"type": "string", "required": False},
+}
+
+
+def test_flat_dict_optional_fields_default_none():
+    g = PythonGenerator()
+    assert g._python_body_sig_tokens(_FLAT_BODY) == [
+        "fileContent: Any", "clientSideId: Any = None",
+    ]
+
+
+def test_flat_dict_body_drops_none_optionals():
+    g = PythonGenerator()
+    lines, expr = g._python_body_build(_FLAT_BODY, "application/json", "        ")
+    src = "\n".join(lines)
+    assert expr == "body"
+    assert "if v is not None" in src
+
+
+def test_flat_dict_all_required_body_stays_plain():
+    g = PythonGenerator()
+    body = {"username": {"type": "string", "required": True}}
+    lines, _ = g._python_body_build(body, "application/json", "        ")
+    assert "is not None" not in "\n".join(lines)
+
+
+def test_composite_inline_body_drops_none():
+    g = PythonGenerator()
+    ep = {
+        "id": "post_upload_photo", "function_name": "upload_photo_to_mediaviz",
+        "controller": "PhotoUpload", "method": "POST", "path": "/photo_upload",
+        "auth": "required", "api_host": "photo_upload", "params": [],
+        "request_body": _FLAT_BODY, "content_type": "application/json", "tags": [],
+    }
+    input_map = {
+        "file_content": "params.photo.file_content",
+        "client_side_id": "params.photo.client_side_id",
+    }
+    src = "\n".join(g._emit_python_inline_httpx(ep, input_map, "result", {}, "        "))
+    assert "_body = {k: v for k, v in {" in src
+    assert "}.items() if v is not None}" in src

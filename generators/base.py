@@ -110,17 +110,45 @@ class BaseGenerator(ABC):
 
     @staticmethod
     def _parse_model_flag(expr: str) -> tuple[str, str]:
-        """Parse a ``model_flag:<step_var>:<header_key>`` input_map expression.
+        """Parse a ``model_flag:<step_var>:<field_key>`` input_map expression.
 
-        Returns ``(step_var, header_key)``. Colon-separated so hyphenated header
-        keys (``x-blur``) survive. Used to read a model toggle out of a fetched
-        template's ``headers`` map and coerce it to the string ``"true"`` (or omit),
-        which the plain dot-path input_map syntax cannot express.
+        Returns ``(step_var, field_key)``. Used to read a model toggle out of a
+        fetched template's ``body`` map (falling back to the legacy ``headers``
+        map, see ``_legacy_flag_header``) and coerce it to the string ``"true"``
+        (or omit), which the plain dot-path input_map syntax cannot express.
         """
         parts = expr.split(":", 2)
         if len(parts) != 3 or not parts[1] or not parts[2]:
-            raise ValueError(f"malformed model_flag expression: {expr!r} (expected 'model_flag:<step>:<header>')")
+            raise ValueError(f"malformed model_flag expression: {expr!r} (expected 'model_flag:<step>:<field>')")
         return parts[1], parts[2]
+
+    @staticmethod
+    def _legacy_flag_header(field_key: str) -> str:
+        """Legacy x-* header key a model-toggle body field was migrated from."""
+        return "x-" + field_key.replace("_", "-")
+
+    def _flat_body_fields(self, request_body: dict) -> list[tuple[str, str, bool]]:
+        """(snake, camel, required) per flat-dict body field, in declaration order.
+
+        Fields without metadata (non-dict spec or no ``required`` key) stay
+        required, preserving the pre-metadata behaviour. Positional signatures
+        are emitted in declaration order, so a required field after an optional
+        one cannot get a default-less parameter — fail fast and make the YAML
+        author reorder.
+        """
+        fields = []
+        seen_optional = False
+        for snake, camel in self._flatten_body(request_body):
+            spec = request_body.get(snake)
+            required = bool(spec.get("required", True)) if isinstance(spec, dict) else True
+            if required and seen_optional:
+                raise ValueError(
+                    f"flat-dict request_body field '{snake}' is required but declared after "
+                    f"an optional field; declare required fields first"
+                )
+            seen_optional = seen_optional or not required
+            fields.append((snake, camel, required))
+        return fields
 
     @staticmethod
     def _expanded_fields(request_body: dict) -> list[dict]:

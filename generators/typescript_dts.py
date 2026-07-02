@@ -311,6 +311,18 @@ def _py_to_ts(t, schemas: dict, queue: set[str]) -> str:
     low = t.lower()
     if low in ("null", "none", "any"):
         return "any"
+    # union spellings like "bool|string (model toggle)" — strip the trailing
+    # comment, map each side, and rejoin (any member mapping to `any` wins)
+    base = re.sub(r"\s*\(.*\)$", "", t)
+    if "|" in base:
+        parts = []
+        for p in base.split("|"):
+            ts = _py_to_ts(p, schemas, queue)
+            if ts == "any":
+                return "any"
+            if ts not in parts:
+                parts.append(ts)
+        return parts[0] if len(parts) == 1 else " | ".join(parts)
     wrap = _WRAP_RE.match(t)
     if wrap:
         return _py_to_ts(wrap.group(1), schemas, queue)

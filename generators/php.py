@@ -894,13 +894,16 @@ class PhpGenerator(BaseGenerator):
 
         if self._body_shape(request_body) == "flat_dict":
             fields = self._flatten_body(request_body)
-            lines.append(f"{indent}$_body = [")
+            # `?? null` suppresses undefined-key warnings on nested array access
+            # (e.g. an optional photo key); array_filter then drops the absent
+            # fields so the JSON matches JS's undefined-dropping behaviour.
+            lines.append(f"{indent}$_body = array_filter([")
             for snake_key, _ in fields:
                 mapped = input_map.get(snake_key)
                 if mapped:
                     val = self._resolve_php_expr_loop(mapped, comp, loop_var) if loop_var else self._resolve_php_expr(mapped, comp)
-                    lines.append(f"{indent}    '{snake_key}' => {val},")
-            lines.append(f"{indent}];")
+                    lines.append(f"{indent}    '{snake_key}' => ({val}) ?? null,")
+            lines.append(f"{indent}], fn($v) => $v !== null);")
 
         lines.append(f"{indent}$_ch = curl_init();")
         lines.append(f"{indent}curl_setopt($_ch, CURLOPT_URL, $_baseUrl . {php_path});")
@@ -1040,8 +1043,9 @@ class PhpGenerator(BaseGenerator):
 
     def _resolve_php_expr(self, expr: str, comp: dict) -> str:
         if expr.startswith("model_flag:"):
-            step_var, header_key = self._parse_model_flag(expr)
-            ref = f"(${step_var}['headers']['{header_key}'] ?? null)"
+            step_var, field_key = self._parse_model_flag(expr)
+            legacy_key = self._legacy_flag_header(field_key)
+            ref = f"(${step_var}['body']['{field_key}'] ?? ${step_var}['headers']['{legacy_key}'] ?? null)"
             return f"(({ref} === true || {ref} === 'true') ? 'true' : null)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
@@ -1111,8 +1115,10 @@ class PhpGenerator(BaseGenerator):
                     tokens.append(f"?{t} ${camel} = null")
             return tokens
         if shape == "flat_dict":
-            fields = self._flatten_body(request_body)
-            return [f"mixed ${camel}" for _, camel in fields]
+            return [
+                f"mixed ${camel}" if required else f"mixed ${camel} = null"
+                for _, camel, required in self._flat_body_fields(request_body)
+            ]
         if shape == "generic":
             return ["array $body = []"]
         return []
@@ -1137,11 +1143,15 @@ class PhpGenerator(BaseGenerator):
             rendered[-1] = rendered[-1] + ";"
             return rendered, "$body"
         if shape == "flat_dict":
-            fields = self._flatten_body(request_body)
-            lines = [f"{indent}$body = ["]
-            for snake_key, camel in fields:
+            fields = self._flat_body_fields(request_body)
+            has_optional = any(not required for _, _, required in fields)
+            # Optional fields left at their null default are dropped so the JSON
+            # only carries what the caller supplied (parity with JS, where
+            # JSON.stringify drops undefined). All-required bodies stay plain.
+            lines = [f"{indent}$body = array_filter([" if has_optional else f"{indent}$body = ["]
+            for snake_key, camel, _ in fields:
                 lines.append(f"{indent}    '{snake_key}' => ${camel},")
-            lines.append(f"{indent}];")
+            lines.append(f"{indent}], fn($v) => $v !== null);" if has_optional else f"{indent}];")
             return lines, "$body"
         if shape == "generic":
             return [], "$body"
