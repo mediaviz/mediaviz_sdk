@@ -378,6 +378,34 @@ def test_flat_dict_all_required_body_stays_plain():
     assert "is not None" not in "\n".join(lines)
 
 
+_POSITIONAL_BODY = {
+    "file_content": {"type": "string", "required": True},
+    "blur": {"type": "bool|string (model toggle)", "required": True, "positional": True},
+    "colors": {"type": "bool|string (model toggle)", "required": False, "positional": True},
+    "client_side_id": {"type": "string", "required": False},
+    "size": {"type": "string", "required": False},
+}
+
+
+def test_flat_dict_positional_sig_bag_is_keyword_only():
+    g = PythonGenerator()
+    assert g._python_body_sig_tokens(_POSITIONAL_BODY) == [
+        "fileContent: Any",          # required → positional
+        "blur: Any",                 # required + positional → positional
+        "colors: Any = None",        # optional + positional → positional w/ default
+        "*",                         # remaining optionals forced keyword-only
+        "clientSideId: Any = None",
+        "size: Any = None",
+    ]
+
+
+def test_flat_dict_without_positional_marker_stays_legacy():
+    g = PythonGenerator()
+    assert g._python_body_sig_tokens(_FLAT_BODY) == [
+        "fileContent: Any", "clientSideId: Any = None",
+    ]
+
+
 def test_composite_inline_body_drops_none():
     g = PythonGenerator()
     ep = {

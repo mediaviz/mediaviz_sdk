@@ -1,6 +1,5 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-import re
 import shutil
 import os
 
@@ -149,6 +148,37 @@ class BaseGenerator(ABC):
             seen_optional = seen_optional or not required
             fields.append((snake, camel, required))
         return fields
+
+    def _flat_dict_positional(self, request_body) -> bool:
+        """True when a flat-dict body opts into positional-arg style — i.e. any
+        field carries a ``positional: true`` marker. Un-marked flat-dict bodies keep
+        the legacy signature (single options object in JS; all-fields-positional in
+        PHP/Python), so this change is scoped to opted-in endpoints only."""
+        if not isinstance(request_body, dict):
+            return False
+        return any(isinstance(spec, dict) and spec.get("positional") for spec in request_body.values())
+
+    def _flat_body_categories(self, request_body: dict) -> tuple[list, list, list]:
+        """Split a flat-dict body into (required, positional_optional, named_optional),
+        each a list of ``(snake, camel, spec)``.
+
+        Required fields become positional args (no default); optional fields marked
+        ``positional: true`` become positional args (with a default); everything else
+        becomes a trailing named options bag. Grouping by category — required first —
+        guarantees the required-before-optional positional ordering regardless of the
+        field declaration order in the YAML.
+        """
+        required, positional_optional, named_optional = [], [], []
+        for snake, camel in self._flatten_body(request_body):
+            spec = request_body.get(snake)
+            spec = spec if isinstance(spec, dict) else {}
+            if bool(spec.get("required", True)):
+                required.append((snake, camel, spec))
+            elif spec.get("positional"):
+                positional_optional.append((snake, camel, spec))
+            else:
+                named_optional.append((snake, camel, spec))
+        return required, positional_optional, named_optional
 
     @staticmethod
     def _expanded_fields(request_body: dict) -> list[dict]:

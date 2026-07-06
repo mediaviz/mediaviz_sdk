@@ -558,7 +558,7 @@ class PhpGenerator(BaseGenerator):
             indent = "        "
             sig = f"    public function {func_name}(\n"
             sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
-            sig += f"\n    ): mixed {{"
+            sig += "\n    ): mixed {"
             lines = [sig]
         elif sig_parts:
             lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
@@ -1115,10 +1115,19 @@ class PhpGenerator(BaseGenerator):
                     tokens.append(f"?{t} ${camel} = null")
             return tokens
         if shape == "flat_dict":
-            return [
-                f"mixed ${camel}" if required else f"mixed ${camel} = null"
-                for _, camel, required in self._flat_body_fields(request_body)
-            ]
+            if not self._flat_dict_positional(request_body):
+                return [
+                    f"mixed ${camel}" if required else f"mixed ${camel} = null"
+                    for _, camel, required in self._flat_body_fields(request_body)
+                ]
+            # positional style: required + positional-optional as positional params,
+            # remaining optionals as a trailing associative $options array.
+            required, positional_optional, named_optional = self._flat_body_categories(request_body)
+            tokens = [f"mixed ${camel}" for _, camel, _ in required]
+            tokens += [f"mixed ${camel} = null" for _, camel, _ in positional_optional]
+            if named_optional:
+                tokens.append("array $options = []")
+            return tokens
         if shape == "generic":
             return ["array $body = []"]
         return []
@@ -1143,14 +1152,28 @@ class PhpGenerator(BaseGenerator):
             rendered[-1] = rendered[-1] + ";"
             return rendered, "$body"
         if shape == "flat_dict":
-            fields = self._flat_body_fields(request_body)
-            has_optional = any(not required for _, _, required in fields)
             # Optional fields left at their null default are dropped so the JSON
             # only carries what the caller supplied (parity with JS, where
             # JSON.stringify drops undefined). All-required bodies stay plain.
+            if not self._flat_dict_positional(request_body):
+                fields = self._flat_body_fields(request_body)
+                has_optional = any(not required for _, _, required in fields)
+                lines = [f"{indent}$body = array_filter([" if has_optional else f"{indent}$body = ["]
+                for snake_key, camel, _ in fields:
+                    lines.append(f"{indent}    '{snake_key}' => ${camel},")
+                lines.append(f"{indent}], fn($v) => $v !== null);" if has_optional else f"{indent}];")
+                return lines, "$body"
+            # positional style: required + positional-optional read from their own
+            # params; the remaining optionals are read out of the $options array.
+            required, positional_optional, named_optional = self._flat_body_categories(request_body)
+            has_optional = bool(positional_optional or named_optional)
             lines = [f"{indent}$body = array_filter([" if has_optional else f"{indent}$body = ["]
-            for snake_key, camel, _ in fields:
-                lines.append(f"{indent}    '{snake_key}' => ${camel},")
+            for snake, camel, _ in required:
+                lines.append(f"{indent}    '{snake}' => ${camel},")
+            for snake, camel, _ in positional_optional:
+                lines.append(f"{indent}    '{snake}' => ${camel},")
+            for snake, camel, _ in named_optional:
+                lines.append(f"{indent}    '{snake}' => $options['{camel}'] ?? null,")
             lines.append(f"{indent}], fn($v) => $v !== null);" if has_optional else f"{indent}];")
             return lines, "$body"
         if shape == "generic":

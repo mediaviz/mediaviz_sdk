@@ -894,7 +894,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         header_params = [p for p in ep["params"] if p["in"] == "header"]
         request_body = ep.get("request_body")
 
-        resolve = lambda mapped: self._resolve_js_expr(mapped, comp) if mapped else "undefined"
+        def resolve(mapped):
+            return self._resolve_js_expr(mapped, comp) if mapped else "undefined"
 
         if ep.get("api_host"):
             # alt-host signature: path, required headers, body, optional headers
@@ -904,12 +905,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                 if p.get("required"):
                     args.append(resolve(input_map.get(p["name"])))
             if self._body_shape(request_body) == "flat_dict":
-                fields = self._flatten_body(request_body)
-                parts = []
-                for snake_key, camel_key in fields:
-                    val = resolve(input_map.get(snake_key))
-                    parts.append(f"{_js_safe(camel_key)}: {val}")
-                args.append("{ " + ", ".join(parts) + " }")
+                args.extend(self._js_flat_body_call_args(request_body, input_map, resolve))
             opt = [p for p in header_params if not p.get("required")]
             if opt:
                 parts = []
@@ -924,12 +920,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
             for p in path_params:
                 args.append(resolve(input_map.get(p["name"])))
             if self._body_shape(request_body) == "flat_dict":
-                fields = self._flatten_body(request_body)
-                parts = []
-                for snake_key, camel_key in fields:
-                    val = resolve(input_map.get(snake_key))
-                    parts.append(f"{_js_safe(camel_key)}: {val}")
-                args.append("{ " + ", ".join(parts) + " }")
+                args.extend(self._js_flat_body_call_args(request_body, input_map, resolve))
             if query_params:
                 parts = []
                 for p in query_params:
@@ -940,6 +931,25 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                     args.append("{ " + ", ".join(parts) + " }")
 
         return ", ".join(args)
+
+    def _js_flat_body_call_args(self, request_body, input_map, resolve) -> list[str]:
+        """Composite call-site args for a flat-dict body, matching the shape emitted
+        by _js_body_sig_tokens (legacy single object, or positional args + bag)."""
+        if not self._flat_dict_positional(request_body):
+            parts = [f"{_js_safe(camel)}: {resolve(input_map.get(snake))}"
+                     for snake, camel in self._flatten_body(request_body)]
+            return ["{ " + ", ".join(parts) + " }"]
+        required, positional_optional, named_optional = self._flat_body_categories(request_body)
+        args = [resolve(input_map.get(snake)) for snake, _, _ in required]
+        args += [resolve(input_map.get(snake)) for snake, _, _ in positional_optional]
+        if named_optional:
+            parts = []
+            for snake, camel, _ in named_optional:
+                mapped = input_map.get(snake)
+                if mapped:
+                    parts.append(f"{_js_safe(camel)}: {resolve(mapped)}")
+            args.append("{ " + ", ".join(parts) + " }")
+        return args
 
     def _emit_call_auth_endpoint(self, ep: dict, input_map: dict, var: str, comp: dict, indent: str, declare: bool = False) -> list[str]:
         """Emit a call to an auth endpoint via the context's client."""
@@ -1297,8 +1307,21 @@ class JavaScriptBrowserGenerator(BaseGenerator):
                     tokens.append(f"{name} = undefined")
             return tokens
         if shape == "flat_dict":
-            camels = [_js_safe(self.snake_to_camel(k)) for k in request_body.keys()]
-            return ["{ " + ", ".join(camels) + " }"]
+            if not self._flat_dict_positional(request_body):
+                camels = [_js_safe(self.snake_to_camel(k)) for k in request_body.keys()]
+                return ["{ " + ", ".join(camels) + " }"]
+            # positional style: required + positional-optional as positional args,
+            # remaining optionals as a trailing destructured options bag.
+            required, positional_optional, named_optional = self._flat_body_categories(request_body)
+            tokens = [_js_safe(camel) for _, camel, _ in required]
+            tokens += [f"{_js_safe(camel)} = undefined" for _, camel, _ in positional_optional]
+            if named_optional:
+                parts = []
+                for _, camel, _ in named_optional:
+                    safe = _js_safe(camel)
+                    parts.append(camel if camel == safe else f"{camel}: {safe}")
+                tokens.append("{ " + ", ".join(parts) + " } = {}")
+            return tokens
         if shape == "generic":
             return ["body = {}"]
         return []

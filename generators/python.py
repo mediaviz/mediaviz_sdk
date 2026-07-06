@@ -727,7 +727,7 @@ class PythonGenerator(BaseGenerator):
             lines.append(f"        _cache_key = {cache_key_expr}")
             lines.append(f"        if _cache_key in self._{step_id}_cache:")
             lines.append(f"            {var} = self._{step_id}_cache[_cache_key]")
-            lines.append(f"        else:")
+            lines.append("        else:")
             indent = "            "
         else:
             indent = "        "
@@ -802,7 +802,7 @@ class PythonGenerator(BaseGenerator):
             lines.append(f"        _cache_key = {cache_key_expr}")
             lines.append(f"        if _cache_key in self._{step_id}_cache:")
             lines.append(f"            {var} = self._{step_id}_cache[_cache_key]")
-            lines.append(f"        else:")
+            lines.append("        else:")
             indent = "            "
         else:
             indent = "        "
@@ -1050,10 +1050,21 @@ class PythonGenerator(BaseGenerator):
                     tokens.append(f"{name}: {_python_nullable(t)} = None")
             return tokens
         if shape == "flat_dict":
-            return [
-                f"{camel}: Any" if required else f"{camel}: Any = None"
-                for _, camel, required in self._flat_body_fields(request_body)
-            ]
+            if not self._flat_dict_positional(request_body):
+                return [
+                    f"{camel}: Any" if required else f"{camel}: Any = None"
+                    for _, camel, required in self._flat_body_fields(request_body)
+                ]
+            # positional style: required + positional-optional as positional params,
+            # remaining optionals forced keyword-only (after `*`) so they read like a
+            # named options bag.
+            required, positional_optional, named_optional = self._flat_body_categories(request_body)
+            tokens = [f"{camel}: Any" for _, camel, _ in required]
+            tokens += [f"{camel}: Any = None" for _, camel, _ in positional_optional]
+            if named_optional:
+                tokens.append("*")
+                tokens += [f"{camel}: Any = None" for _, camel, _ in named_optional]
+            return tokens
         if shape == "generic":
             return ["body: dict | None = None"]
         return []

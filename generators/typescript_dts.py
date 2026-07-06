@@ -146,12 +146,22 @@ def _body_params(gen, request_body, schemas: dict, queue: set[str]) -> list[str]
             out.append(f"{_js_safe(f['name'])}{opt}: {_py_to_ts(f.get('type'), schemas, queue)}")
         return out
     if shape == "flat_dict":
-        members = []
-        for key, spec in request_body.items():
-            spec = spec or {}
-            opt = "" if spec.get("required") else "?"
-            members.append(f"{_member_key(snake_to_camel(key))}{opt}: {_py_to_ts(spec.get('type'), schemas, queue)}")
-        return ["body: { " + ", ".join(members) + " }"]
+        if not gen._flat_dict_positional(request_body):
+            members = []
+            for key, spec in request_body.items():
+                spec = spec or {}
+                opt = "" if spec.get("required") else "?"
+                members.append(f"{_member_key(snake_to_camel(key))}{opt}: {_py_to_ts(spec.get('type'), schemas, queue)}")
+            return ["body: { " + ", ".join(members) + " }"]
+        # positional style: required + positional-optional as positional params,
+        # remaining optionals as a trailing options object (mirrors _js_body_sig_tokens).
+        required, positional_optional, named_optional = gen._flat_body_categories(request_body)
+        out = [f"{_js_safe(camel)}: {_py_to_ts(spec.get('type'), schemas, queue)}" for _, camel, spec in required]
+        out += [f"{_js_safe(camel)}?: {_py_to_ts(spec.get('type'), schemas, queue)}" for _, camel, spec in positional_optional]
+        if named_optional:
+            members = ", ".join(f"{_member_key(camel)}?: {_py_to_ts(spec.get('type'), schemas, queue)}" for _, camel, spec in named_optional)
+            out.append("options?: { " + members + " }")
+        return out
     if shape == "generic":
         return ["body?: Record<string, any>"]
     return []

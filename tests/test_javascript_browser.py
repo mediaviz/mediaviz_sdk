@@ -325,6 +325,55 @@ def test_flatten_body_snake_to_camel(gen):
     assert fields == [("new_password", "newPassword"), ("photo_id_inclusion_list", "photoIdInclusionList")]
 
 
+# ── flat-dict positional style (positional: true opt-in) ─────────────────────
+
+_POSITIONAL_BODY = {
+    "file_content": {"type": "string", "required": True},
+    "blur": {"type": "bool|string (model toggle)", "required": True, "positional": True},
+    "colors": {"type": "bool|string (model toggle)", "required": False, "positional": True},
+    "client_side_id": {"type": "string", "required": False},
+    "size": {"type": "string", "required": False},
+}
+
+
+def test_flat_dict_positional_sig_required_bools_positional_rest_bag(gen):
+    assert gen._js_body_sig_tokens(_POSITIONAL_BODY) == [
+        "fileContent",                          # required → positional
+        "blur",                                 # required + positional → positional
+        "colors = undefined",                   # optional + positional → positional w/ default
+        "{ clientSideId, size } = {}",          # remaining optionals → destructured bag
+    ]
+
+
+def test_flat_dict_without_positional_marker_stays_single_object(gen):
+    body = {"file_content": {"required": True}, "client_side_id": {"required": False}}
+    assert gen._js_body_sig_tokens(body) == ["{ fileContent, clientSideId }"]
+
+
+def test_flat_dict_positional_sibling_call_matches_signature(gen):
+    ep = {
+        "id": "post_upload_photo", "function_name": "upload_photo_to_mediaviz",
+        "controller": "PhotoUpload", "method": "POST", "path": "/photo_upload",
+        "auth": "required", "api_host": "photo_upload", "params": [],
+        "request_body": _POSITIONAL_BODY, "content_type": "application/json",
+    }
+    input_map = {
+        "file_content": "params.photo.file_content",
+        "blur": "model_flag:template:blur",
+        "colors": "model_flag:template:colors",
+        "client_side_id": "params.photo.client_side_id",
+        "size": "params.photo.size",
+    }
+    args = gen._build_sibling_call_args(ep, input_map, {})
+    head, _, tail = args.partition("{ clientSideId")
+    # named-bag fields appear only inside the trailing options object, never positional
+    assert "clientSideId" not in head and "size" not in head
+    assert "clientSideId:" in ("{ clientSideId" + tail) and "size:" in tail
+    # three positional args (file_content, blur, colors) precede the bag
+    assert head.rstrip().endswith(",")
+    assert head.count(",") == 3
+
+
 # ── module re-export ─────────────────────────────────────────────────────────
 
 

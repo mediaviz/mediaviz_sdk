@@ -480,6 +480,44 @@ def test_flat_dict_all_required_body_stays_plain(gen):
     assert "array_filter" not in "\n".join(lines)
 
 
+# ── flat-dict positional style (positional: true opt-in) ─────────────────────
+
+_POSITIONAL_BODY = {
+    "file_content": {"type": "string", "required": True},
+    "blur": {"type": "bool|string (model toggle)", "required": True, "positional": True},
+    "colors": {"type": "bool|string (model toggle)", "required": False, "positional": True},
+    "client_side_id": {"type": "string", "required": False},
+    "size": {"type": "string", "required": False},
+}
+
+
+def test_flat_dict_positional_sig_required_and_bools_positional_rest_options(gen):
+    assert gen._php_body_sig_tokens(_POSITIONAL_BODY) == [
+        "mixed $fileContent",       # required → positional, no default
+        "mixed $blur",              # required + positional → positional, no default
+        "mixed $colors = null",     # optional + positional → positional, default null
+        "array $options = []",      # remaining optionals → named bag
+    ]
+
+
+def test_flat_dict_positional_body_reads_named_from_options(gen):
+    lines, expr = gen._php_body_build(_POSITIONAL_BODY, "application/json", "        ")
+    src = "\n".join(lines)
+    assert expr == "$body"
+    assert "'file_content' => $fileContent," in src
+    assert "'blur' => $blur," in src
+    assert "'colors' => $colors," in src
+    assert "'client_side_id' => $options['clientSideId'] ?? null," in src
+    assert "'size' => $options['size'] ?? null," in src
+
+
+def test_flat_dict_without_positional_marker_stays_legacy(gen):
+    # No positional markers → unchanged single-per-field signature, no $options bag.
+    assert gen._php_body_sig_tokens(_FLAT_BODY) == [
+        "mixed $fileContent", "mixed $clientSideId = null", "mixed $blur = null",
+    ]
+
+
 def test_composite_inline_body_null_safe_and_filtered(gen):
     ep = {
         "id": "post_upload_photo", "function_name": "upload_photo_to_mediaviz",

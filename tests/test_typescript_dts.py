@@ -152,6 +152,26 @@ def test_all_optional_body_is_options_bag(gen):
     assert "updateThing(body?: { name?: string, count?: number })" in out
 
 
+def test_flat_dict_positional_required_bools_then_options_bag(gen):
+    rb = {
+        "file_content": {"type": "str", "required": True},
+        "blur": {"type": "bool", "required": True, "positional": True},
+        "colors": {"type": "bool", "required": False, "positional": True},
+        "client_side_id": {"type": "Optional[str]", "required": False},
+    }
+    ep = _auth_ep("upload_photo_to_mediaviz", "/photo_upload", request_body=rb, response={"body": "dict"})
+    out = build_dts(gen, [ep], None, None, SCHEMAS)
+    assert ("uploadPhotoToMediaviz(fileContent: string, blur: boolean, colors?: boolean, "
+            "options?: { clientSideId?: string })") in out
+
+
+def test_flat_dict_without_positional_marker_stays_body_object(gen):
+    rb = {"file_content": {"type": "str", "required": True}, "client_side_id": {"type": "Optional[str]", "required": False}}
+    ep = _auth_ep("upload_photo_to_mediaviz", "/photo_upload", request_body=rb, response={"body": "dict"})
+    out = build_dts(gen, [ep], None, None, SCHEMAS)
+    assert "uploadPhotoToMediaviz(body: { fileContent: string, clientSideId?: string })" in out
+
+
 def test_reserved_word_param_escaped(gen):
     rb = {"_shape": "expanded", "fields": [{"name": "private", "type": "bool", "required": True}]}
     ep = _auth_ep("x", "/x", request_body=rb, response={"body": "dict"})
