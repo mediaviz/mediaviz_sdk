@@ -1,0 +1,106 @@
+[
+  {
+    "id": 1,
+    "description": "Replace Node.js crypto with Web Crypto API in pkce.js. generateCodeVerifier: use globalThis.crypto.getRandomValues(new Uint8Array(48)) + manual base64url encode + slice to 64 chars. generateCodeChallenge: use globalThis.crypto.subtle.digest('SHA-256', TextEncoder) — must become async, returns Promise<string>. generateState: use getRandomValues(new Uint8Array(16)) + hex join. Remove require('crypto'). Keep module.exports unchanged.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/src/pkce.js",
+        "location": "generateCodeVerifier",
+        "status": "replace crypto.randomBytes with getRandomValues + base64url encode"
+      },
+      {
+        "file": "sdk/javascript/src/pkce.js",
+        "location": "generateCodeChallenge",
+        "status": "make async, replace createHash with crypto.subtle.digest"
+      },
+      {
+        "file": "sdk/javascript/src/pkce.js",
+        "location": "generateState",
+        "status": "replace crypto.randomBytes with getRandomValues + hex join"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 2,
+    "description": "Update client.js to await the now-async generateCodeChallenge. In generateAuthorizationUrl, change the call to: const challenge = await generateCodeChallenge(verifier). The method is already async so the public signature is unchanged.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/src/client.js",
+        "location": "generateAuthorizationUrl",
+        "status": "add await before generateCodeChallenge call"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 3,
+    "description": "Update pkce.test.js for async generateCodeChallenge. Change the PKCE test vector assertion to use await: expect(await generateCodeChallenge(verifier)).toBe('E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'). Mark the test function async. All other tests are sync and unchanged.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/src/__tests__/pkce.test.js",
+        "location": "test('generateCodeChallenge')",
+        "status": "add async/await to test vector assertion"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 4,
+    "description": "Add Rollup build tooling. Install dev dependencies: rollup, @rollup/plugin-node-resolve, @rollup/plugin-terser. Create rollup.config.js at sdk/javascript/ with two outputs: (1) dist/oauth-sdk.umd.js — format: 'umd', name: 'OAuthSDK', exports: 'named', plugins: [terser()]; (2) dist/oauth-sdk.esm.js — format: 'esm'. Input: src/index.js. Use nodeResolve plugin to handle any internal references.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/package.json",
+        "location": "devDependencies",
+        "status": "add rollup, @rollup/plugin-node-resolve, @rollup/plugin-terser"
+      },
+      {
+        "file": "sdk/javascript/rollup.config.js",
+        "location": "module",
+        "status": "create with umd + esm output config"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 5,
+    "description": "Update package.json fields. Add: 'module': 'dist/oauth-sdk.esm.js'; 'browser': 'dist/oauth-sdk.umd.js'; 'files': ['src/', 'dist/']; scripts 'build': 'rollup -c' and 'prepublishOnly': 'npm run build'. Keep 'main': 'src/index.js' for Node.js CJS path.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/package.json",
+        "location": "root",
+        "status": "add module, browser, files fields and build scripts"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 6,
+    "description": "Add dist/ to .gitignore in sdk/javascript/. Update smoke-test.js: add await to generateAuthorizationUrl call (wrap in async IIFE or top-level await if package is ESM). Verify node smoke-test.js still exits 0.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/.gitignore",
+        "location": "root",
+        "status": "add dist/"
+      },
+      {
+        "file": "sdk/javascript/smoke-test.js",
+        "location": "main assertion block",
+        "status": "confirm generateAuthorizationUrl is awaited (should already be)"
+      }
+    ],
+    "completion_status": true
+  },
+  {
+    "id": 7,
+    "description": "Build verification. Run npm install then npm run build in sdk/javascript/. Confirm dist/oauth-sdk.umd.js and dist/oauth-sdk.esm.js are produced. Run npm test — all tests must pass. Run node smoke-test.js — must exit 0. Create sdk/javascript/browser-smoke-test.html: minimal HTML page that loads dist/oauth-sdk.umd.js via <script>, calls OAuthSDK.OAuthClient with dummy config, calls generateAuthorizationUrl(), asserts url contains 'response_type=code', logs PASS/FAIL to console.",
+    "touch_points": [
+      {
+        "file": "sdk/javascript/browser-smoke-test.html",
+        "location": "script block",
+        "status": "create browser smoke test for UMD bundle"
+      }
+    ],
+    "completion_status": true
+  }
+]
