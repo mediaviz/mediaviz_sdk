@@ -387,13 +387,22 @@ class PhpTestGenerator(BaseTestGenerator):
                 val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
                 parts.append(_php_literal(val))
         elif shape == "flat_dict":
-            for field in request_body:
-                val_type = (
-                    request_body[field].get("type", "string")
-                    if isinstance(request_body[field], dict)
-                    else "string"
-                )
-                parts.append(_php_literal(self.test_value_for_type(val_type)))
+            if not self._flat_dict_positional(request_body):
+                for field in request_body:
+                    val_type = (
+                        request_body[field].get("type", "string")
+                        if isinstance(request_body[field], dict)
+                        else "string"
+                    )
+                    parts.append(_php_literal(self.test_value_for_type(val_type)))
+            else:
+                required, positional_optional, named_optional = self._flat_body_categories(request_body)
+                for field, spec in required + positional_optional:
+                    parts.append(_php_literal(self.test_value_for_type(spec.get("type", "string"))))
+                if named_optional:
+                    bag = ", ".join(f"'{self.snake_to_camel(field)}' => {_php_literal(self.test_value_for_type(spec.get('type', 'string')))}"
+                                    for field, spec in named_optional)
+                    parts.append("[" + bag + "]")
         elif request_body:
             parts.append("[]")
 

@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-from naming import header_to_param, snake_to_pascal
+from naming import header_to_param, snake_to_camel, snake_to_pascal
 from .base import BaseTestGenerator, TestResult
 
 
@@ -19,6 +19,7 @@ class PythonTestGenerator(BaseTestGenerator):
     _sdk_dir: str | None = None  # captured in generate(), used by run() to install deps
 
     snake_to_pascal = staticmethod(snake_to_pascal)
+    snake_to_camel = staticmethod(snake_to_camel)
     header_to_param = staticmethod(header_to_param)
 
     def generate(self, endpoints: list[dict], sdk_dir: str, test_dir: str) -> None:
@@ -211,7 +212,7 @@ class PythonTestGenerator(BaseTestGenerator):
         call_args = self._build_call_args(ep, ep.get("params", []))
         return [
             f"def test_{ep['id']}_http_method(mv_client, spy_client):",
-            f"    spy_client.reset()",
+            "    spy_client.reset()",
             f"    mv_client.{controller}.{func_name}({call_args})",
             f"    assert spy_client.last_call()['method'] == {repr(ep['method'])}",
             "",
@@ -225,7 +226,7 @@ class PythonTestGenerator(BaseTestGenerator):
         call_args = self._build_call_args(ep, params, encoding=True)
         return [
             f"def test_{ep['id']}_path(mv_client, spy_client):",
-            f"    spy_client.reset()",
+            "    spy_client.reset()",
             f"    mv_client.{controller}.{func_name}({call_args})",
             f"    assert {repr(expected_path)} in spy_client.last_call()['url']",
             "",
@@ -238,9 +239,9 @@ class PythonTestGenerator(BaseTestGenerator):
         call_args = self._build_call_args(ep, params)
         lines = [
             f"def test_{ep['id']}_query_params(mv_client, spy_client):",
-            f"    spy_client.reset()",
+            "    spy_client.reset()",
             f"    mv_client.{controller}.{func_name}({call_args})",
-            f"    url = spy_client.last_call()['url']",
+            "    url = spy_client.last_call()['url']",
         ]
         for qp in query_params:
             lines.append(f"    assert {repr(qp['name'] + '=')} in url")
@@ -254,9 +255,9 @@ class PythonTestGenerator(BaseTestGenerator):
         shape = self._body_shape(request_body)
         lines = [
             f"def test_{ep['id']}_request_body(mv_client, spy_client):",
-            f"    spy_client.reset()",
+            "    spy_client.reset()",
             f"    mv_client.{controller}.{func_name}({call_args})",
-            f"    body = spy_client.last_call()['body']",
+            "    body = spy_client.last_call()['body']",
         ]
         if shape == "scalar":
             lines.append("    assert body is not None")
@@ -277,8 +278,8 @@ class PythonTestGenerator(BaseTestGenerator):
         call_args = self._build_call_args(ep, ep.get("params", []))
         return [
             f"def test_{ep['id']}_http_method(mv_client, monkeypatch):",
-            f"    _mc = _MockClient()",
-            f"    monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)",
+            "    _mc = _MockClient()",
+            "    monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)",
             f"    mv_client.{controller}.{func_name}({call_args})",
             f"    assert _mc.recorded[0]['method'] == {repr(ep['method'])}",
             "",
@@ -292,8 +293,8 @@ class PythonTestGenerator(BaseTestGenerator):
         call_args = self._build_call_args(ep, params, encoding=True)
         return [
             f"def test_{ep['id']}_path(mv_client, monkeypatch):",
-            f"    _mc = _MockClient()",
-            f"    monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)",
+            "    _mc = _MockClient()",
+            "    monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: _mc)",
             f"    mv_client.{controller}.{func_name}({call_args})",
             f"    assert {repr(expected_path)} in _mc.recorded[0]['url']",
             "",
@@ -333,11 +334,21 @@ class PythonTestGenerator(BaseTestGenerator):
                 val = _py_literal(self.test_value_for_type(t))
                 parts.append(f"{f['name']}={val}" if kwargs_only else val)
         elif shape == "flat_dict":
-            for field, val_spec in request_body.items():
-                if field.startswith("_"):
-                    continue
-                val_type = val_spec.get("type", "string") if isinstance(val_spec, dict) else "string"
-                parts.append(_py_literal(self.test_value_for_type(val_type)))
+            if not self._flat_dict_positional(request_body):
+                for field, val_spec in request_body.items():
+                    if field.startswith("_"):
+                        continue
+                    val_type = val_spec.get("type", "string") if isinstance(val_spec, dict) else "string"
+                    parts.append(_py_literal(self.test_value_for_type(val_type)))
+            else:
+                required, positional_optional, named_optional = self._flat_body_categories(request_body)
+                for field, spec in required + positional_optional:
+                    parts.append(_py_literal(self.test_value_for_type(spec.get("type", "string"))))
+                for field, spec in named_optional:
+                    val = _py_literal(self.test_value_for_type(spec.get("type", "string")))
+                    parts.append(f"{self.snake_to_camel(field)}={val}")
+                # remaining optional headers / query params must also be keyword now
+                kwargs_only = kwargs_only or bool(named_optional)
         elif request_body is not None:
             parts.append("{}")
 
