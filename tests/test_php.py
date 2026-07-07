@@ -96,7 +96,9 @@ def test_auth_method_query_params(gen):
     assert "?int $lastId = null" in src
     assert "$query['limit'] = $limit" in src
     assert "$query['last_id'] = $lastId" in src
-    assert "http_build_query($query)" in src
+    # manual pair building: http_build_query would emit k[0]=... for arrays
+    assert "$pairs[] = rawurlencode($k) . '=' . rawurlencode((string)$vv);" in src
+    assert "implode('&', $pairs)" in src
     assert "rawurlencode((string)$tableName)" in src
     assert "rawurlencode((string)$sortOrder)" in src
 
@@ -436,7 +438,99 @@ def test_split_types_discover_finds_split_classes(gen, tmp_path):
             assert e["psr4"] is True
 
 
-def test_model_flag_reads_template_headers(gen):
-    expr = gen._resolve_php_expr("model_flag:template:x-ocr", {})
+def test_model_flag_reads_template_body_with_header_fallback(gen):
+    expr = gen._resolve_php_expr("model_flag:template:ocr", {})
+    assert "$template['body']['ocr']" in expr
     assert "$template['headers']['x-ocr']" in expr
     assert "'true'" in expr and "null" in expr
+
+
+# ── flat-dict bodies with optional fields (header→body upload migration) ─────
+
+_FLAT_BODY = {
+    "file_content": {"type": "string", "required": True},
+    "client_side_id": {"type": "string", "required": False},
+    "blur": {"type": "bool|string (model toggle)", "required": False},
+}
+
+
+def test_flat_dict_optional_fields_default_null(gen):
+    assert gen._php_body_sig_tokens(_FLAT_BODY) == [
+        "mixed $fileContent", "mixed $clientSideId = null", "mixed $blur = null",
+    ]
+
+
+def test_flat_dict_required_after_optional_raises(gen):
+    body = {"a": {"required": False}, "b": {"required": True}}
+    with pytest.raises(ValueError, match="declare required fields first"):
+        gen._php_body_sig_tokens(body)
+
+
+def test_flat_dict_body_drops_null_optionals(gen):
+    lines, expr = gen._php_body_build(_FLAT_BODY, "application/json", "        ")
+    src = "\n".join(lines)
+    assert expr == "$body"
+    assert "array_filter([" in src
+    assert "fn($v) => $v !== null" in src
+
+
+def test_flat_dict_all_required_body_stays_plain(gen):
+    body = {"username": {"type": "string", "required": True}}
+    lines, _ = gen._php_body_build(body, "application/json", "        ")
+    assert "array_filter" not in "\n".join(lines)
+
+
+# ── flat-dict positional style (positional: true opt-in) ─────────────────────
+
+_POSITIONAL_BODY = {
+    "file_content": {"type": "string", "required": True},
+    "blur": {"type": "bool|string (model toggle)", "required": True, "positional": True},
+    "colors": {"type": "bool|string (model toggle)", "required": False, "positional": True},
+    "client_side_id": {"type": "string", "required": False},
+    "size": {"type": "string", "required": False},
+}
+
+
+def test_flat_dict_positional_sig_required_and_bools_positional_rest_options(gen):
+    assert gen._php_body_sig_tokens(_POSITIONAL_BODY) == [
+        "mixed $fileContent",       # required → positional, no default
+        "mixed $blur",              # required + positional → positional, no default
+        "mixed $colors = null",     # optional + positional → positional, default null
+        "array $options = []",      # remaining optionals → named bag
+    ]
+
+
+def test_flat_dict_positional_body_reads_named_from_options(gen):
+    lines, expr = gen._php_body_build(_POSITIONAL_BODY, "application/json", "        ")
+    src = "\n".join(lines)
+    assert expr == "$body"
+    assert "'file_content' => $fileContent," in src
+    assert "'blur' => $blur," in src
+    assert "'colors' => $colors," in src
+    assert "'client_side_id' => $options['clientSideId'] ?? null," in src
+    assert "'size' => $options['size'] ?? null," in src
+
+
+def test_flat_dict_without_positional_marker_stays_legacy(gen):
+    # No positional markers → unchanged single-per-field signature, no $options bag.
+    assert gen._php_body_sig_tokens(_FLAT_BODY) == [
+        "mixed $fileContent", "mixed $clientSideId = null", "mixed $blur = null",
+    ]
+
+
+def test_composite_inline_body_null_safe_and_filtered(gen):
+    ep = {
+        "id": "post_upload_photo", "function_name": "upload_photo_to_mediaviz",
+        "controller": "PhotoUpload", "method": "POST", "path": "/photo_upload",
+        "auth": "required", "api_host": "photo_upload", "params": [],
+        "request_body": _FLAT_BODY, "content_type": "application/json", "tags": [],
+    }
+    input_map = {
+        "file_content": "params.photo.file_content",
+        "client_side_id": "params.photo.client_side_id",
+        "blur": "model_flag:template:blur",
+    }
+    src = "\n".join(gen._emit_php_inline_curl(ep, input_map, "result", {}, "        "))
+    assert "$_body = array_filter([" in src
+    assert "($photo['client_side_id']) ?? null" in src
+    assert "fn($v) => $v !== null" in src
