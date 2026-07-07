@@ -172,8 +172,9 @@ def test_js_reserved_keyword_escaped(js):
     ep = {"id": "x", "function_name": "x", "controller": "T", "method": "POST", "path": "/x",
           "auth": "required", "params": [], "request_body": rb, "content_type": "application/json", "tags": []}
     src = "\n".join(js._emit_method(ep))
-    # "private" is reserved in strict mode — must be escaped as "private_"
-    assert "private_ = undefined" in src
+    # "private" is reserved in strict mode — must be escaped as "private_".
+    # All-optional body → destructured options bag, aliasing the reserved key.
+    assert "{ private: private_ } = {}" in src
     assert "private: private_" in src
 
 

@@ -126,6 +126,31 @@ class BaseTestGenerator(ABC):
         return request_body.get("fields", [])
 
     @staticmethod
+    def _flat_dict_positional(request_body) -> bool:
+        """Mirror of BaseGenerator._flat_dict_positional — True when a flat-dict body
+        opts into positional-arg style via any field's `positional: true` marker."""
+        if not isinstance(request_body, dict):
+            return False
+        return any(isinstance(spec, dict) and spec.get("positional") for spec in request_body.values())
+
+    @staticmethod
+    def _flat_body_categories(request_body: dict) -> tuple[list, list, list]:
+        """Mirror of BaseGenerator._flat_body_categories — split a flat-dict body into
+        (required, positional_optional, named_optional), each a list of (field, spec)."""
+        required, positional_optional, named_optional = [], [], []
+        for field, spec in request_body.items():
+            if field.startswith("_"):
+                continue
+            spec = spec if isinstance(spec, dict) else {}
+            if bool(spec.get("required", True)):
+                required.append((field, spec))
+            elif spec.get("positional"):
+                positional_optional.append((field, spec))
+            else:
+                named_optional.append((field, spec))
+        return required, positional_optional, named_optional
+
+    @staticmethod
     def _order_expanded_fields(fields: list[dict]) -> list[dict]:
         required = [f for f in fields if f.get("required")]
         optional = [f for f in fields if not f.get("required")]

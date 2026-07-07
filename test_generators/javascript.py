@@ -170,7 +170,7 @@ class JavaScriptTestGenerator(BaseTestGenerator):
                 f"  it('{cls} exists and is a constructor', () => {{",
                 f"    expect(typeof {cls}).toBe('function');",
                 f"    const e = new {cls}('msg', 500, 'rid', {arg4});",
-                f"    expect(e instanceof Error).toBe(true);",
+                "    expect(e instanceof Error).toBe(true);",
                 "  });",
                 "",
             ]
@@ -238,20 +238,20 @@ class JavaScriptTestGenerator(BaseTestGenerator):
             lines = [
                 "    const spy = makeSpyFetch();",
                 "    globalThis.fetch = spy;",
-                f"    const ctx = {{ accessToken: 'access_token', requireTokens: () => {{}}, requireHost: () => 'https://upload.example.com' }};",
+                "    const ctx = { accessToken: 'access_token', requireTokens: () => {}, requireHost: () => 'https://upload.example.com' };",
                 f"    const {inst} = new {class_name}(ctx);",
             ]
         elif uses_client:
             lines = [
                 "    const spy = new SpyOAuthClient();",
-                f"    const ctx = {{ client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {{}} }};",
+                "    const ctx = { client: spy, accessToken: 'access_token', refreshToken: 'refresh_token', requireTokens: () => {} };",
                 f"    const {inst} = new {class_name}(ctx);",
             ]
         else:
             lines = [
                 "    const spy = makeSpyFetch();",
                 "    globalThis.fetch = spy;",
-                f"    const ctx = {{ baseUrl: 'https://api.example.com' }};",
+                "    const ctx = { baseUrl: 'https://api.example.com' };",
                 f"    const {inst} = new {class_name}(ctx);",
             ]
         return lines, inst
@@ -340,7 +340,6 @@ class JavaScriptTestGenerator(BaseTestGenerator):
         return lines
 
     def _emit_auth_routing_test(self, ep: dict, class_name: str, func_name: str, params: list[dict]) -> list[str]:
-        uses_client = self._uses_oauth_client(ep)
         call_args = self._build_call_args(ep, params)
         setup_lines, inst = self._build_ctx_and_instance(ep, class_name)
         lines = [f"  it('{func_name} — auth routing', async () => {{"]
@@ -390,12 +389,21 @@ class JavaScriptTestGenerator(BaseTestGenerator):
                     val = self.test_value_for_type("array" if f.get("kind") == "list" else f.get("type", "string"))
                     parts.append(_js_literal(val))
         elif shape == "flat_dict":
-            field_parts = []
-            for field in request_body:
-                camel = self.snake_to_camel(field)
-                val = self.test_value_for_type(request_body[field].get("type", "string") if isinstance(request_body[field], dict) else "string")
-                field_parts.append(f"{camel}: {_js_literal(val)}")
-            parts.append("{ " + ", ".join(field_parts) + " }")
+            if not self._flat_dict_positional(request_body):
+                field_parts = []
+                for field in request_body:
+                    camel = self.snake_to_camel(field)
+                    val = self.test_value_for_type(request_body[field].get("type", "string") if isinstance(request_body[field], dict) else "string")
+                    field_parts.append(f"{camel}: {_js_literal(val)}")
+                parts.append("{ " + ", ".join(field_parts) + " }")
+            else:
+                required, positional_optional, named_optional = self._flat_body_categories(request_body)
+                for field, spec in required + positional_optional:
+                    parts.append(_js_literal(self.test_value_for_type(spec.get("type", "string"))))
+                if named_optional:
+                    bag_parts = [f"{self.snake_to_camel(field)}: {_js_literal(self.test_value_for_type(spec.get('type', 'string')))}"
+                                 for field, spec in named_optional]
+                    parts.append("{ " + ", ".join(bag_parts) + " }")
         elif request_body:
             parts.append("{}")
 
