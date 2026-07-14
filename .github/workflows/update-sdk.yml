@@ -374,7 +374,10 @@ jobs:
       # ── npm + Packagist publish (gated per-package on content hash) ────────
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
         if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
-        run: npm install -g npm@latest
+        # Pin to 11.x: it satisfies the ≥11.5 Trusted Publishing floor while staying
+        # compatible with the runner's node 20. npm@latest (12.x) requires node ≥22
+        # and fails with EBADENGINE here. Bump this ceiling only alongside node-version.
+        run: npm install -g npm@^11
 
       - name: Publish @mediaviz/sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'
