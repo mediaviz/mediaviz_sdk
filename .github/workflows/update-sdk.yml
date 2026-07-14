@@ -96,7 +96,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # 22 is the current LTS; node 20 reached EOL. Keeps us on a supported
+          # runtime and lets `npm install -g npm@latest` (12.x, needs node ≥22) work.
+          node-version: "22"
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -374,10 +376,10 @@ jobs:
       # ── npm + Packagist publish (gated per-package on content hash) ────────
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
         if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
-        # Pin to 11.x: it satisfies the ≥11.5 Trusted Publishing floor while staying
-        # compatible with the runner's node 20. npm@latest (12.x) requires node ≥22
-        # and fails with EBADENGINE here. Bump this ceiling only alongside node-version.
-        run: npm install -g npm@^11
+        # node-version is 22, so npm@latest (12.x, requires node ≥22) installs cleanly
+        # and satisfies the ≥11.5 Trusted Publishing floor. If node is ever pinned back
+        # below 22, pin npm below 12 here (e.g. npm@^11) to avoid EBADENGINE.
+        run: npm install -g npm@latest
 
       - name: Publish @mediaviz/sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'
