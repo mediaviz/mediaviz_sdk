@@ -1,0 +1,23 @@
+{
+  "name": "mediaviz/mediaviz-php-sdk",
+  "description": "MediaViz PHP SDK \u2014 auto-generated public endpoint client.",
+  "type": "library",
+  "license": "MIT",
+  "version": "1.4.0",
+  "require": {
+    "php": ">=8.1",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "MediaVizSdk\\": "./",
+      "OAuthSdk\\": "./oauth/src/"
+    },
+    "files": [
+      "./Exceptions.php",
+      "./MediaVizClient.php",
+      "./_oauth.php"
+    ]
+  }
+}
