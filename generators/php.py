@@ -558,7 +558,7 @@ class PhpGenerator(BaseGenerator):
             indent = "        "
             sig = f"    public function {func_name}(\n"
             sig += ",\n".join(f"{indent}{s}" for s in sig_parts)
-            sig += f"\n    ): mixed {{"
+            sig += "\n    ): mixed {"
             lines = [sig]
         elif sig_parts:
             lines = [f"    public function {func_name}({', '.join(sig_parts)}): mixed {{"]
@@ -663,7 +663,7 @@ class PhpGenerator(BaseGenerator):
         # Build headers array
         lines.append("        $headers = [")
         lines.append(f"            'Content-Type: {content_type}',")
-        lines.append("            'Authorization: ' . $accessToken,")
+        lines.append("            'Authorization: Bearer ' . $accessToken,")
         for p in required_headers:
             param = self.header_to_param(p["name"])
             lines.append(f"            '{p['name']}: ' . ${param},")
@@ -877,7 +877,7 @@ class PhpGenerator(BaseGenerator):
 
         lines.append(f"{indent}$_headers = [")
         lines.append(f"{indent}    'Content-Type: {content_type}',")
-        lines.append(f"{indent}    'Authorization: ' . $this->ctx->accessToken,")
+        lines.append(f"{indent}    'Authorization: Bearer ' . $this->ctx->accessToken,")
         for p in header_params:
             if p.get("required"):
                 mapped = input_map.get(p["name"])
@@ -894,13 +894,16 @@ class PhpGenerator(BaseGenerator):
 
         if self._body_shape(request_body) == "flat_dict":
             fields = self._flatten_body(request_body)
-            lines.append(f"{indent}$_body = [")
+            # `?? null` suppresses undefined-key warnings on nested array access
+            # (e.g. an optional photo key); array_filter then drops the absent
+            # fields so the JSON matches JS's undefined-dropping behaviour.
+            lines.append(f"{indent}$_body = array_filter([")
             for snake_key, _ in fields:
                 mapped = input_map.get(snake_key)
                 if mapped:
                     val = self._resolve_php_expr_loop(mapped, comp, loop_var) if loop_var else self._resolve_php_expr(mapped, comp)
-                    lines.append(f"{indent}    '{snake_key}' => {val},")
-            lines.append(f"{indent}];")
+                    lines.append(f"{indent}    '{snake_key}' => ({val}) ?? null,")
+            lines.append(f"{indent}], fn($v) => $v !== null);")
 
         lines.append(f"{indent}$_ch = curl_init();")
         lines.append(f"{indent}curl_setopt($_ch, CURLOPT_URL, $_baseUrl . {php_path});")
@@ -1039,6 +1042,11 @@ class PhpGenerator(BaseGenerator):
         return f"({expr} ?? null) !== null"
 
     def _resolve_php_expr(self, expr: str, comp: dict) -> str:
+        if expr.startswith("model_flag:"):
+            step_var, field_key = self._parse_model_flag(expr)
+            legacy_key = self._legacy_flag_header(field_key)
+            ref = f"(${step_var}['body']['{field_key}'] ?? ${step_var}['headers']['{legacy_key}'] ?? null)"
+            return f"(({ref} === true || {ref} === 'true') ? 'true' : null)"
         if expr.startswith("params."):
             param_name = expr.split(".", 1)[1]
             parts = param_name.split(".", 1)
@@ -1107,8 +1115,19 @@ class PhpGenerator(BaseGenerator):
                     tokens.append(f"?{t} ${camel} = null")
             return tokens
         if shape == "flat_dict":
-            fields = self._flatten_body(request_body)
-            return [f"mixed ${camel}" for _, camel in fields]
+            if not self._flat_dict_positional(request_body):
+                return [
+                    f"mixed ${camel}" if required else f"mixed ${camel} = null"
+                    for _, camel, required in self._flat_body_fields(request_body)
+                ]
+            # positional style: required + positional-optional as positional params,
+            # remaining optionals as a trailing associative $options array.
+            required, positional_optional, named_optional = self._flat_body_categories(request_body)
+            tokens = [f"mixed ${camel}" for _, camel, _ in required]
+            tokens += [f"mixed ${camel} = null" for _, camel, _ in positional_optional]
+            if named_optional:
+                tokens.append("array $options = []")
+            return tokens
         if shape == "generic":
             return ["array $body = []"]
         return []
@@ -1133,11 +1152,29 @@ class PhpGenerator(BaseGenerator):
             rendered[-1] = rendered[-1] + ";"
             return rendered, "$body"
         if shape == "flat_dict":
-            fields = self._flatten_body(request_body)
-            lines = [f"{indent}$body = ["]
-            for snake_key, camel in fields:
-                lines.append(f"{indent}    '{snake_key}' => ${camel},")
-            lines.append(f"{indent}];")
+            # Optional fields left at their null default are dropped so the JSON
+            # only carries what the caller supplied (parity with JS, where
+            # JSON.stringify drops undefined). All-required bodies stay plain.
+            if not self._flat_dict_positional(request_body):
+                fields = self._flat_body_fields(request_body)
+                has_optional = any(not required for _, _, required in fields)
+                lines = [f"{indent}$body = array_filter([" if has_optional else f"{indent}$body = ["]
+                for snake_key, camel, _ in fields:
+                    lines.append(f"{indent}    '{snake_key}' => ${camel},")
+                lines.append(f"{indent}], fn($v) => $v !== null);" if has_optional else f"{indent}];")
+                return lines, "$body"
+            # positional style: required + positional-optional read from their own
+            # params; the remaining optionals are read out of the $options array.
+            required, positional_optional, named_optional = self._flat_body_categories(request_body)
+            has_optional = bool(positional_optional or named_optional)
+            lines = [f"{indent}$body = array_filter([" if has_optional else f"{indent}$body = ["]
+            for snake, camel, _ in required:
+                lines.append(f"{indent}    '{snake}' => ${camel},")
+            for snake, camel, _ in positional_optional:
+                lines.append(f"{indent}    '{snake}' => ${camel},")
+            for snake, camel, _ in named_optional:
+                lines.append(f"{indent}    '{snake}' => $options['{camel}'] ?? null,")
+            lines.append(f"{indent}], fn($v) => $v !== null);" if has_optional else f"{indent}];")
             return lines, "$body"
         if shape == "generic":
             return [], "$body"
