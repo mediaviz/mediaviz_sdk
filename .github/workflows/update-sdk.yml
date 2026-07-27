@@ -355,7 +355,18 @@ jobs:
           # record. -A also stages deletion of the prior tracked version, which the
           # generator moved into the gitignored archive/. The old `git status
           # --porcelain` guard is blind to ignored paths, so gate on the staged diff.
-          git add -Af sdk/ admin-sdk/
+          #
+          # -f overrides .gitignore wholesale, so the paths that must NEVER be tracked
+          # are re-excluded explicitly — otherwise every run commits archive/ (the
+          # generator's rolling copy of every prior version: 100k+ files incl. multi-MB
+          # native binaries) and node_modules/ (reinstallable build/test deps). Both
+          # still exist in the runner workspace — archive/ is what the content-hash
+          # gate above diffs against — they just never enter a commit.
+          NO_VENDOR=(':(exclude)**/archive/**' ':(exclude)**/node_modules/**')
+          git add -Af sdk/ admin-sdk/ "${NO_VENDOR[@]}"
+          # Self-heal: drop any such path a stray local `git add -f` left in the index,
+          # so the exclusion can't be silently defeated once and then persist forever.
+          git rm -r --cached -q --ignore-unmatch -- '**/archive/**' '**/node_modules/**'
           if git diff --cached --quiet -- sdk/ admin-sdk/; then
             echo "No SDK changes to commit."
             exit 0
