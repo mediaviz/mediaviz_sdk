@@ -270,6 +270,7 @@ class PhpGenerator(BaseGenerator):
 
         host_keys = sorted(self.snake_to_camel(h) for h in alt_hosts)
         host_env_vars = {self.snake_to_camel(h): f"MEDIAVIZ_{h.upper()}_URL" for h in alt_hosts}
+        webhooks_ctrl = self.webhooks_controller(groups)
 
         lines = [
             "<?php",
@@ -365,6 +366,8 @@ class PhpGenerator(BaseGenerator):
         lines.append("")
         for prop, cls in controllers:
             lines.append(f"    public readonly {cls} ${prop};")
+        if webhooks_ctrl:
+            lines.append("    public readonly \\MediaVizWebhooks\\WebhookConsumer $webhooks;")
         if utils_emitted:
             lines.append("    public readonly _Utils $utils;")
         lines.append("")
@@ -399,6 +402,9 @@ class PhpGenerator(BaseGenerator):
         lines.append("        $ctx = new _Context($this);")
         for prop, cls in controllers:
             lines.append(f"        $this->{prop} = new {cls}($ctx);")
+        if webhooks_ctrl:
+            prop = self._to_prop_name(webhooks_ctrl)
+            lines.append(f"        $this->webhooks = new \\MediaVizWebhooks\\WebhookConsumer($ctx, $this->{prop});")
         if utils_emitted:
             lines.append("        $this->utils = new _Utils($this);")
         lines.append("    }")

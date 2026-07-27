@@ -55,6 +55,28 @@ class BaseGenerator(ABC):
         """Backward-compatible delegate to copy_module."""
         self.copy_module("oauth", oauth_sdk_root, output_dir)
 
+    # Name the bundled webhook-consumer module registers under. Python overrides
+    # it with the importable package name.
+    webhooks_module_name = "webhooks"
+
+    def copy_webhooks_module(self, webhooks_root: str, output_dir: str) -> None:
+        """Bundle the hand-written webhook consumer module (webhook_module/ in this repo)."""
+        self.copy_module(self.webhooks_module_name, webhooks_root, output_dir)
+
+    def has_module(self, name: str) -> bool:
+        return any(mod["name"] == name for mod in self._copied_modules)
+
+    def webhooks_controller(self, groups: dict) -> str | None:
+        """Group key of the Subscription controller when the webhooks module can be
+        wired onto the client (module copied + subscription endpoints in this flow),
+        else None."""
+        if not self.has_module(self.webhooks_module_name):
+            return None
+        for controller in groups:
+            if self.snake_to_pascal(controller) == "Subscription":
+                return controller
+        return None
+
     def reexport_all_modules(self, output_dir: str) -> list[str]:
         """Discover and re-export all copied modules. Returns filenames for barrel/autoload."""
         reexport_files = []

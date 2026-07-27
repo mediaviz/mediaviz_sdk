@@ -139,12 +139,16 @@ jobs:
         working-directory: mediaviz_sdk
         # dev/qa derive their minor from main's current version (minor + 1) so the
         # published number stays aligned with main while each channel keeps its own
-        # counter. Read straight off origin/main's tracked VERSION files (public uses
-        # sdk/VERSION, admin uses admin-sdk/VERSION — they version independently).
+        # counter. Read straight off origin/main's tracked manifest (public uses
+        # sdk/VERSION.main, admin uses admin-sdk/VERSION.main — they version
+        # independently). VERSION.main is per-channel: dev/qa write VERSION.dev /
+        # VERSION.qa instead, so promotions never conflict on versioning. The bare
+        # VERSION fallback covers main until its first post-split run retires it.
         run: |
           git fetch origin main --depth=1 -q 2>/dev/null || true
-          PUB=$(git show origin/main:sdk/VERSION 2>/dev/null | tr -d '[:space:]')
-          ADM=$(git show origin/main:admin-sdk/VERSION 2>/dev/null | tr -d '[:space:]')
+          read_main() { git show "origin/main:$1.main" 2>/dev/null || git show "origin/main:$1" 2>/dev/null; }
+          PUB=$(read_main sdk/VERSION | tr -d '[:space:]')
+          ADM=$(read_main admin-sdk/VERSION | tr -d '[:space:]')
           echo "public=${PUB:-1.0.0}" >> $GITHUB_OUTPUT
           echo "admin=${ADM:-1.0.0}" >> $GITHUB_OUTPUT
           echo "main baselines → public=${PUB:-1.0.0} admin=${ADM:-1.0.0}"

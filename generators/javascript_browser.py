@@ -347,10 +347,14 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         host_keys = sorted(self.snake_to_camel(h) for h in alt_hosts)
         host_env_vars = {self.snake_to_camel(h): f"MEDIAVIZ_{h.upper()}_URL" for h in alt_hosts}
 
+        webhooks_ctrl = self.webhooks_controller(groups)
+
         lines = [
             "// Auto-generated — do not edit",
             f"import {{ OAuthClient }} from './{self._oauth_import_path()}';",
         ]
+        if webhooks_ctrl:
+            lines.append("import { WebhookConsumer } from './_webhooks.js';")
         for stmt in collect_framework_imports(utilities, "javascript"):
             lines.append(stmt)
         for prop, cls, fname in controllers:
@@ -441,6 +445,8 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         lines.append("    const _ctx = new _Context(this);")
         for prop, cls, _ in controllers:
             lines.append(f"    this.{prop} = new {cls}(_ctx);")
+        if webhooks_ctrl:
+            lines.append(f"    this.webhooks = new WebhookConsumer(_ctx, this.{self._to_prop_name(webhooks_ctrl)});")
         if self._has_utilities(utilities):
             lines.append("    this.utils = new _Utils(this);")
         lines.append("  }")
