@@ -96,7 +96,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # 22 is the current LTS; node 20 reached EOL. Keeps us on a supported
+          # runtime and lets `npm install -g npm@latest` (12.x, needs node ≥22) work.
+          node-version: "22"
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -137,12 +139,16 @@ jobs:
         working-directory: mediaviz_sdk
         # dev/qa derive their minor from main's current version (minor + 1) so the
         # published number stays aligned with main while each channel keeps its own
-        # counter. Read straight off origin/main's tracked VERSION files (public uses
-        # sdk/VERSION, admin uses admin-sdk/VERSION — they version independently).
+        # counter. Read straight off origin/main's tracked manifest (public uses
+        # sdk/VERSION.main, admin uses admin-sdk/VERSION.main — they version
+        # independently). VERSION.main is per-channel: dev/qa write VERSION.dev /
+        # VERSION.qa instead, so promotions never conflict on versioning. The bare
+        # VERSION fallback covers main until its first post-split run retires it.
         run: |
           git fetch origin main --depth=1 -q 2>/dev/null || true
-          PUB=$(git show origin/main:sdk/VERSION 2>/dev/null | tr -d '[:space:]')
-          ADM=$(git show origin/main:admin-sdk/VERSION 2>/dev/null | tr -d '[:space:]')
+          read_main() { git show "origin/main:$1.main" 2>/dev/null || git show "origin/main:$1" 2>/dev/null; }
+          PUB=$(read_main sdk/VERSION | tr -d '[:space:]')
+          ADM=$(read_main admin-sdk/VERSION | tr -d '[:space:]')
           echo "public=${PUB:-1.0.0}" >> $GITHUB_OUTPUT
           echo "admin=${ADM:-1.0.0}" >> $GITHUB_OUTPUT
           echo "main baselines → public=${PUB:-1.0.0} admin=${ADM:-1.0.0}"
@@ -349,7 +355,18 @@ jobs:
           # record. -A also stages deletion of the prior tracked version, which the
           # generator moved into the gitignored archive/. The old `git status
           # --porcelain` guard is blind to ignored paths, so gate on the staged diff.
-          git add -Af sdk/ admin-sdk/
+          #
+          # -f overrides .gitignore wholesale, so the paths that must NEVER be tracked
+          # are re-excluded explicitly — otherwise every run commits archive/ (the
+          # generator's rolling copy of every prior version: 100k+ files incl. multi-MB
+          # native binaries) and node_modules/ (reinstallable build/test deps). Both
+          # still exist in the runner workspace — archive/ is what the content-hash
+          # gate above diffs against — they just never enter a commit.
+          NO_VENDOR=(':(exclude)**/archive/**' ':(exclude)**/node_modules/**')
+          git add -Af sdk/ admin-sdk/ "${NO_VENDOR[@]}"
+          # Self-heal: drop any such path a stray local `git add -f` left in the index,
+          # so the exclusion can't be silently defeated once and then persist forever.
+          git rm -r --cached -q --ignore-unmatch -- '**/archive/**' '**/node_modules/**'
           if git diff --cached --quiet -- sdk/ admin-sdk/; then
             echo "No SDK changes to commit."
             exit 0
@@ -374,10 +391,10 @@ jobs:
       # ── npm + Packagist publish (gated per-package on content hash) ────────
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
         if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
-        # Pin to 11.x: it satisfies the ≥11.5 Trusted Publishing floor while staying
-        # compatible with the runner's node 20. npm@latest (12.x) requires node ≥22
-        # and fails with EBADENGINE here. Bump this ceiling only alongside node-version.
-        run: npm install -g npm@^11
+        # node-version is 22, so npm@latest (12.x, requires node ≥22) installs cleanly
+        # and satisfies the ≥11.5 Trusted Publishing floor. If node is ever pinned back
+        # below 22, pin npm below 12 here (e.g. npm@^11) to avoid EBADENGINE.
+        run: npm install -g npm@latest
 
       - name: Publish @mediaviz/sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'

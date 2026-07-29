@@ -86,7 +86,8 @@ endpoints:
 ### 2. Versioning (`versioning.py`)
 
 Computes a channel-aware `SdkVersion` for each run, floored by the on-disk
-`v…/` directories **and** a tracked `VERSION` manifest file in the output dir.
+`v…/` directories **and** a tracked per-channel `VERSION.<branch>` manifest file
+in the output dir.
 
 **Channel scheme.** `main` releases a plain 3-part version; `dev`/`qa` are pinned
 one minor ahead of main (`minor = main_minor + 1`) with a per-channel counter, so
@@ -104,24 +105,45 @@ release segment + PEP 440 suffix (one shared `mediaviz-sdk` package, `.dev0`/`rc
 keep dev↔qa distinct); PHP ships only from main, so it always gets the composer-safe
 3-part base.
 
-**Logic:**
-- `main` (channel `None`): floor = max of release-shaped `v…/` dirs + the VERSION manifest; bump per CLI flag — `iteration` (`1.0.2`→`1.0.3`), `minor` (`--minor-version`, `1.2.5`→`1.3.0`), `major` (`--major-version`, `2.1.3`→`3.0.0`). First release is `1.0.0`.
-- `dev`/`qa` (channel `dev`/`rc`): `minor` = `base_minor` (= main's minor + 1, from `--base-version`; falls back to the manifest's stored minor for local regen). `counter` = one above the highest counter seen for *this channel* in the dirs/manifest (channel-isolated, so a dev manifest never seeds qa's counter).
-- The same `SdkVersion` is used for the resolved YAML and all framework outputs; on success `generate.py` writes its npm form back to `<output_dir>/VERSION`.
+**Manifest files.** Each channel owns one tracked file in the output dir, so
+`dev`/`qa`/`main` never write the same path and promotions can't conflict on
+versioning:
 
-**Why the VERSION manifest:** the generated `v…/` dirs are gitignored and only persist
+| Channel (code) | File | Example content |
+|---|---|---|
+| main (`None`) | `VERSION.main` | `1.4.0` |
+| dev (`dev`) | `VERSION.dev` | `1.5.0-dev.81` |
+| qa (`rc`) | `VERSION.qa` | `1.5.0-rc.5` |
+
+The pre-split shared `VERSION` file is still *read* (its content declares the
+channel that wrote it, so it floors that channel and nothing else) and is deleted
+on the next `write_version_manifest()` — the migration completes on each branch's
+first regeneration.
+
+**Logic:**
+- `main` (channel `None`): floor = max of release-shaped `v…/` dirs + the VERSION manifests; bump per CLI flag — `iteration` (`1.0.2`→`1.0.3`), `minor` (`--minor-version`, `1.2.5`→`1.3.0`), `major` (`--major-version`, `2.1.3`→`3.0.0`). First release is `1.0.0`.
+- `dev`/`qa` (channel `dev`/`rc`): `minor` = `base_minor` (= main's minor + 1, from `--base-version`). Without the flag (local regen) it derives from the checked-out `VERSION.main` (`minor + 1`), floored by the channel's own stored minor so a stale main copy can't walk the number backwards. `counter` = one above the highest counter seen for *this channel* in the dirs/manifests (channel-isolated, so a dev manifest never seeds qa's counter).
+- The same `SdkVersion` is used for the resolved YAML and all framework outputs; on success `generate.py` writes its npm form back to `<output_dir>/VERSION.<branch>`.
+
+**Why the VERSION manifests:** the generated `v…/` dirs are gitignored and only persist
 because CI force-adds them. A merge/rebase/fresh-checkout that drops them would otherwise
 silently reset versioning and collide with the immutable npm/PyPI registries (this caused a
 real admin-sdk publish failure: `403 — cannot publish over 1.0.0`). The tracked,
-non-gitignored `VERSION` file is a durable floor that survives the throwaway tree, and for
+non-gitignored files are a durable floor that survives the throwaway tree, and for
 `main` the `max()` with the dir scan also makes promotions safe — a lower promoted manifest
 can never regress a branch above its own published version.
+
+**Why one file per channel:** a single shared `VERSION` was rewritten by all three
+branches every run, so every `dev→qa→main` promotion collided on it. Splitting by
+channel removes the shared write target entirely; each branch's merge sees the other
+channels' files as unchanged.
 
 **API:**
 - `SdkVersion(major, minor, patch=0, channel=None, counter=0)` — `.npm()` / `.pypi()` / `.base()` (composer) / `.dir_name()` renderers.
 - `next_version(output_dir, bump="iteration", *, channel=None, base_minor=None)` — returns the next `SdkVersion`.
 - `parse_version(text)` — parse `1.4.0` / `v1.4.0-dev.81` → `SdkVersion` or `None`.
-- `read_version_manifest(output_dir)` / `write_version_manifest(output_dir, version)` — durable floor I/O (npm form).
+- `manifest_name(channel)` — `None`→`VERSION.main`, `"dev"`→`VERSION.dev`, `"rc"`→`VERSION.qa`.
+- `read_version_manifest(output_dir, channel=None)` / `write_version_manifest(output_dir, version)` — durable floor I/O (npm form); the write targets `version.channel`'s file and retires the legacy shared one.
 
 ### 3. Base Generator (`generators/base.py`)
 
@@ -358,6 +380,22 @@ export * from './projects.js';
 Copied into `sdk/v{ver}/{framework}/oauth/` directly from the source OAuth SDK for that framework.
 
 **PHP PSR-4 normalization:** After copying, the PHP generator splits any multi-class `Types.php` into individual files (one class per file, e.g. `OAuthClientConfig.php`, `TokenResponse.php`) to match PSR-4 autoloading conventions. The `files` autoload entry for `Types.php` is removed from `composer.json` since PSR-4 handles discovery.
+
+### Bundled Webhooks Module (`webhook_module/`)
+
+Hand-written per-framework webhook-consumer code that lives **in this repo** at `webhook_module/{javascript,php,python}/` (unlike the OAuth wrapper, which lives in the sibling `oauth_library` repo). It is the client-side counterpart of the MediaViz webhook producer: photo-by-photo `target.completed` events as a project upload is analyzed. Ported from the reference implementation in `../mediaviz_webhook_consumer` (see its `docs/consumer-contract.md` for the wire contract).
+
+`generate.py` calls `gen.copy_webhooks_module(WEBHOOK_MODULE_DIR, fw_dir)` right after `copy_auth_wrapper`, which delegates to the standard `copy_module` machinery — JS/PHP register the module as `webhooks/`, Python copies the inner package flat as `mediaviz_webhooks/` (a sibling package like `oauth_sdk`, listed in `pyproject.toml`'s `packages`, folded into `mediaviz_sdk/__init__.py` re-exports). PHP autoloads via the merged `MediaVizWebhooks\` PSR-4 mapping; JS re-exports through `_webhooks.js` into the barrel and dist bundle.
+
+**Client wiring:** when the module was copied *and* the flow contains a `Subscription` controller (`BaseGenerator.webhooks_controller`), each client class constructs `this.webhooks = new WebhookConsumer(_ctx, this.subscription)` (`mv.webhooks` / `$client->webhooks` / `client.webhooks`). The consumer delegates all producer-API calls to the generated subscription controller methods, so endpoint changes flow through regeneration; only the out-of-band photo fetch goes through `_ctx.client.request` directly.
+
+**Surface (uniform across frameworks):**
+- *Receiver half* (no auth): `classifyMessage`, `handleChallenge` (verification-challenge echo), `handleDelivery` (HMAC verify + timestamp skew ± 300s + dedupe on `event_id` → `'handled' | 'duplicate' | 'bad_signature'`), and `handleRequest` — framework-agnostic glue returning `{status, body}` (200 handled/duplicate, 401 bad signature, 400 unparseable/unknown) for adaptation to any HTTP framework in a few lines. `onEvent(fn)` registers the single callback invoked once per new event (push or pull); a callback failure releases the dedupe claim so the producer's retry redelivers.
+- *API half* (auth required): `register`/`confirm` (store the `signing_secret` the moment a `SubscriptionActivated` body carries it), `rotateSecret` (dual-secret rotation window, default 24 h), `updateCallback` (PATCH + immediate re-confirm), `disable`, `listSubscriptions`, `pullEvents`, `reconcile` (cursor-driven history pull through the same dedupe+dispatch path as push; returns `{pulled, dispatched}`), and `fetchResult` (webhooks carry a `result_location` pointer, never results — fetches `GET /api/v1/photos/{table}/{photo_id}` and selects the target's columns via the `WEBHOOK_MODEL_COLUMNS` / `WEBHOOK_OUTCOME_MODELS` maps).
+- *Signing* (exported standalone): `signWebhookPayload` / `verifyWebhookSignature` — `X-Signature = 'sha256=' + hex(HMAC-SHA256(secret, "{X-Timestamp}." + raw_body))` over the **raw body bytes**, constant-time compare, current+previous secret acceptance. JS uses Web Crypto (`crypto.subtle`, async) so the same code runs in Node ≥ 18 and browsers.
+- *Store seam*: `markSeen`/`unmarkSeen`/`saveSecret`/`rotateSecret`/`getSecrets`/`getCursor`/`setCursor`. A bounded in-memory default ships (`InMemoryWebhookStore`, 100k-entry dedupe cap, 7-day TTL); multi-process consumers (all real PHP deployments) must supply a Redis/DB-backed implementation with the same shape.
+
+The TypeScript declarations gain a `WebhookConsumer`/`WebhookStoreLike`/`WebhookDeliveryEvent`/`WebhookAck` block and a `readonly webhooks` client property, emitted under the same wiring condition.
 
 ### TypeScript Declarations (`dist/sdk.d.ts`)
 
@@ -670,7 +708,7 @@ The hub and SDK propagate workflows trigger only on `repository_dispatch` (not `
 ### Version-bump rule
 `update-sdk.yml` passes `--minor-version` to `generate.py` only when `mode == propagate AND branch == main`. dev/qa propagate runs use the default iteration bump. Verify-mode runs never bump (no commit happens).
 
-**Versions are channel-local pre-releases pinned to next-main, not a promoted artifact.** Each channel regenerates independently from `hub@<branch>`. dev/qa pin their base to **main's minor + 1** (read live from `origin/main`'s `VERSION` via `--base-version`) and append a per-channel counter, so the number stays *aligned with main* (`dev=1.4.0-dev.81`, `qa=1.4.0-rc.5`, `latest=1.3.0`) while each channel tracks separately. Consequences consumers and operators must account for:
+**Versions are channel-local pre-releases pinned to next-main, not a promoted artifact.** Each channel regenerates independently from `hub@<branch>`. dev/qa pin their base to **main's minor + 1** (read live from `origin/main`'s `VERSION.main` via `--base-version`) and append a per-channel counter, so the number stays *aligned with main* (`dev=1.4.0-dev.81`, `qa=1.4.0-rc.5`, `latest=1.3.0`) while each channel tracks separately. Consequences consumers and operators must account for:
 - **dev/qa are semver/PEP 440 pre-releases of the next main release.** `1.4.0-dev.81` sorts below the eventual `1.4.0`, so `npm install @mediaviz/sdk` (latest) and `pip install mediaviz-sdk` resolve to the final main release; the `dev`/`qa` dist-tag (npm) or `--pre`/exact pin (PyPI) is required to get a channel build. The counter is still a monotonic per-channel value with no compatibility meaning — pin exact per dist-tag.
 - **base re-aligns automatically when main bumps.** When main releases `1.4.0`, the next dev/qa runs read the new baseline and jump to `1.5.0-dev.{C}` / `1.5.0-rc.{C}`; the counter carries across the base change (it floors on the highest counter seen for the channel, independent of the base).
 - **Traceability is by upstream commit, not version.** "Which bytes is qa running" is answered by the `chore(auto): regenerate SDK from intelligence_hub@<sha>` commit message on each channel.
@@ -739,7 +777,7 @@ Single package on pypi.org, published on **every** dev/qa/main propagate run (un
 - `qa` → release candidate `1.0.4.{C}rc0`
 - `dev` → dev release `1.0.4.{C}.dev0`
 
-The channel comes from the workflow's **Decide Python pre-release channel** step (branch → `--prerelease dev`/`rc`/none) and `--base-version` (main's current version, read from `origin/main`'s `VERSION`). `generate.py` builds a channel-aware `SdkVersion` and sets it on every generator; `emit_pyproject_toml` renders `self.sdk_version.pypi()` — a 4-part release segment (`1.0.{main_minor+1}.{counter}`) plus the PEP 440 `.dev0`/`rc0` suffix that keeps dev↔qa distinct on the one shared package. (The legacy `_PRERELEASE_SUFFIX` + dir-regex path remains only as a fallback for unit tests that emit without an `SdkVersion`.) The base re-aligns automatically when main bumps; the counter is monotonic per channel. Consequence: `pip install mediaviz-sdk` always resolves to the latest **final** (main) release; `--pre` or an exact pin is required for rc/dev builds. `pyproject.toml` declares `packages = ["mediaviz_sdk", "oauth_sdk"]`, so the bundled OAuth wrapper ships in the same wheel.
+The channel comes from the workflow's **Decide Python pre-release channel** step (branch → `--prerelease dev`/`rc`/none) and `--base-version` (main's current version, read from `origin/main`'s `VERSION.main`). `generate.py` builds a channel-aware `SdkVersion` and sets it on every generator; `emit_pyproject_toml` renders `self.sdk_version.pypi()` — a 4-part release segment (`1.0.{main_minor+1}.{counter}`) plus the PEP 440 `.dev0`/`rc0` suffix that keeps dev↔qa distinct on the one shared package. (The legacy `_PRERELEASE_SUFFIX` + dir-regex path remains only as a fallback for unit tests that emit without an `SdkVersion`.) The base re-aligns automatically when main bumps; the counter is monotonic per channel. Consequence: `pip install mediaviz-sdk` always resolves to the latest **final** (main) release; `--pre` or an exact pin is required for rc/dev builds. `pyproject.toml` declares `packages = ["mediaviz_sdk", "oauth_sdk"]`, so the bundled OAuth wrapper ships in the same wheel.
 
 Auth via **PyPI Trusted Publishing** (OIDC) using `pypa/gh-action-pypi-publish@release/v1`, reusing the job's existing `permissions: id-token: write`. No long-lived PyPI token. PyPI supports *pending publishers*, so the trusted-publisher entry (owner=mediaviz, repo=mediaviz_sdk, workflow=update-sdk.yml) can be registered before the first publish — no manual-token bootstrap (unlike npm). The build step runs `python -m build` in `sdk/v*/python/`; publish points at `sdk/v*/python/dist` with `skip-existing: true` for re-run idempotency (every run emits a unique bumped version, so this never masks a real publish).
 

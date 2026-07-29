@@ -7,10 +7,22 @@ from dataclasses import dataclass
 # Tracked, non-gitignored floor for the version counter. The generated vN/ dirs
 # are gitignored and only exist because CI force-adds them, so any merge/rebase/
 # fresh-checkout that drops them would otherwise silently reset versioning and
-# collide with the immutable npm/PyPI registries. This file persists the last
-# released version independently of that throwaway tree and is folded into the
+# collide with the immutable npm/PyPI registries. These files persist the last
+# released version independently of that throwaway tree and are folded into the
 # floor below, so a dropped vN/ dir can never regress the count.
-MANIFEST_NAME = "VERSION"
+#
+# One file PER CHANNEL: dev/qa/main each write only their own path, so promoting
+# dev→qa→main never produces a merge conflict on versioning (the pre-split single
+# VERSION file was rewritten by all three branches, so every promotion collided).
+# Keys are the internal channel codes (None = main, "rc" = qa); filenames use the
+# branch names, which is what operators actually reason about.
+MANIFEST_NAMES = {None: "VERSION.main", "dev": "VERSION.dev", "rc": "VERSION.qa"}
+
+# The pre-split shared manifest. Still read as a fallback — its content declares
+# its own channel, so whichever branch's copy survives floors the right channel —
+# and deleted on the next write, so the migration completes on each branch's first
+# regeneration and the shared merge target disappears for good.
+LEGACY_MANIFEST_NAME = "VERSION"
 
 # Matches both release dirs/manifests (v1.4.0 / 1.4.0) and channel pre-releases
 # (v1.4.0-dev.81 / 1.4.0-rc.5). Leading 'v' optional.
@@ -83,19 +95,36 @@ def parse_version(text: str) -> SdkVersion | None:
     )
 
 
-def read_version_manifest(output_dir: str) -> SdkVersion | None:
-    """Return the version recorded in <output_dir>/VERSION, or None if absent/unparseable."""
-    path = os.path.join(output_dir, MANIFEST_NAME)
-    if not os.path.isfile(path):
-        return None
-    return parse_version(open(path).read())
+def manifest_name(channel: str | None) -> str:
+    """Manifest filename owned by *channel* (None = main)."""
+    return MANIFEST_NAMES[channel]
+
+
+def read_version_manifest(output_dir: str, channel: str | None = None) -> SdkVersion | None:
+    """Return the version *channel* recorded in *output_dir*, or None if absent/unparseable.
+
+    Falls back to the pre-split shared VERSION file, but only when its content
+    declares this same channel — on a dev checkout that file holds a dev version
+    and must not be mistaken for main's baseline.
+    """
+    own = _read_manifest_file(os.path.join(output_dir, manifest_name(channel)))
+    if own and own.channel == channel:
+        return own
+    legacy = _read_manifest_file(os.path.join(output_dir, LEGACY_MANIFEST_NAME))
+    return legacy if legacy and legacy.channel == channel else None
 
 
 def write_version_manifest(output_dir: str, version: SdkVersion) -> None:
-    """Persist *version* (npm form — carries channel + counter) as the durable floor."""
+    """Persist *version* (npm form — carries channel + counter) as its channel's floor."""
     os.makedirs(output_dir, exist_ok=True)
-    with open(os.path.join(output_dir, MANIFEST_NAME), "w") as f:
+    with open(os.path.join(output_dir, manifest_name(version.channel)), "w") as f:
         f.write(version.npm() + "\n")
+    # Retire the shared manifest once this channel owns its own file, so it stops
+    # being a three-way merge target. Its value is preserved: this write records a
+    # version strictly above whatever it held for this channel.
+    legacy = os.path.join(output_dir, LEGACY_MANIFEST_NAME)
+    if os.path.isfile(legacy):
+        os.remove(legacy)
 
 
 def next_version(
@@ -109,7 +138,7 @@ def next_version(
 
     channel None (main): a 3-part release bumped per *bump* ("iteration" /
     "minor" / "major"), floored by the max of the on-disk vN/ dirs and the
-    VERSION manifest so a dropped dir can't regress the count.
+    VERSION manifests so a dropped dir can't regress the count.
 
     channel "dev"/"rc": pinned to ``1.{base_minor}.0`` (base_minor = main's
     minor + 1, supplied by the caller) with a per-channel ``counter`` that is
@@ -130,14 +159,29 @@ def next_version(
         return SdkVersion(major, minor, patch + 1)
 
     same = [c for c in candidates if c.channel == channel]
-    if base_minor is None:  # local regen without --base-version: reuse the stored base
-        base_minor = max((c.minor for c in same), default=1)
+    stored = max((c.minor for c in same), default=1)
+    if base_minor is None:
+        # Local regen without --base-version: derive the base from the checked-out
+        # main manifest (CI passes origin/main's, which is authoritative). Floored by
+        # the stored base so a stale main copy can't regress below a published minor.
+        main = read_version_manifest(output_dir, None)
+        base_minor = max(stored, main.minor + 1) if main else stored
     counter = max((c.counter for c in same), default=0) + 1
     return SdkVersion(1, base_minor, 0, channel, counter)
 
 
+def _read_manifest_file(path: str) -> SdkVersion | None:
+    if not os.path.isfile(path):
+        return None
+    return parse_version(open(path).read())
+
+
 def _scan_versions(output_dir: str) -> list[SdkVersion]:
-    """All versions discoverable in *output_dir*: vN/ dir names + the VERSION manifest."""
+    """All versions discoverable in *output_dir*: vN/ dir names + every VERSION manifest.
+
+    Manifests for other channels are harmless here — callers filter candidates by
+    channel, so each channel's floor stays isolated.
+    """
     found: list[SdkVersion] = []
     if os.path.isdir(output_dir):
         for d in os.listdir(output_dir):
@@ -145,7 +189,8 @@ def _scan_versions(output_dir: str) -> list[SdkVersion]:
                 v = parse_version(d)
                 if v:
                     found.append(v)
-    manifest = read_version_manifest(output_dir)
-    if manifest:
-        found.append(manifest)
+    for name in (*MANIFEST_NAMES.values(), LEGACY_MANIFEST_NAME):
+        manifest = _read_manifest_file(os.path.join(output_dir, name))
+        if manifest:
+            found.append(manifest)
     return found

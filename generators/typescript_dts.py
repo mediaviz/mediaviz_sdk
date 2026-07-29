@@ -57,6 +57,8 @@ def build_dts(gen, endpoints, composites, utilities, schemas, *, admin: bool = F
         _config_and_oauth_block(),
         _errors_block(),
     ]
+    if gen.webhooks_controller(groups):
+        parts.append(_webhooks_block())
     if interfaces:
         parts.append("// ── response schemas ──")
         parts.append(interfaces)
@@ -243,6 +245,79 @@ def _config_and_oauth_block() -> str:
     )
 
 
+def _webhooks_block() -> str:
+    raw_body = "string | Uint8Array | ArrayBuffer"
+    return (
+        "export type WebhookAck = 'handled' | 'duplicate' | 'bad_signature';\n\n"
+        "export interface WebhookDeliveryEvent {\n"
+        "  event_id: string;\n"
+        "  event_type: string;\n"
+        "  schema_version?: string;\n"
+        "  subscription_id: string;\n"
+        "  project_table_name: string;\n"
+        "  photo_id: number;\n"
+        "  target: string;\n"
+        "  completed_at?: string;\n"
+        "  result_location?: string;\n"
+        "  [key: string]: any;\n"
+        "}\n\n"
+        "export interface WebhookStoreLike {\n"
+        "  markSeen(eventId: string, ttlS: number): boolean;\n"
+        "  unmarkSeen(eventId: string): void;\n"
+        "  saveSecret(subscriptionId: string, secret: string): void;\n"
+        "  rotateSecret(subscriptionId: string, newSecret: string, windowS: number): void;\n"
+        "  getSecrets(subscriptionId: string): [string | null, string | null];\n"
+        "  getCursor(subscriptionId: string): string | null;\n"
+        "  setCursor(subscriptionId: string, cursor: string): void;\n"
+        "}\n\n"
+        "export class InMemoryWebhookStore implements WebhookStoreLike {\n"
+        "  markSeen(eventId: string, ttlS: number): boolean;\n"
+        "  unmarkSeen(eventId: string): void;\n"
+        "  saveSecret(subscriptionId: string, secret: string): void;\n"
+        "  rotateSecret(subscriptionId: string, newSecret: string, windowS: number): void;\n"
+        "  getSecrets(subscriptionId: string): [string | null, string | null];\n"
+        "  getCursor(subscriptionId: string): string | null;\n"
+        "  setCursor(subscriptionId: string, cursor: string): void;\n"
+        "}\n\n"
+        "export class WebhookConsumer {\n"
+        "  constructor(ctx: any, subscriptionApi: any, options?: {\n"
+        "    store?: WebhookStoreLike;\n"
+        "    onEvent?: (event: WebhookDeliveryEvent) => void | Promise<void>;\n"
+        "    skewToleranceS?: number;\n"
+        "    rotationWindowS?: number;\n"
+        "    dedupeTtlS?: number;\n"
+        "    pageLimit?: number;\n"
+        "  });\n"
+        "  store: WebhookStoreLike;\n"
+        "  skewToleranceS: number;\n"
+        "  rotationWindowS: number;\n"
+        "  dedupeTtlS: number;\n"
+        "  pageLimit: number;\n"
+        "  onEvent(fn: (event: WebhookDeliveryEvent) => void | Promise<void>): (event: WebhookDeliveryEvent) => void | Promise<void>;\n"
+        "  useStore(store: WebhookStoreLike): void;\n"
+        "  classifyMessage(body: any): 'verification' | 'delivery' | 'unknown';\n"
+        "  handleChallenge(body: any): { challenge: string };\n"
+        f"  handleDelivery(headers: any, rawBody: {raw_body}): Promise<WebhookAck>;\n"
+        f"  handleRequest(headers: any, rawBody: {raw_body}): Promise<{{ status: number; body: any }}>;\n"
+        "  register(projectTableName: string, callbackUrl: string, targets: string[]): Promise<any>;\n"
+        "  confirm(subscriptionId: string): Promise<any>;\n"
+        "  rotateSecret(subscriptionId: string): Promise<string>;\n"
+        "  updateCallback(subscriptionId: string, callbackUrl: string): Promise<any>;\n"
+        "  disable(subscriptionId: string): Promise<any>;\n"
+        "  listSubscriptions(): Promise<any>;\n"
+        "  pullEvents(subscriptionId: string, options?: { since?: string; limit?: number }): Promise<any>;\n"
+        "  reconcile(subscriptionId: string, projectTableName: string): Promise<{ pulled: number; dispatched: number }>;\n"
+        "  fetchResult(event: WebhookDeliveryEvent): Promise<{ photo: any; selected: Record<string, any> | null }>;\n"
+        "  saveSecret(subscriptionId: string, secret: string): void;\n"
+        "}\n\n"
+        f"export function signWebhookPayload(secret: string, timestamp: string, rawBody: {raw_body}): Promise<string>;\n"
+        f"export function verifyWebhookSignature(secretCurrent: string | null, secretPrevious: string | null, headers: any, rawBody: {raw_body}, options?: {{ skewToleranceS?: number; now?: number }}): Promise<boolean>;\n"
+        "export function selectResultColumns(photo: any, target: string): Record<string, any> | null;\n"
+        "export const WEBHOOK_MODEL_COLUMNS: Record<string, string[]>;\n"
+        "export const WEBHOOK_OUTCOME_MODELS: Record<string, string[]>;\n"
+    )
+
+
 def _errors_block() -> str:
     return (
         "export class ApiError extends Error {\n"
@@ -300,6 +375,8 @@ def _mediaviz_class(gen, groups: dict, comp_groups: dict, utilities) -> str:
         prop = gen._to_prop_name(controller)
         cls = gen.snake_to_pascal(controller)
         lines.append(f"  readonly {prop}: {cls};")
+    if gen.webhooks_controller(groups):
+        lines.append("  readonly webhooks: WebhookConsumer;")
     if gen._has_utilities(utilities):
         lines.append("  readonly utils: MediaVizUtils;")
     lines.append("}")

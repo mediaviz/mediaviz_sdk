@@ -136,6 +136,9 @@ def test_generate_emits_pyproject_toml():
     with tempfile.TemporaryDirectory() as tmpdir:
         output_dir = os.path.join(tmpdir, "sdk", "v2.3.4", "python")
         os.makedirs(output_dir)
+        # packages mirrors what was actually copied — register a fake oauth module
+        os.makedirs(os.path.join(output_dir, "oauth_sdk"))
+        g._copied_modules.append({"name": "oauth_sdk", "path": os.path.join(output_dir, "oauth_sdk")})
         g.generate([_AUTH_EP], output_dir)
         toml_path = os.path.join(output_dir, "pyproject.toml")
         assert os.path.isfile(toml_path)
