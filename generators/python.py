@@ -56,7 +56,10 @@ def _is_list_type(t) -> bool:
 class PythonGenerator(BaseGenerator):
     framework_name = "python"
 
-    # Use "oauth_sdk" so the copied package is importable as `from oauth_sdk import ...`
+    # Copied modules register under their importable package names
+    # (`from oauth_sdk import ...`, `from mediaviz_webhooks import ...`).
+    webhooks_module_name = "mediaviz_webhooks"
+
     def copy_auth_wrapper(self, oauth_sdk_root: str, output_dir: str) -> None:
         self.copy_module("oauth_sdk", oauth_sdk_root, output_dir)
 
@@ -160,6 +163,8 @@ class PythonGenerator(BaseGenerator):
         host_keys = sorted(self.snake_to_camel(h) for h in alt_hosts)
         host_env_vars = {self.snake_to_camel(h): f"MEDIAVIZ_{h.upper()}_URL" for h in alt_hosts}
 
+        webhooks_ctrl = self.webhooks_controller(groups)
+
         lines: list[str] = [
             "from __future__ import annotations",
             "import os",
@@ -167,6 +172,8 @@ class PythonGenerator(BaseGenerator):
             "",
             "from oauth_sdk import OAuthClient, OAuthClientConfig",
         ]
+        if webhooks_ctrl:
+            lines.append("from mediaviz_webhooks import WebhookConsumer")
         for stmt in collect_framework_imports(utilities, "python"):
             lines.append(stmt)
         for ctrl, cls in controllers:
@@ -294,6 +301,8 @@ class PythonGenerator(BaseGenerator):
         ]
         for ctrl, cls in controllers:
             lines.append(f"        self.{ctrl} = {cls}(_ctx)")
+        if webhooks_ctrl:
+            lines.append(f"        self.webhooks = WebhookConsumer(_ctx, self.{webhooks_ctrl})")
         if utils_emitted:
             lines.append("        self.utils = _Utils(self)")
 
@@ -492,11 +501,13 @@ class PythonGenerator(BaseGenerator):
             f.write("\n".join(lines))
 
     def emit_init_file(self, pkg_dir: str) -> None:
-        oauth_exports: list[dict] = []
+        # Fold every copied module's public surface into the SDK package —
+        # module names double as importable package names (see copy_module).
+        module_exports: list[tuple[str, list[dict]]] = []
         for mod in self._copied_modules:
-            if mod["name"] == "oauth_sdk":
-                oauth_exports = self.discover_module_exports(mod["name"], mod["path"])
-                break
+            exports = self.discover_module_exports(mod["name"], mod["path"])
+            if exports:
+                module_exports.append((mod["name"], exports))
 
         lines: list[str] = [
             "from __future__ import annotations",
@@ -504,15 +515,16 @@ class PythonGenerator(BaseGenerator):
             "from .client import MediaVizClient",
             "from .errors import ApiError, ValidationError, NotFoundError, RateLimitError, ServerError",
         ]
-        if oauth_exports:
-            names = ", ".join(e["name"] for e in oauth_exports)
-            lines.append(f"from oauth_sdk import {names}")
+        for name, exports in module_exports:
+            names = ", ".join(e["name"] for e in exports)
+            lines.append(f"from {name} import {names}")
         lines.append("")
         lines.append("__all__ = [")
         lines.append("    'MediaVizClient',")
         lines.append("    'ApiError', 'ValidationError', 'NotFoundError', 'RateLimitError', 'ServerError',")
-        for e in oauth_exports:
-            lines.append(f"    '{e['name']}',")
+        for _, exports in module_exports:
+            for e in exports:
+                lines.append(f"    '{e['name']}',")
         lines.append("]")
         lines.append("")
         with open(os.path.join(pkg_dir, "__init__.py"), "w") as f:
@@ -524,6 +536,9 @@ class PythonGenerator(BaseGenerator):
         else:  # unit tests emit directly without a channel-aware version
             m = re.search(r'v(\d+\.\d+\.\d+)', output_dir)
             version = (m.group(1) if m else "0.1.0") + _PRERELEASE_SUFFIX.get(self.prerelease, "")
+        # Copied modules ship as flat sibling packages; module names are package names.
+        names = ["mediaviz_sdk"] + sorted(mod["name"] for mod in self._copied_modules)
+        packages = "[" + ", ".join(f'"{n}"' for n in names) + "]"
         content = (
             f'[project]\n'
             f'name = "mediaviz-sdk"\n'
@@ -541,7 +556,7 @@ class PythonGenerator(BaseGenerator):
             f'build-backend = "setuptools.build_meta"\n'
             f'\n'
             f'[tool.setuptools]\n'
-            f'packages = ["mediaviz_sdk", "oauth_sdk"]\n'
+            f'packages = {packages}\n'
         )
         with open(os.path.join(output_dir, "pyproject.toml"), "w") as f:
             f.write(content)

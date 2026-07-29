@@ -4,9 +4,10 @@ from versioning import (
     next_version,
     parse_version,
     version_str,
+    manifest_name,
     read_version_manifest,
     write_version_manifest,
-    MANIFEST_NAME,
+    LEGACY_MANIFEST_NAME,
 )
 
 
@@ -60,18 +61,62 @@ def test_parse_version_rejects_garbage(bad):
 
 def test_manifest_roundtrip_main(tmp_path):
     write_version_manifest(str(tmp_path), SdkVersion(1, 3, 0))
-    assert (tmp_path / MANIFEST_NAME).read_text().strip() == "1.3.0"
-    assert read_version_manifest(str(tmp_path)) == SdkVersion(1, 3, 0)
+    assert (tmp_path / "VERSION.main").read_text().strip() == "1.3.0"
+    assert read_version_manifest(str(tmp_path), None) == SdkVersion(1, 3, 0)
 
 
 def test_manifest_roundtrip_dev(tmp_path):
     write_version_manifest(str(tmp_path), SdkVersion(1, 4, 0, "dev", 80))
-    assert (tmp_path / MANIFEST_NAME).read_text().strip() == "1.4.0-dev.80"
-    assert read_version_manifest(str(tmp_path)) == SdkVersion(1, 4, 0, "dev", 80)
+    assert (tmp_path / "VERSION.dev").read_text().strip() == "1.4.0-dev.80"
+    assert read_version_manifest(str(tmp_path), "dev") == SdkVersion(1, 4, 0, "dev", 80)
+
+
+def test_manifest_roundtrip_qa(tmp_path):
+    write_version_manifest(str(tmp_path), SdkVersion(1, 4, 0, "rc", 5))
+    assert (tmp_path / "VERSION.qa").read_text().strip() == "1.4.0-rc.5"
+    assert read_version_manifest(str(tmp_path), "rc") == SdkVersion(1, 4, 0, "rc", 5)
 
 
 def test_manifest_absent_returns_none(tmp_path):
-    assert read_version_manifest(str(tmp_path)) is None
+    assert read_version_manifest(str(tmp_path), None) is None
+
+
+def test_channels_write_distinct_files(tmp_path):
+    # The whole point of the split: no two channels ever write the same path.
+    for v in (SdkVersion(1, 3, 0), SdkVersion(1, 4, 0, "dev", 80), SdkVersion(1, 4, 0, "rc", 5)):
+        write_version_manifest(str(tmp_path), v)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["VERSION.dev", "VERSION.main", "VERSION.qa"]
+    assert read_version_manifest(str(tmp_path), None) == SdkVersion(1, 3, 0)
+    assert read_version_manifest(str(tmp_path), "dev") == SdkVersion(1, 4, 0, "dev", 80)
+    assert read_version_manifest(str(tmp_path), "rc") == SdkVersion(1, 4, 0, "rc", 5)
+
+
+def test_read_ignores_other_channels_manifest(tmp_path):
+    write_version_manifest(str(tmp_path), SdkVersion(1, 4, 0, "dev", 80))
+    assert read_version_manifest(str(tmp_path), None) is None
+    assert read_version_manifest(str(tmp_path), "rc") is None
+
+
+# ── legacy shared VERSION migration ─────────────────────────────────────────
+
+def test_legacy_manifest_floors_its_own_channel(tmp_path):
+    # Pre-split checkout: the shared file declares the channel that wrote it.
+    (tmp_path / LEGACY_MANIFEST_NAME).write_text("1.4.0-dev.80\n")
+    assert read_version_manifest(str(tmp_path), "dev") == SdkVersion(1, 4, 0, "dev", 80)
+    assert next_version(str(tmp_path), channel="dev", base_minor=4) == SdkVersion(1, 4, 0, "dev", 81)
+
+
+def test_legacy_manifest_not_read_as_another_channel(tmp_path):
+    # A dev checkout's shared VERSION must not be mistaken for main's baseline.
+    (tmp_path / LEGACY_MANIFEST_NAME).write_text("1.4.0-dev.80\n")
+    assert read_version_manifest(str(tmp_path), None) is None
+
+
+def test_write_retires_legacy_manifest(tmp_path):
+    (tmp_path / LEGACY_MANIFEST_NAME).write_text("1.4.0-dev.80\n")
+    write_version_manifest(str(tmp_path), SdkVersion(1, 4, 0, "dev", 81))
+    assert not (tmp_path / LEGACY_MANIFEST_NAME).exists()
+    assert (tmp_path / manifest_name("dev")).read_text().strip() == "1.4.0-dev.81"
 
 
 # ── next_version: main (channel=None) ───────────────────────────────────────
@@ -156,3 +201,18 @@ def test_base_minor_falls_back_to_manifest_when_absent(tmp_path):
     # Local regen without --base-version reuses the stored base minor.
     write_version_manifest(str(tmp_path), SdkVersion(1, 4, 0, "dev", 80))
     assert next_version(str(tmp_path), channel="dev") == SdkVersion(1, 4, 0, "dev", 81)
+
+
+def test_base_minor_derived_from_main_manifest(tmp_path):
+    # VERSION.main is merged down into dev/qa, so a local regen pins one minor
+    # ahead of it without needing --base-version.
+    write_version_manifest(str(tmp_path), SdkVersion(1, 6, 0))
+    write_version_manifest(str(tmp_path), SdkVersion(1, 5, 0, "dev", 12))
+    assert next_version(str(tmp_path), channel="dev") == SdkVersion(1, 7, 0, "dev", 13)
+
+
+def test_stale_main_manifest_cannot_regress_base_minor(tmp_path):
+    # A main manifest older than the last dev release must not walk the minor back.
+    write_version_manifest(str(tmp_path), SdkVersion(1, 3, 0))
+    write_version_manifest(str(tmp_path), SdkVersion(1, 7, 0, "dev", 12))
+    assert next_version(str(tmp_path), channel="dev") == SdkVersion(1, 7, 0, "dev", 13)
