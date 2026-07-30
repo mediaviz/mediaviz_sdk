@@ -1,0 +1,174 @@
+source: upload_photos.yaml
+resolved_at: '2026-07-30T12:26:58Z'
+composites:
+- id: composite_upload_photo
+  function_name: upload_photo
+  summary: Fetch upload template (cached per project), then upload a single photo
+  controller: PhotoUpload
+  auth: required
+  params:
+  - name: company_id
+    type: str
+    required: true
+  - name: user_id
+    type: str
+    required: true
+  - name: project_table_name
+    type: str
+    required: true
+  - name: photo
+    type: object
+    required: true
+    description: 'Photo object. Must have: file_content (base64), mimetype, file_path
+      (title is derived from its basename). Optional: client_side_id, format, size,
+      source_resolution_x, source_resolution_y, date_taken, latitude, longitude. Model
+      toggles (blur, colors, face_recognition, etc.) are NOT read from the photo —
+      they come from the project''s upload template.
+
+      '
+  steps:
+  - step_id: get_template
+    execution: once
+    cache:
+      enabled: true
+      key: upload_template:{params.project_table_name}
+    input_map:
+      project_table_name: params.project_table_name
+    output_as: template
+    endpoint:
+      id: get_get_project_prelim_model_request_template
+      function_name: get_project_prelim_model_request_template
+      controller: Projects
+      base_path: /api/v1
+      method: GET
+      path: /api/v1/project_outcome/{project_table_name}
+      summary: get_project_prelim_model_request_template
+      auth: required
+      params:
+      - name: project_table_name
+        in: path
+        type: str
+        required: true
+      request_body: null
+      response:
+        status: 200
+        source: inferred
+        body: dict
+      content_type: null
+      tags:
+      - all
+      hidden: false
+      api_host: null
+  - step_id: upload
+    execution: once
+    output_as: upload_result
+    input_map:
+      file_content: params.photo.file_content
+      mimetype: params.photo.mimetype
+      file_path: params.photo.file_path
+      company_id: params.company_id
+      user_id: params.user_id
+      project_table_name: params.project_table_name
+      blur: model_flag:template:blur
+      colors: model_flag:template:colors
+      face_recognition: model_flag:template:face_recognition
+      image_describe: model_flag:template:image_describe
+      image_classification: model_flag:template:image_classification
+      image_comparison: model_flag:template:image_comparison
+      ocr: model_flag:template:ocr
+      client_side_id: params.photo.client_side_id
+      format: params.photo.format
+      size: params.photo.size
+      source_resolution_x: params.photo.source_resolution_x
+      source_resolution_y: params.photo.source_resolution_y
+      date_taken: params.photo.date_taken
+      latitude: params.photo.latitude
+      longitude: params.photo.longitude
+    endpoint:
+      id: post_upload_photo
+      function_name: upload_photo_to_mediaviz
+      controller: PhotoUpload
+      base_path: /
+      method: POST
+      path: /photo_upload
+      summary: Upload a preprocessed photo with metadata in the JSON body
+      auth: required
+      params: []
+      request_body:
+        file_content:
+          type: string (base64-encoded image)
+          required: true
+        file_path:
+          type: string (original filesystem path; title derived from basename)
+          required: true
+        mimetype:
+          type: string (e.g. image/jpeg)
+          required: true
+        company_id:
+          type: string
+          required: true
+        user_id:
+          type: string
+          required: true
+        project_table_name:
+          type: string
+          required: true
+        blur:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        colors:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        face_recognition:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        image_classification:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        image_comparison:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        image_describe:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        ocr:
+          type: bool|string (model toggle)
+          required: true
+          positional: true
+        client_side_id:
+          type: string
+          required: false
+        format:
+          type: string (file format from metadata)
+          required: false
+        size:
+          type: string (WxH original dimensions)
+          required: false
+        source_resolution_x:
+          type: number|string (EXIF x resolution)
+          required: false
+        source_resolution_y:
+          type: number|string (EXIF y resolution)
+          required: false
+        date_taken:
+          type: string (EXIF DateTimeOriginal)
+          required: false
+        latitude:
+          type: number|string (EXIF GPS latitude)
+          required: false
+        longitude:
+          type: number|string (EXIF GPS longitude)
+          required: false
+      response: null
+      content_type: application/json
+      tags:
+      - top
+      hidden: false
+      api_host: photo_upload
+  returns: steps.upload_result
