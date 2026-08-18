@@ -20,9 +20,18 @@
 - Two emission forms per utility: `target` (pass-through wrapper around an inner-client method — only `source_module: oauth` is wired today) and `snippets` (per-framework body files inlined verbatim by the generator). Mutually exclusive.
 - Snippet bodies live under `<utilities_dir>/snippets/<module>/<id>.{py,php,js}`. Paths in YAML are resolved relative to the YAML file. Bodies are loaded at resolve time and embedded into `resolved_utilities.yaml` for reproducibility.
 - Optional per-utility fields: `imports.<fw>` (hoisted to the client file header, deduplicated across utilities) and `async.<fw>` (currently only honored by the JS generator).
-- Shipped utilities:
+- Shipped utilities (as resolved on `dev` — `Resolved 2 utility method(s) across 2 module(s)`):
   - `oauth.yaml` — currently empty placeholder.
-  - `photos.yaml` — `downscale_photos(image_bytes, max_dimension)` via snippets. **All three frameworks return JPEG bytes (quality 90)** for cross-runtime consistency. Python uses PIL — `ImageOps.exif_transpose`, `Image.resize` w/ LANCZOS, `convert("RGB")`, `save(format="JPEG")`. PHP uses GD — `imagecreatefromstring` → `imagecopyresampled` → `imagejpeg`. JS is **dual-runtime**: it detects browser vs Node at call time. Browser path uses `createImageBitmap(blob, { imageOrientation: 'from-image' })` + `OffscreenCanvas`/`<canvas>` and `convertToBlob({ type: 'image/jpeg' })`. Node path (Electron main, server) lazy-loads `sharp` via an indirect-specifier dynamic `import()` so bundlers cannot resolve it at build time, then runs `.rotate().resize({fit:'inside', withoutEnlargement:true}).jpeg({quality:90})`. Both JS paths return `Uint8Array`. `sharp` is declared as `optionalDependencies` in the generated `package.json` (`emit_package_json` in `generators/javascript_browser.py`) and surfaces a clear error if the Node path is invoked without it installed.
+  - `media.yaml` — `get_media_access_query(project_table_name)` and `authorize_media_url(photo_url, project_table_name)` via snippets. Both async in JS only.
+    - `get_media_access_query` mints the project's CloudFront signed query string and memoizes it until 60 s before expiry. The memo is the entire reason it is a utility rather than a bare endpoint call: one mint covers the whole project prefix, so a grid of N photos costs one round trip. Memo scope differs per runtime by necessity — JS on the `_Utils` instance (already per-client), Python on the instance via `getattr`, PHP a **method static keyed on `sha256(access_token|project)`** because PHP 8.2 deprecates dynamic properties and the static is process-wide, so two users in one process must not collide.
+    - The body calls the **generated endpoint method** (`media.get_project_access_query`), not a bare HTTP request, so it inherits the OAuth client's 401-refresh-and-retry.
+    - Unlike its predecessor it **propagates** failures rather than returning null — it is the only way to read an image, so swallowing the error would render a grid of broken tiles with no diagnostic.
+    - `authorize_media_url` appends the memoized query string to one CDN photo URL, picking `?` vs `&` and short-circuiting if the URL is already signed (appending a second policy yields duplicate params and an opaque 403 at the edge).
+      - **The signed query params are `Policy` / `Signature` / `Key-Pair-Id` — NOT the `CloudFront-*` spelling the removed cookie path used** (`cloudfront_signing.build_signed_query_params`: "only the parameter names differ"). The idempotency guard keys on `Key-Pair-Id`, which is unambiguous; a first cut keyed on `CloudFront-Policy` matched nothing and silently defeated the guard. Caught by exercising the generated code, not by the suites — no test covers utility bodies, since snippets are inlined verbatim and never asserted on.
+    - Expiry parsing relies on the API's Pydantic-2.9 `Z`-suffixed timestamps; the Python snippet uses `datetime.fromisoformat`, which only accepts `Z` on **3.11+** — the generated package already pins `requires-python = ">=3.12"`. On an unparseable expiry all three snippets return the result **unmemoized** rather than caching something they can never invalidate.
+    - Replaced `mint_media_access_cookies` (removed). See "CloudFront signed-query migration" below.
+
+> **Doc correction:** this list previously claimed a shipped `photos.yaml` / `downscale_photos` utility. It does not exist on `dev` — it lives only on the unmerged branch `@cbalbera/downscale-utility` (`mediaviz_intelligence_hub@fafdd3e`, "initial frameup … routes through BLOB so needs update") and has never appeared in any generated `resolved_utilities.yaml`. `spec.md` still uses it as an illustrative config-format example, which is fine; claiming it as shipped was not. Re-add it here when that branch merges.
 
 ## Composite Steps that Reference Utilities
 
@@ -35,7 +44,51 @@
 
 - `validate_composite_endpoints` (resolver.py) also checks every endpoint step's `input_map` keys against `_declared_input_keys(ep)` — the union of declared param names and request_body field keys. A key matching nothing fails the build, because generators build calls strictly from declared params and would otherwise drop the mapping silently.
 - This guards the upload-photo composite class of bug: the step fetched the project template but mapped its model toggles (`x-blur`, `x-colors`, …) to headers the generator never emitted. Toggles are now sourced from `steps.template.*` (applied to every upload); the stale `x-bucket-name`/`x-photo-index`/`x-resized-dimensions` keys were removed from the composite.
-- Opaque/generic-body endpoints skip the key check (field names aren't enumerable); utility steps skip it too.
+- The reverse check (`_required_input_keys(ep)`) closes the other direction: every required param/body field the endpoint declares must have an `input_map` entry, or the build fails. Required fields get a positional slot in the generated call, so an unmapped one is emitted as a literal `undefined`/`null`/`None` and the field silently stops being sent — the same drift, opposite direction.
+  - This guards the `judgment_model` class of bug. A new preliminary model added to `get_project_prelim_model_request_template` (external_api) propagates to `photo_upload.yaml` automatically via the hub scanner, so `upload_photo_to_mediaviz` gained a required `judgment` arg — but `composites/upload_photos.yaml` is hand-maintained, so `upload_photo` passed `undefined` in that slot through `@mediaviz/sdk@1.8.0-dev.103`. Adding a preliminary model now requires the composite's `model_flag:template:<name>` mapping or the build fails.
+  - Flat-dict fields with no `required:` key are treated as required, matching `_flat_body_categories()`.
+- Opaque/generic-body endpoints skip both key checks (field names aren't enumerable); utility steps skip them too.
+- A fourth check rejects a composite whose `params` declare a required param after an optional one. Signatures are emitted in declaration order and both Python and PHP 8 reject that ordering, so without the check the failure mode is an unparseable generated SDK instead of a config error.
+- `validate_endpoint_param_sources` (resolver.py, called from `generate.py` immediately after `resolve_refs`) applies to **all** endpoints, not just composite steps. It aborts the build when a param declares a dict-shaped type (`dict`, `Dict[...]`, `Mapping[...]`, `List[dict]`) anywhere other than the body, since generators stringify query values and a dict cannot survive that.
+  - This guards the `photo_data` class of bug. `PUT /api/v1/photos_update` took `photo_data: dict`, which FastAPI reads from the request body, but the hub scanner catalogued it as `in: query` — so `updatePhotoInProject` sent `photo_data=[object Object]` in the query string and no body, and every call 422'd through `@mediaviz/sdk@1.8.0-dev.105`. Both the generator and the server were internally consistent; only the spec was wrong, which is why nothing caught it.
+  - Repeatable scalar lists (`List[str]`, `Annotated[any]`) stay allowed in `query`: ~30 endpoints declare `Annotated[List[str], Query()]` and rejecting them would block generation on a false positive.
+  - Upstream companion fix in `mediaviz_intelligence_hub/scan_endpoints.py`: `_is_body_param` (FastAPI `Body()` params were previously dropped silently) plus `_is_non_scalar_annotation`, so unmarked non-scalars are catalogued as bodies. Explicit `Query`/`Path`/`Header`/`Cookie` markers — including those inside `Annotated[...]` metadata — always win, which is what keeps the ~30 list-query endpoints intact.
+- The `generic` body shape (`request_body: dict` → a single unembedded opaque body) previously had no test coverage and no live spec exercising it; `tests/test_expanded_body.py` now pins its wire contract for JS and PHP.
+
+## Composite Query Params and Optional Params — complete
+
+Both surfaced while wiring `composites/view_photo.yaml`, whose signed-URL step mapped an optional `ttl_seconds` query param. **That composite has since been deleted** (see "CloudFront signed-query migration" below) and `upload_photos.yaml`, the only remaining composite, maps no optional query params — so `tests/test_composite_query_and_optional_params.py` is now the *sole* coverage for both fixes. Its synthetic fixtures deliberately retain the old `get_photo_signed_url` shape; they exercise generator mechanics, not the live catalog, and must not be deleted along with the endpoint.
+
+- **Query params were dropped on inlined composite steps.** `_emit_python_call_auth` / `_emit_php_call_auth` (and their `_loop` variants) built the path from path params only and never appended a query string, so every mapped query param vanished. The request still succeeded — just without the caller's TTL/limit/filter — which makes it the same silent-drift class the `input_map` checks were written for, one layer down in emission rather than in config. Both now delegate to a shared `_emit_{python,php}_composite_query()` that mirrors the low-level methods' serialization behind a null check per param. JS was never affected: same-controller steps route through the sibling method, which builds the query itself.
+- **`required: false` composite params were emitted as required.** Python emitted a bare positional annotation and PHP a non-nullable typed arg, so a caller could not omit an optional param without a `TypeError`. Both now emit the framework's null default; `typescript_dts._composite_sig` marks the param `?` to match.
+- Regression tests: `tests/test_composite_query_and_optional_params.py` (6 cases — query emission and optional-param defaults per framework, the `.d.ts` signature, and the check-4 ordering rejection).
+
+## CloudFront Signed-Query Migration — complete
+
+Catalog-side change only: **no generator code was modified**. The external API collapsed three media routes to one, and the hub catalog plus regenerated output follow.
+
+**Why the API changed** (`mediaviz_external_api/docs/cloudfront_signed_query_access_amendment.md`): the SDK's cookie mint could never work in a browser. The API serves `CORS_ALLOW_ORIGINS='*'`, and a wildcard `Access-Control-Allow-Origin` is incompatible with credentialed requests, so `Set-Cookie` was dropped cross-origin. Starlette only reflects an explicit origin under a wildcard config when the request *already* carries a `Cookie` header — a chicken-and-egg the old snippet documented in its own comments. Narrowing `CORS_ALLOW_ORIGINS` was rejected: new clients must be able to onboard without being blocked.
+
+**Hub catalog (`mediaviz_intelligence_hub`)**
+
+| Item | Change |
+|---|---|
+| `api_docs/controllers/media.yaml` | `post_issue_media_access_cookies` + `get_get_photo_signed_url` → single `get_get_project_access_query` (`GET /api/v1/media/project/{project_table_name}/access_query`). Also corrects `source: declared` → `response_model`; `declared` is not in `api_docs/schema.yaml`'s enum and these two endpoints were its only users. |
+| `api_docs/api_schemas.yaml` | `MediaAccessCookieDisplay` + `MediaSignedUrlDisplay` → `MediaAccessQueryDisplay` (`query_string`, `url_prefix`, `expires_at`, `project_table_name`). |
+| `api_docs/utilities/media.yaml` + `snippets/media/` | `mint_media_access_cookies` (3 snippets) → `get_media_access_query` + `authorize_media_url` (6 snippets). |
+| `api_docs/composites/view_photo.yaml`, `api_docs/composites.yaml` | Deleted. Both its steps targeted removed endpoints, and a per-photo composite now contradicts the design: one mint covers the whole project prefix, so minting per photo is the anti-pattern the amendment exists to kill. `authorize_media_url` replaces it. |
+| `api_docs/endpoint_list/{all,public_sdk}_endpoints.yaml` | Regenerated via `generate_api_endpoint_list.py`, not hand-edited. |
+
+**Pre-existing bug this surfaced:** `all_endpoints.yaml` was missing *every* media ref and `composites/view_photo.yaml`, despite its own description ("All non-hidden API endpoints and composite operations") and despite `_collect_refs()` sourcing both lists from the same `controllers/` scan. It had simply gone stale relative to the generator. Regenerating restored both. Only `public_sdk_endpoints.yaml` had been kept current, so **anything reading `all_endpoints.yaml` — including `--admin` builds, which default to it — was silently missing media.**
+
+**Generated SDK (v1.8.0-dev.110)**
+
+- `Media` class: `getProjectAccessQuery` / `get_project_access_query` only.
+- `_Utils`: `getMediaAccessQuery` + `authorizeMediaUrl` (and snake_case Python equivalents).
+- `.d.ts`: `MediaAccessQueryDisplay` interface, `MediaVizUtils` gains both methods.
+- Verified no residual `access_cookies`, `MediaAccessCookieDisplay`, `MediaSignedUrlDisplay`, `mintMediaAccessCookies`, `viewPhoto`, or `getPhotoSignedUrl` symbols anywhere in the generated tree.
+- Suites: JS 20/20, PHP 533/533, Python 397/397; generator suite 514 passed.
+- Behaviour verified by exercising the generated code directly (the suites do not cover utility bodies): on Python 3.13 a 3-tile grid triggers **one** mint, the memo returns an identical object, `authorize_media_url` is idempotent, and `?` vs `&` is chosen correctly. JS and PHP guards verified to agree. On Python ≤3.10 the memo silently degrades to one mint per call — `fromisoformat` rejects the `Z` suffix and the snippet returns unmemoized — which is why `requires-python = ">=3.12"` matters here beyond syntax.
 
 ## Bundled Webhooks Module — complete
 

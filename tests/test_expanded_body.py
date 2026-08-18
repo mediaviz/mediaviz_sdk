@@ -227,3 +227,55 @@ def test_php_nested_schema_reassembles_envelope(php):
     # Nested array_filter for each sub-object
     assert "'user' => array_filter([" in src
     assert "'company' => array_filter([" in src
+
+
+# ── generic/opaque body (request_body: dict) ──────────────────────────────────
+#
+# The "generic" shape is what a bare `dict` body param resolves to. It had no
+# coverage and no real spec exercising it, so these pin the wire contract: the
+# caller's object becomes the whole JSON body, unembedded.
+
+
+def _generic_ep(method="PUT"):
+    return {
+        "id": "update_photo_in_project",
+        "function_name": "update_photo_in_project",
+        "controller": "Photos",
+        "method": method,
+        "path": "/api/v1/photos_update/{table_name}/id/{photo_id}",
+        "auth": "required",
+        "params": [
+            {"name": "table_name", "in": "path", "type": "str", "required": True},
+            {"name": "photo_id", "in": "path", "type": "int", "required": True},
+        ],
+        "request_body": "dict",
+        "content_type": "application/json",
+        "tags": [],
+    }
+
+
+def test_generic_body_shape_classification(js):
+    assert js._body_shape("dict") == "generic"
+    assert js._body_shape(None) is None
+
+
+def test_js_generic_body_is_sent_unembedded(js):
+    src = "\n".join(js._emit_method(_generic_ep()))
+    # body is passed straight through as the payload, not nested under a field name
+    assert "body = {}" in src
+    assert ", body)" in src
+    assert "'photo_data'" not in src
+    # and it must not leak into the query string — the original bug
+    assert "query.append" not in src
+
+
+def test_php_generic_body_is_sent_unembedded(php):
+    src = "\n".join(php._emit_method(_generic_ep()))
+    assert "$body" in src
+    assert "photo_data" not in src
+
+
+def test_js_generic_body_path_params_stay_in_path(js):
+    src = "\n".join(js._emit_method(_generic_ep()))
+    assert "encodeURIComponent(tableName)" in src
+    assert "encodeURIComponent(photoId)" in src

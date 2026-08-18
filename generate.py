@@ -7,7 +7,7 @@ from generators import discover_generators
 from github_sources import fetch_sources, resolve_flow_path
 from resolver import (
     load_schemas, resolve_refs, resolve_composite_files, validate_composite_endpoints,
-    write_flattened_yaml, write_flattened_composites_yaml,
+    validate_endpoint_param_sources, write_flattened_yaml, write_flattened_composites_yaml,
 )
 from test_generators import discover_test_generators
 from test_generators.base import TestResult
@@ -137,6 +137,7 @@ def main() -> None:
                 endpoints_path, controllers_dir=controllers_dir, schemas=schemas,
             )
             all_warnings = list(resolve_warnings)
+            validate_endpoint_param_sources(endpoints)
             resolved_path = write_flattened_yaml(endpoints, endpoints_path, version_dir)
             print(f"Resolved {len(endpoints)} endpoints → {resolved_path}")
 

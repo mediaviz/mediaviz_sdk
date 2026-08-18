@@ -418,18 +418,37 @@ def resolve_composite_files(
 def validate_composite_endpoints(composites: list[dict], endpoints: list[dict]) -> None:
     """Verify composite endpoint steps are wired to real, fully-declared endpoints.
 
-    Two checks, both fail-fast:
-      1. every endpoint step references an endpoint in the resolved list, and
+    Four checks, all fail-fast:
+      1. every endpoint step references an endpoint in the resolved list,
       2. every ``input_map`` key matches a param or request_body field the endpoint
          actually declares — generators build calls strictly from declared params,
-         so an unmatched key is silently dropped (the upload-template bug class).
+         so an unmatched key is silently dropped (the upload-template bug class),
+      3. conversely, every *required* param or body field the endpoint declares has an
+         ``input_map`` entry — an unmapped required field is emitted as a literal
+         ``undefined``/``None`` in the generated call, so a new required field added
+         upstream silently stops being sent (the judgment_model bug class), and
+      4. the composite's own ``params`` list declares no required param after an
+         optional one. Generators emit composite signatures in declaration order, and
+         Python (``def f(a=None, b)``) and PHP 8 both reject that ordering, so the
+         emitted SDK would not parse.
 
-    Utility steps are auto-included from ``api_docs/utilities/`` and skip both checks.
+    Utility steps are auto-included from ``api_docs/utilities/`` and skip all checks.
     """
     endpoint_ids = {ep["id"] for ep in endpoints}
     missing = []
     unmapped = []
+    unfilled = []
+    misordered = []
     for comp in composites:
+        first_optional = None
+        for p in comp.get("params", []):
+            if not p.get("required", True):
+                first_optional = first_optional or p["name"]
+            elif first_optional:
+                misordered.append(
+                    f"  composite '{comp['id']}' declares required param '{p['name']}' after "
+                    f"optional param '{first_optional}'"
+                )
         for step in comp["steps"]:
             if "utility" in step:
                 continue
@@ -440,20 +459,64 @@ def validate_composite_endpoints(composites: list[dict], endpoints: list[dict]) 
             allowed = _declared_input_keys(ep)
             if allowed is None:  # opaque body — field names unknown, can't validate
                 continue
-            for key in step.get("input_map", {}):
+            input_map = step.get("input_map", {})
+            for key in input_map:
                 if key not in allowed:
                     unmapped.append(
                         f"  composite '{comp['id']}' step '{step['step_id']}' input_map key "
                         f"'{key}' matches no param or body field on endpoint '{ep['id']}' (would be silently dropped)"
                     )
+            for key in sorted(_required_input_keys(ep) - set(input_map)):
+                unfilled.append(
+                    f"  composite '{comp['id']}' step '{step['step_id']}' has no input_map entry for "
+                    f"required field '{key}' on endpoint '{ep['id']}' (would be sent as undefined)"
+                )
 
     errors = []
     if missing:
         errors.append("Composite steps reference endpoints not in the provided endpoint list:\n" + "\n".join(missing))
     if unmapped:
         errors.append("Composite input_map keys do not match any endpoint param or body field:\n" + "\n".join(unmapped))
+    if unfilled:
+        errors.append("Composite steps leave required endpoint fields unmapped:\n" + "\n".join(unfilled))
+    if misordered:
+        errors.append(
+            "Composite params declare a required param after an optional one "
+            "(invalid signature in Python and PHP):\n" + "\n".join(misordered)
+        )
     if errors:
         raise ValueError("\n\n".join(errors))
+
+
+DICT_LIKE_PARAM_TYPES = ("dict", "Dict[", "Mapping[", "MutableMapping[", "List[dict", "List[Dict[")
+
+
+def validate_endpoint_param_sources(endpoints: list[dict]) -> None:
+    """Fail fast on params declared in the query string that cannot be sent there.
+
+    A dict-shaped value has no query-string encoding: generators stringify each
+    query value, so a declared ``dict`` param goes out as ``[object Object]`` while
+    FastAPI -- which routes unmarked non-scalars to the request body -- rejects the
+    call for a missing body. Both sides look correct in isolation, so the mismatch
+    only ever surfaces as a 422 at runtime (the photo_data bug class). Repeatable
+    scalar lists (``List[str]``, ``Annotated[any]``) are legitimate and allowed.
+    """
+    offenders = []
+    for ep in endpoints:
+        for p in ep.get("params") or []:
+            if p.get("in") not in ("query", "path", "header", "cookie"):
+                continue
+            declared = str(p.get("type") or "")
+            if declared.startswith(DICT_LIKE_PARAM_TYPES):
+                offenders.append(
+                    f"  endpoint '{ep.get('id')}' ({ep.get('method')} {ep.get('path')}) declares param "
+                    f"'{p.get('name')}' as {declared} in {p.get('in')} — dict-shaped values cannot be "
+                    f"encoded there; declare it as a request_body (a Pydantic model on the server)"
+                )
+    if offenders:
+        raise ValueError(
+            "Endpoint params declare a dict-shaped type in a non-body location:\n" + "\n".join(offenders)
+        )
 
 
 def write_flattened_yaml(
@@ -517,4 +580,33 @@ def _declared_input_keys(ep: dict) -> set[str] | None:
         keys.update(f["name"] for f in body.get("fields", []))
     else:  # flat_dict
         keys.update(k for k in body if k != "_shape")
+    return keys
+
+
+def _required_input_keys(ep: dict) -> set[str]:
+    """Subset of ``_declared_input_keys`` a composite step must supply.
+
+    Only fields the endpoint declares required: generators emit a positional slot for
+    each, so one with no input_map entry becomes a literal undefined in the call.
+    Callers must skip endpoints whose ``_declared_input_keys`` is ``None`` (opaque
+    body) — an unenumerable body's required fields are equally unknowable.
+
+    Flat-dict body fields default to required when the key is absent, matching
+    ``BaseGenerator._flat_body_categories``.
+    """
+    keys = {p["name"] for p in ep.get("params", []) if p.get("required")}
+    body = ep.get("request_body")
+    if not isinstance(body, dict):
+        return keys
+    shape = body.get("_shape")
+    if shape == "scalar":
+        if body.get("required", True):
+            keys.add(body.get("param_name"))
+    elif shape == "expanded":
+        keys.update(f["name"] for f in body.get("fields", []) if f.get("required"))
+    else:  # flat_dict — absent `required` means required, per _flat_body_categories
+        keys.update(
+            k for k, spec in body.items()
+            if k != "_shape" and (not isinstance(spec, dict) or spec.get("required", True))
+        )
     return keys

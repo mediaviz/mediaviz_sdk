@@ -5,7 +5,13 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from resolver import parse_ref, resolve_refs, validate_composite_endpoints, write_flattened_yaml
+from resolver import (
+    parse_ref,
+    resolve_refs,
+    validate_composite_endpoints,
+    validate_endpoint_param_sources,
+    write_flattened_yaml,
+)
 
 
 @pytest.fixture
@@ -220,3 +226,98 @@ def test_validate_composite_skips_opaque_body():
     endpoints[0]["request_body"] = "opaque"  # non-dict body → field names unknown
     composites[0]["steps"][0]["endpoint"]["request_body"] = "opaque"
     validate_composite_endpoints(composites, endpoints)  # key check skipped — no raise
+
+
+def test_validate_composite_rejects_unmapped_required_body_field():
+    """The judgment_model bug class: a new required upstream field with no input_map
+    entry generates a literal undefined in the call rather than failing the build."""
+    composites, endpoints = _composite_with_input_map({"x-blur": "steps.t.blur"})
+    with pytest.raises(ValueError, match="file_content"):
+        validate_composite_endpoints(composites, endpoints)
+
+
+def test_validate_composite_rejects_unmapped_required_param():
+    composites, endpoints = _composite_with_input_map({"file_content": "params.p.fc"})
+    for ep in (endpoints[0], composites[0]["steps"][0]["endpoint"]):
+        ep["params"] = [{"name": "table_name", "in": "path", "required": True}]
+    with pytest.raises(ValueError, match="table_name"):
+        validate_composite_endpoints(composites, endpoints)
+
+
+def test_validate_composite_allows_unmapped_optional_body_field():
+    composites, endpoints = _composite_with_input_map({"file_content": "params.p.fc"})
+    for ep in (endpoints[0], composites[0]["steps"][0]["endpoint"]):
+        ep["request_body"]["client_side_id"] = {"type": "str", "required": False}
+    validate_composite_endpoints(composites, endpoints)  # optional — no raise
+
+
+def test_validate_composite_treats_absent_required_key_as_required():
+    """Mirrors BaseGenerator._flat_body_categories, which defaults required to True."""
+    composites, endpoints = _composite_with_input_map({"file_content": "params.p.fc"})
+    for ep in (endpoints[0], composites[0]["steps"][0]["endpoint"]):
+        ep["request_body"]["judgment"] = {"type": "bool|string (model toggle)"}
+    with pytest.raises(ValueError, match="judgment"):
+        validate_composite_endpoints(composites, endpoints)
+
+
+# ── param-source validation (photo_data bug class) ────────────────────────────
+
+
+def _ep(param_type, location="query", ep_id="update_photo_in_project"):
+    return {
+        "id": ep_id,
+        "method": "PUT",
+        "path": "/api/v1/photos_update",
+        "params": [{"name": "photo_data", "in": location, "type": param_type, "required": False}],
+    }
+
+
+def test_dict_query_param_is_rejected():
+    """A dict in the query string stringifies to [object Object] and the server
+    demands a body — the mismatch is invisible until a 422 at runtime."""
+    with pytest.raises(ValueError, match="dict-shaped type in a non-body location"):
+        validate_endpoint_param_sources([_ep("dict")])
+
+
+@pytest.mark.parametrize("declared", ["dict", "Dict[str, Any]", "Mapping[str, str]", "List[dict]"])
+def test_all_dict_like_query_types_are_rejected(declared):
+    with pytest.raises(ValueError, match="cannot be "):
+        validate_endpoint_param_sources([_ep(declared)])
+
+
+@pytest.mark.parametrize("location", ["query", "path", "header", "cookie"])
+def test_dict_rejected_in_every_non_body_location(location):
+    with pytest.raises(ValueError):
+        validate_endpoint_param_sources([_ep("dict", location=location)])
+
+
+@pytest.mark.parametrize("declared", ["str", "int", "Optional[bool]", "UUID", "EmailStr", "float"])
+def test_scalar_query_params_pass(declared):
+    validate_endpoint_param_sources([_ep(declared)])
+
+
+@pytest.mark.parametrize("declared", ["List[str]", "Annotated[any]"])
+def test_repeatable_scalar_lists_are_allowed(declared):
+    """These are legitimate repeatable query params and are used by ~30 real
+    endpoints — flagging them would be a false positive that blocks generation."""
+    validate_endpoint_param_sources([_ep(declared)])
+
+
+def test_dict_in_request_body_is_allowed():
+    """The body is exactly where a dict belongs."""
+    validate_endpoint_param_sources([
+        {"id": "x", "method": "PUT", "path": "/x", "params": [], "request_body": "dict"},
+    ])
+
+
+def test_error_names_the_offending_endpoint_and_param():
+    with pytest.raises(ValueError) as exc:
+        validate_endpoint_param_sources([_ep("dict")])
+    msg = str(exc.value)
+    assert "update_photo_in_project" in msg
+    assert "photo_data" in msg
+    assert "request_body" in msg  # points at the fix
+
+
+def test_endpoints_without_params_pass():
+    validate_endpoint_param_sources([{"id": "x", "method": "GET", "path": "/x"}])

@@ -531,11 +531,14 @@ returns: "steps.upload_result"
 
 The resolved output (`resolved_composites.yaml`) is self-contained: the utility snippet bodies are embedded into each step that references them, so the snapshot can be replayed without consulting `resolved_utilities.yaml` or the source `utilities/` directory.
 
-`validate_composite_endpoints()` enforces two contracts, both fail-fast:
+`validate_composite_endpoints()` enforces four contracts, all fail-fast:
 1. Every endpoint step's `id` is present in the resolved `--endpoints` list.
 2. Every step `input_map` key matches a param name or request_body field the step's endpoint declares (computed by `_declared_input_keys()`). Generators build calls strictly from declared params, so an `input_map` key with no matching declaration is **silently dropped** — this check turns that class of source/composite drift into a build failure. (It is exactly what allowed the upload-photo composite to fetch the project template yet never apply its model toggles to the upload.) Endpoints with an opaque/generic body shape skip the key check, since their field names aren't enumerable.
+3. The converse: every **required** param or body field the endpoint declares has an `input_map` entry (computed by `_required_input_keys()`). A required field emits a positional slot in the generated call, so one with no mapping is passed as a literal `undefined`/`null`/`None` — the call still compiles and the field silently stops being sent. This is how a new required upstream field can land in the low-level method while the composite keeps omitting it (the `judgment_model` drift: the field reached `upload_photo_to_mediaviz` via the hub scanner, but `upload_photo` passed `undefined` in its slot for two published dev builds). Flat-dict fields with no `required:` key count as required, matching `_flat_body_categories()`. Steps skipped by check 2 for an opaque body are skipped here too — an unenumerable body's required fields are equally unknowable.
 
-Utility steps are skipped for both — utilities are auto-discovered (`load_utilities(sources.utilities_dir)` in `generate.py`) and are not subject to the endpoint-ref-list enumeration rule.
+4. The composite's own `params` list declares no **required** param after an optional one. Composite signatures are emitted in declaration order, and both Python (`def f(a=None, b)`) and PHP 8 reject that ordering — so the violation surfaces as an unparseable generated SDK rather than a config error. Checking it here fails the build at the config, where it is fixable.
+
+Checks 1–3 skip utility steps — utilities are auto-discovered (`load_utilities(sources.utilities_dir)` in `generate.py`) and are not subject to the endpoint-ref-list enumeration rule. Check 4 is per-composite and applies regardless of step kind.
 
 ### Generator Behavior
 
@@ -543,6 +546,8 @@ Utility steps are skipped for both — utilities are auto-discovered (`load_util
 - **Cross-controller imports:** If a composite step calls an endpoint from a different controller, the generator adds the necessary import (JS) or inlines the call (PHP)
 - **Once steps — same-controller:** When a step's endpoint belongs to the same controller as the composite, the generated code delegates to the sibling method (e.g., `this.uploadPhotoToMediaviz(...)`) with `input_map` values mapped to the method's positional signature. Generation fails if the sibling endpoint is missing from the endpoint list. If cache is enabled, the step is still wrapped in a static `Map` (JS) or instance-property array (PHP)
 - **Once steps — cross-controller:** Inlined via the context's `client.request()` (auth endpoints) or direct `fetch`/`curl` (alt-host endpoints)
+- **Query params on inlined steps:** Inlined auth-endpoint calls append mapped query params to the built path, matching the low-level methods' serialization (`_q` + `urlencode(_q, doseq=True)` in Python; `$_query` → per-element `rawurlencode` pairs in PHP; `URLSearchParams` in JS). Each param is emitted behind a null check, so an unset optional stays off the wire. This applies to `once` and `for_each` steps alike. Same-controller steps get it for free by delegating to the sibling method. Omitting it does not fail the call — it succeeds without the filter/limit/TTL the caller passed — so it is regression-tested per framework in `tests/test_composite_query_and_optional_params.py`
+- **Optional composite params:** A composite `param` with `required: false` is emitted with the framework's null default (`name: T | None = None` in Python, `?T $name = null` in PHP, `name?: T` in the `.d.ts`); JS relies on positional `undefined`. Required params stay required. See `validate_composite_endpoints()` check 4 for the ordering constraint this imposes on the config
 - **Utility steps:** Detected by `step["utility"]` being present. Emitted as a positional call through the `_Context.utils` accessor — `self._ctx.utils.<fn>(...)` in Python, `$this->ctx->utils-><fn>(...)` in PHP, `this._ctx.utils.<fn>(...)` in JS. JS wraps the call in `await` when the utility's `async.javascript` flag is set. Argument order follows the utility's `params` declaration; each arg is the resolved `input_map[paramName]` dot-path expression (or the framework's null literal if no mapping is supplied). `_Context.utils` is only emitted when at least one utility is registered — composites without utility steps see no surface-area change.
 - **For-each steps:** Loop over the array. For endpoint steps, inline the HTTP call when intermediate data flow requires it (e.g., passing cached template values as body fields); otherwise call the generated function. For utility steps, the same loop scaffolding wraps a per-iteration positional call through `_ctx.utils`.
 - **On-error modes:** `abort` throws immediately; `collect` wraps in try/catch and returns `{ results, errors }`. Both apply identically to endpoint and utility steps.
@@ -566,6 +571,16 @@ No separate CLI flag is needed — composites are included by adding them to the
 ### Endpoint Validation
 
 Every endpoint referenced by a composite's steps must also be present in the same ref-list as an endpoint ref. If any step references an endpoint not in the list, generation aborts with an error listing each missing endpoint by composite ID, step ID, and endpoint ID. This prevents silent inconsistencies where the SDK contains composite functions that call endpoints not included in the build.
+
+### Param Source Validation
+
+`validate_endpoint_param_sources(endpoints)` runs on every resolved endpoint (not just composites) before any framework is emitted, and aborts the build if a param declares a dict-shaped type (`dict`, `Dict[...]`, `Mapping[...]`, `List[dict]`) in a non-body location (`query`, `path`, `header`, `cookie`).
+
+A dict has no query-string encoding: generators stringify each query value, so such a param goes out as `[object Object]` while FastAPI — which routes unmarked non-scalar params to the request body — rejects the call for a missing body. Both sides look self-consistent, so the mismatch only ever surfaces as a runtime 422.
+
+This guards the `photo_data` class of bug. `PUT /api/v1/photos_update` declared `photo_data: dict` and the hub scanner catalogued it as `in: query`, so `updatePhotoInProject` sent the payload as a query param and no body at all — every call failed with `422 body: Field required` through `@mediaviz/sdk@1.8.0-dev.105`. The fix is a Pydantic model on the server (`PhotoUpdate`), which resolves to the `expanded` body shape and emits individual optional named params.
+
+Repeatable scalar lists (`List[str]`, `Annotated[any]`) are explicitly **allowed** in `query` — roughly 30 endpoints legitimately declare `Annotated[List[str], Query()]`, and flagging those would be a false positive that blocks generation.
 
 ## Utilities
 
