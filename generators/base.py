@@ -272,7 +272,7 @@ class BaseGenerator(ABC):
         dst = os.path.join(output_dir, module_name)
         if os.path.isdir(src):
             shutil.copytree(src, dst, dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("vendor", "node_modules"))
+                            ignore=shutil.ignore_patterns("vendor", "node_modules", "__tests__"))
         else:
             os.makedirs(dst, exist_ok=True)
         self._copied_modules.append({"name": module_name, "path": dst})
