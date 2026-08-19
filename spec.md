@@ -16,6 +16,8 @@ mediaviz_sdk/
     javascript_browser.py   # Browser JS generator (UMD via Rollup)
     javascript_node.py      # Node.js generator (ESM)
     php.py                  # PHP generator
+    react_native.py         # React Native / Expo generator (subclasses javascript_browser)
+  react_native_module/     # Hand-written React Native runtime adapters (bundled into the RN SDK)
   resolver.py              # Reads ref-list YAML, resolves refs, outputs flattened YAML
   utilities_resolver.py    # Reads api_docs/utilities YAML, validates, outputs flattened snapshot
   versioning.py            # Version auto-increment logic
@@ -25,6 +27,7 @@ mediaviz_sdk/
       javascript/
       php/
       python/
+      react_native/
       tests/
     archive/               # Previous versions moved here on new generation
       v1.0.0/
@@ -397,6 +400,37 @@ Hand-written per-framework webhook-consumer code that lives **in this repo** at 
 
 The TypeScript declarations gain a `WebhookConsumer`/`WebhookStoreLike`/`WebhookDeliveryEvent`/`WebhookAck` block and a `readonly webhooks` client property, emitted under the same wiring condition.
 
+### React Native SDK (`generators/react_native.py` + `react_native_module/`)
+
+`ReactNativeGenerator` subclasses `JavaScriptBrowserGenerator` and inherits the endpoint surface **unchanged** — the generated controllers, client class, errors module and composites are byte-identical to the browser SDK's, because that code is already platform-neutral (`fetch`, `URLSearchParams`, no DOM, `process.env` behind a `typeof` guard). Only packaging and the runtime adapters differ, so an endpoint change can never drift between the two targets.
+
+**What React Native cannot supply on its own.** Hermes has no `SubtleCrypto` at all and no `crypto.getRandomValues` without a polyfill, which is precisely what PKCE needs. The OAuth SDK therefore takes an injected crypto provider (`configureCrypto({getRandomValues, sha256})` in `oauth_library/sdk/javascript/src/crypto.js`), defaulting to WebCrypto so browser and Node behaviour is unchanged; without a provider on such a runtime it throws a message naming `configureCrypto` rather than failing deep inside PKCE. The same change replaced `atob`/`TextDecoder` (JWT decode) and `TextEncoder` (PKCE verifier) with a hand-rolled base64url + UTF-8 codec, so no path depends on a global React Native may not have.
+
+**Public clients.** A mobile app holds no `client_secret`, and the authorization server *rejects* a public client that sends one (`oauth_token_service.py`: "Public clients must not send a client_secret"). The OAuth client now omits the key entirely when unset — previously it was passed through unconditionally and serialized into the form body as the literal string `undefined`, so the public-client flow could never have worked. `client_credentials` remains confidential-only by server rule, so the mobile path is always Authorization Code + PKCE.
+
+**Bundled adapters (`react_native_module/javascript/src/`).** Copied in through the standard `copy_module` machinery, re-exported from the package root via `_react_native.js`:
+- `crypto.js` — `createCryptoProvider({getRandomValues, digest})` builds a `configureCrypto` provider, normalising the digest result (`Uint8Array` / `ArrayBuffer` / typed array / byte array) and the two fill conventions. The native module is **injected**, never `require`d: expo-crypto and react-native-quick-crypto are alternatives, and a static require of one would break Metro for apps using the other.
+- `storage.js` — `MemoryTokenStore` plus `createSecureTokenStore` (expo-secure-store) and `createKeychainTokenStore` (react-native-keychain). SecureStore keeps the two tokens under separate keys because it caps a value at 2048 bytes; Keychain has no cap and stores one JSON entry. Both accept the OAuth snake_case shape and the client's camelCase shape.
+- `authSession.js` — `startAuthSession(mv, {openAuthSession, redirectUri})` runs the full flow and leaves the client authenticated. State mismatch fails closed (including a missing state); browser `cancel`/`dismiss` maps to an `AuthSessionError` with code `cancelled`. `parseRedirectUrl` is hand-rolled because React Native's `URL` polyfill mis-parses custom schemes — the shape every native redirect URI takes.
+- `session.js` — `createSession({MediaViz, config, store, openAuthSession})` owns the lifecycle: `restore()`, `signIn()`, `signOut()`, and persistence on rotation. Persisting from the `onTokenRefresh` callback is not optional — the server issues single-use refresh tokens (RFC 6749 §6), so a dropped write logs the user out at the next refresh.
+- `react.js` — `MediaVizProvider` / `useMediaViz`, deliberately **outside** the barrel and reachable at `@mediaviz/react-native-sdk/react`, so the core SDK stays importable from plain modules, background tasks, and tests with no React in scope. The `MediaViz` class is a prop rather than an import: the module is copied *into* the generated package and cannot name its own host.
+
+**Packaging differences from `@mediaviz/sdk`:**
+
+| | `@mediaviz/sdk` | `@mediaviz/react-native-sdk` |
+|---|---|---|
+| bundles | `sdk.cjs`, `sdk.esm.js`, `sdk.umd.js` | `sdk.cjs`, `sdk.esm.js`, `react.cjs`, `react.esm.js` |
+| resolution field | `browser` → UMD | `react-native` → ESM (Metro resolves it ahead of `browser`/`main`) |
+| subpaths | — | `./react` (React bindings, `react` left external) |
+| peers | — | `react`, `react-native` |
+| `optionalDependencies` | `sharp` | none (native Node image library, dead weight on device) |
+
+Rollup builds the `/react` subpath from a generated ESM shim (`react_entry.js`) rather than `react.js` directly: Rollup collapses a CommonJS entry to a lone default export, so `import { MediaVizProvider }` would resolve to `undefined`. `npm_install_args = ["--omit=peer"]` keeps npm from auto-installing the ~160 MB React Native toolchain that the rollup+tsc build never touches.
+
+**Declarations.** `dist/sdk.d.ts` / `.esm.d.ts` / `.d.cts` are generated exactly as for the browser SDK, plus a hand-written `dist/react.d.ts` / `.d.cts` for the subpath — that surface is the fixed shape of `react.js`, not something the endpoint catalog can vary. All are type-checked with `tsc --strict`.
+
+**Known runtime caveat.** The bundled webhooks module's signing half (`signWebhookPayload` / `verifyWebhookSignature`) still needs `crypto.subtle` and is a server-side concern — only the endpoint receiving a push verifies a signature. The pull half (`pullEvents`, `reconcile`, `fetchResult`) runs over the authenticated API and works on device. Its `TextEncoder` is now built lazily rather than at module scope, where it made merely *importing* the SDK crash on a runtime without that global.
+
 ### TypeScript Declarations (`dist/sdk.d.ts`)
 
 The JavaScript SDK ships first-class TypeScript types. Because the package publishes a single Rollup bundle (`dist/sdk.{cjs,esm.js,umd.js}`), the types are one hand-emitted, consolidated declaration describing that flat module surface. It is built by `generators/typescript_dts.py:build_dts(...)`, called from `JavaScriptBrowserGenerator.emit_dts_file` after `build_dist`, and written to **three byte-identical files**: `dist/sdk.d.ts` (the package's top-level `types`), `dist/sdk.esm.d.ts` (sibling of `sdk.esm.js`, so tools resolving the ESM bundle or the non-standard `module` field find a declaration by adjacency), and `dist/sdk.d.cts` (the CJS declaration — the `.d.cts` extension makes TypeScript treat it as CommonJS so `require()` consumers resolve cleanly under `node16`/`nodenext`, where a `.d.ts` would be read as ESM and rejected). It is advertised via `package.json`'s `types` field plus a `types`-first `exports["."]` map: top-level `types` → `sdk.d.ts`, the `import` condition's nested `types` → `sdk.esm.d.ts`, and the `require` condition's nested `types` → `sdk.d.cts`. The declared surface is identical regardless of module kind, so all three files share content; the generator type-checks both interpretations (`sdk.d.ts` as ESM and `sdk.d.cts` as CJS).
@@ -418,6 +452,7 @@ After writing the file, `_typecheck_dts` runs the locally-installed `tsc --noEmi
 | javascript (browser) | camelCase | lowercase controller name `.js` | n/a (module functions) |
 | nodeJS | camelCase | lowercase controller name `.js` | n/a (module functions) |
 | php | camelCase | PascalCase controller name `.php` | PascalCase controller name |
+| react_native | camelCase | lowercase controller name `.js` | n/a (module functions) |
 
 Snake_case endpoint `id` → framework convention is handled by each generator.
 
@@ -726,7 +761,7 @@ After the SDK is regenerated and committed by `update-sdk.yml` propagate mode, t
 ### Endpoint set
 The CI workflow runs `python generate.py` twice per propagate run:
 - **Public** — no `--endpoints` argument, so the generator uses its default of `public_sdk_endpoints` (the public-facing endpoint subset that excludes admin/system endpoints — `../mediaviz_intelligence_hub/api_docs/endpoint_list/public_sdk_endpoints.yaml`). Outputs to `sdk/`.
-- **Admin** — `--frameworks javascript --destination-dir admin-sdk --admin`. The `--admin` flag implies `--endpoints all_endpoints` (no need to pass it explicitly). Outputs to `admin-sdk/`. JS-only; PHP/Python skipped because the admin variant ships only to npm. The independent `--destination-dir` means `sdk/` and `admin-sdk/` each maintain their own version history (independent `archive/` subdirs, independent `versioning.get_next_version` state), so a generator failure in one path does not corrupt the other.
+- **Admin** — `--frameworks javascript --destination-dir admin-sdk --admin`. The `--admin` flag implies `--endpoints all_endpoints` (no need to pass it explicitly). Outputs to `admin-sdk/`. JS-only; PHP/Python/React Native skipped because the admin variant ships only to npm. The independent `--destination-dir` means `sdk/` and `admin-sdk/` each maintain their own version history (independent `archive/` subdirs, independent `versioning.get_next_version` state), so a generator failure in one path does not corrupt the other.
 
 Resolution rule for `--endpoints`: if unset, it's `all_endpoints` when `--admin` is set, else `public_sdk_endpoints`. Explicit `--endpoints X` always wins, so a manual run can still build any flow into either dir.
 
@@ -742,8 +777,13 @@ JS-only sibling package. Same generator code path as the public package — the 
 
 The admin package requires its **own** trusted-publisher entry at the npm package level (separate from `@mediaviz/sdk`). Bootstrap is identical to the public package: one manual `npm publish --access restricted` from a laptop with a temporary classic token, then register the trusted publisher, then revoke the token. After that the workflow OIDC flow takes over.
 
+### npm — `@mediaviz/react-native-sdk` (public)
+Built by the same public `generate.py` run (no `--frameworks` argument, so every registered framework generates), from `sdk/v*/react_native/`. Same dist-tag scheme and Trusted Publishing flow as `@mediaviz/sdk`, published with `--access public --provenance`. It needs its own trusted-publisher entry at the npm package level — bootstrap identically: one manual publish with a temporary classic token, register the publisher, revoke the token.
+
+Because it ships from the same `sdk/` tree as the public JS package but is a separate npm package, it carries its **own** content-hash gate (`rn_changed`, hashing `sdk/v*/react_native/dist/`): an RN-only adapter change must publish even when the endpoint `dist/` is unchanged, and vice versa. It is public, so the same registry-liveness reconciliation as `@mediaviz/sdk` applies. The `Discard unchanged generator output` step reverts `sdk/` only when the public, Python **and** RN gates are all no-ops.
+
 ### Content-hash gate (skip no-op publishes)
-Each `generate.py` invocation archives the prior `vN/` and creates a fresh `vN+1/` unconditionally — so an admin-only upstream change would otherwise still bump and republish `@mediaviz/sdk` with byte-identical `dist/`. The workflow's `changes` step hashes the new `<dir>/javascript/dist/` against the most-recent `<dir>/archive/v*/javascript/dist/` (per-package, sha256 over sorted-file concat) and emits `public_changed` / `admin_changed`.
+Each `generate.py` invocation archives the prior `vN/` and creates a fresh `vN+1/` unconditionally — so an admin-only upstream change would otherwise still bump and republish `@mediaviz/sdk` with byte-identical `dist/`. The workflow's `changes` step hashes the new `<dir>/javascript/dist/` against the most-recent `<dir>/archive/v*/javascript/dist/` (per-package, sha256 over sorted-file concat) and emits `public_changed` / `admin_changed` / `rn_changed`.
 
 Side effects when a side is unchanged:
 - A `Discard unchanged generator output` step does `git restore <dir>/ && git clean -fd <dir>/`, reverting both the deleted tracked `vN/` and the untracked `vN+1/` (and the untracked, gitignored `archive/vN/`). Working tree for that side returns to its pre-generate state, so the commit step sees no diff there.
