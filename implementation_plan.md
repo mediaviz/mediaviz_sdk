@@ -7,6 +7,7 @@
 | javascript_browser | `generators/javascript_browser.py` | `test_generators/javascript.py` | complete |
 | php | `generators/php.py` | `test_generators/php.py` | complete |
 | python | `generators/python.py` | `test_generators/python.py` | complete |
+| react_native | `generators/react_native.py` | `test_generators/react_native.py` | complete |
 
 ## Cross-framework Carry-forward
 
@@ -48,6 +49,37 @@
 - **Protocol notes** — HMAC `sha256=hex(HMAC-SHA256(secret, "{ts}." + raw_body))` over raw bytes, ±300 s skew, constant-time compare, dual-secret rotation window (24 h); dedupe on `event_id` (7-day TTL, claim released if the `onEvent` callback throws so producer retries redeliver); `handleRequest` returns `{status, body}` (200/200/401/400) for framework-agnostic receiver glue; `reconcile` pulls `GET /subscriptions/{id}/events` cursor pages through the same dispatch path as push. JS signing uses Web Crypto (async) for Node ≥ 18 + browser parity.
 - **Tests** — `tests/test_webhooks_module.py` (14): source layout, Python signing round-trip (skew/rotation/missing-header rejection), wiring predicates, per-framework client wiring + reexports + autoload/packages, dts emission both with and without subscription endpoints.
 - **Companion hub fix** — `mediaviz_intelligence_hub/response_inference.py` now classifies `JSONResponse(content=…)` bodies (unwrapping `.model_dump()`/`.dict()`/`jsonable_encoder`) and carries the status code; `generate_api_endpoint_list.py` honors it. `create_subscription`/`verify_subscription` are documented as `201/200 + SubscriptionActivated` (were `202/200 + empty`), which types `createSubscription()` as `Promise<SubscriptionActivated>` in the dts.
+
+## React Native Support — complete
+
+Adds `@mediaviz/react-native-sdk` as a fourth target. `ReactNativeGenerator` subclasses `JavaScriptBrowserGenerator` and overrides only packaging (`emit_package_json`, `emit_rollup_config`, `emit_react_entry`, `emit_react_dts`, `npm_install_args`); every endpoint emitter is inherited untouched, so the RN and browser controllers cannot drift.
+
+**Upstream prerequisite (`oauth_library`, branch `feat/react-native-support`).** The blocker was never the endpoint code — it was the OAuth wrapper:
+- `src/crypto.js` (new) — pluggable `{getRandomValues, sha256}` provider defaulting to WebCrypto. Hermes has no `SubtleCrypto` at all, so PKCE's SHA-256 has to come from a native module. The default now fails with a message naming `configureCrypto` instead of a `TypeError` deep inside PKCE.
+- `src/base64.js` (new) — hand-rolled base64url codec + UTF-8 decode, replacing `atob`/`TextDecoder` in `decodeAccessToken`; the encoder moved here from `pkce.js`.
+- `src/pkce.js` — ASCII-encodes the verifier per RFC 7636 §4.1 instead of using `TextEncoder`.
+- `src/client.js` — **omits `client_secret` entirely when unset.** The server rejects a public client that sends one (`oauth_token_service.py:72`), and the old unconditional pass-through serialized `undefined` into the form body as that literal string. The public-client flow could never have worked; this was a latent bug, not a React Native limitation.
+
+Verified against the RFC 7636 Appendix B vector and end-to-end on a runtime with `crypto`, `atob`, `btoa`, `TextEncoder`, `TextDecoder` and `Buffer` all removed. Web/Node behaviour is unchanged (99 → 128 tests).
+
+**Bundled adapters (`react_native_module/`, 71 jest tests).** `crypto.js` (provider factory, digest-shape normalisation), `storage.js` (memory / expo-secure-store / react-native-keychain), `authSession.js` (PKCE login + hand-rolled redirect parsing), `session.js` (restore / signIn / signOut / rotation persistence), `react.js` (`MediaVizProvider` + `useMediaViz`). Native modules are **injected, never required** — expo-crypto and react-native-quick-crypto are alternatives, and a static require of one breaks Metro for apps using the other.
+
+The session lifecycle lives in `session.js` rather than inside the provider so it is testable without a renderer; `react.js` only mirrors it into state. `react.js` is deliberately outside the module barrel and reachable at `<pkg>/react`, keeping React off the core import path.
+
+**Packaging decisions worth remembering:**
+- Metro resolves `react-native` ahead of `browser` and `main`. Without that field an RN app consuming `@mediaviz/sdk` lands on the **UMD bundle** — the worst of the three outputs.
+- Rollup collapses a CommonJS entry to a lone default export, so the `/react` subpath is built from a generated ESM shim (`react_entry.js`). Building it from `react.js` directly made `import { MediaVizProvider }` resolve to `undefined` — caught by loading the built bundle, not by any unit test.
+- `npm_install_args = ["--omit=peer"]`: npm auto-installs peers, and `react-native` drags in ~160 MB of native toolchain (hermes-compiler, react-devtools-core) that the rollup+tsc build never touches. Output went 11,999 → 525 files.
+- `sharp` (`optionalDependencies` on the browser package) is dropped — a native Node image library is dead weight on a device.
+
+**Shared-generator changes** (affect the browser SDK too, deliberately):
+- `build_dist` logs with `self.framework_name` instead of a hardcoded `[javascript]`, and takes install flags from the overridable `npm_install_args`.
+- `_copy_module_files` now ignores `__tests__`, so a bundled module's own suite no longer ships inside the SDK (this removed 12 files from the JS package as well).
+- `webhook_module/javascript/src/signing.js` builds its `TextEncoder` lazily. At module scope it made merely *importing* the SDK crash on any runtime without that global — found by running the generated bundle on a stripped runtime, and the one failure that would have shipped silently.
+
+**Known caveat.** The webhooks module's signing half still needs `crypto.subtle`; it is a server-side concern (only a push receiver verifies signatures). The pull half (`pullEvents`, `reconcile`, `fetchResult`) goes over the authenticated API and works on device.
+
+**Still open:** no on-device verification yet. `URLSearchParams` is used in five places in the generated code and React Native's polyfill is partial — the fallback, if it fails, is a small internal `_qs()` helper in `javascript_browser.py` (which would change output for all JS targets). An Expo smoke app is the next step.
 
 ## Header→Body Upload Migration
 

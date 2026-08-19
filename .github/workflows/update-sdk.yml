@@ -105,6 +105,15 @@ jobs:
         with:
           php-version: "8.2"
 
+      - name: Test bundled React Native adapters
+        working-directory: mediaviz_sdk/react_native_module/javascript
+        # These cover the crypto/storage/auth-session/session logic that the
+        # generated suites cannot reach — that code is copied in verbatim, so
+        # nothing else exercises it.
+        run: |
+          npm install --no-audit --no-fund
+          npx jest
+
       - name: Install Python deps
         # httpx is the generated SDK's runtime dep (oauth_sdk imports it at load);
         # tests run inline inside generate.py, so it must be present beforehand.
@@ -185,8 +194,15 @@ jobs:
           }
           PUB=$(ls -d sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
           ADM=$(ls -d admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
+          RN=$(ls -d sdk/v*/react_native 2>/dev/null | grep -v archive | sort -V | tail -1)
           assert_types "$PUB" "@mediaviz/sdk"
           assert_types "$ADM" "@mediaviz/admin-sdk"
+          assert_types "$RN" "@mediaviz/react-native-sdk"
+          # The RN package also ships declarations for its /react subpath, which
+          # assert_types does not know about.
+          [ -f "$RN/dist/react.d.ts" ] || { echo "::error::@mediaviz/react-native-sdk missing $RN/dist/react.d.ts"; exit 1; }
+          [ -f "$RN/dist/react.d.cts" ] || { echo "::error::@mediaviz/react-native-sdk missing $RN/dist/react.d.cts"; exit 1; }
+          echo "@mediaviz/react-native-sdk: react.d.ts + react.d.cts present"
 
       # ── Locate + content-hash gate ─────────────────────────────────────────
       # Each generator unconditionally archives the prior vN/ and creates a fresh
@@ -203,16 +219,19 @@ jobs:
           PHP_DIR=$(ls -d mediaviz_sdk/sdk/v*/php 2>/dev/null | grep -v archive | sort -V | tail -1)
           PY_DIR=$(ls -d mediaviz_sdk/sdk/v*/python 2>/dev/null | grep -v archive | sort -V | tail -1)
           ADMIN_JS_DIR=$(ls -d mediaviz_sdk/admin-sdk/v*/javascript 2>/dev/null | grep -v archive | sort -V | tail -1)
+          RN_DIR=$(ls -d mediaviz_sdk/sdk/v*/react_native 2>/dev/null | grep -v archive | sort -V | tail -1)
           VERSION=$(echo "$JS_DIR" | sed -E 's|.*sdk/v([0-9.]+)/javascript|v\1|')
           echo "js_dir=$JS_DIR" >> $GITHUB_OUTPUT
           echo "php_dir=$PHP_DIR" >> $GITHUB_OUTPUT
           echo "py_dir=$PY_DIR" >> $GITHUB_OUTPUT
           echo "admin_js_dir=$ADMIN_JS_DIR" >> $GITHUB_OUTPUT
+          echo "rn_dir=$RN_DIR" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Located JS: $JS_DIR"
           echo "Located PHP: $PHP_DIR"
           echo "Located Python: $PY_DIR"
           echo "Located admin JS: $ADMIN_JS_DIR"
+          echo "Located React Native: $RN_DIR"
           echo "Version: $VERSION"
 
       # Pure branch→dist-tag map, computed before the detect step (ungated) so the
@@ -258,6 +277,26 @@ jobs:
             else
               echo "public_changed=false" >> $GITHUB_OUTPUT
               echo "Public dist content unchanged and registry in sync (live=${LIVE}) — skipping commit + publish for sdk/."
+            fi
+          fi
+          # React Native ships from the same sdk/ tree as the public JS package but
+          # is its own npm package, so it gets its own content hash: an RN-only
+          # adapter change must publish even when the endpoint dist is identical.
+          # It is public, so the same registry-liveness reconciliation applies.
+          NEW_RN="${{ steps.dirs.outputs.rn_dir }}/dist"
+          OLD_RN=$(ls -d mediaviz_sdk/sdk/archive/v*/react_native/dist 2>/dev/null | sort -V | tail -1)
+          if [ -z "$OLD_RN" ] || [ "$(hash_dist "$NEW_RN")" != "$(hash_dist "$OLD_RN")" ]; then
+            echo "rn_changed=true" >> $GITHUB_OUTPUT
+            echo "React Native dist content changed — will publish @mediaviz/react-native-sdk."
+          else
+            WANT_RN=$(echo "$OLD_RN" | sed -E 's|.*/archive/v([0-9.]+)/react_native/dist|\1|')
+            LIVE_RN=$(npm view "@mediaviz/react-native-sdk@${{ steps.npm-meta.outputs.tag }}" version 2>/dev/null || echo "")
+            if [ -n "$WANT_RN" ] && { [ -z "$LIVE_RN" ] || [ "$(printf '%s\n%s\n' "$WANT_RN" "$LIVE_RN" | sort -V | tail -1)" != "$LIVE_RN" ]; }; then
+              echo "rn_changed=true" >> $GITHUB_OUTPUT
+              echo "React Native dist unchanged BUT registry behind (live=${LIVE_RN:-none}, expected≥${WANT_RN}) — forcing publish to reconcile."
+            else
+              echo "rn_changed=false" >> $GITHUB_OUTPUT
+              echo "React Native dist unchanged and registry in sync (live=${LIVE_RN}) — skipping publish."
             fi
           fi
           # ── Admin SDK liveness caveat ──────────────────────────────────────────
@@ -320,17 +359,17 @@ jobs:
         # created a fresh vN+1/ (also gitignored). `restore` brings the prior tracked
         # vN/ back; `clean -fdx` removes the ignored vN+1/ and archive/ — plain
         # `clean -fd` would skip them now that v*/ is gitignored.
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'false' || steps.changes.outputs.admin_changed == 'false')
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'false' || steps.changes.outputs.admin_changed == 'false' || steps.changes.outputs.rn_changed == 'false')
         working-directory: mediaviz_sdk
         run: |
           # sdk/ holds JS, PHP AND Python — only revert it when BOTH the public (JS/PHP)
           # and Python gates are no-ops. A Python-only forced publish must keep sdk/ so
           # its freshly-bumped version is committed (JS/PHP won't republish — those are
           # gated separately on public_changed/branch downstream).
-          if [ "${{ steps.changes.outputs.public_changed }}" = "false" ] && [ "${{ steps.pychanges.outputs.python_changed }}" = "false" ]; then
+          if [ "${{ steps.changes.outputs.public_changed }}" = "false" ] && [ "${{ steps.pychanges.outputs.python_changed }}" = "false" ] && [ "${{ steps.changes.outputs.rn_changed }}" = "false" ]; then
             git restore sdk/
             git clean -fdx sdk/
-            echo "Reverted sdk/ — no public or Python content diff."
+            echo "Reverted sdk/ — no public, Python or React Native content diff."
           fi
           if [ "${{ steps.changes.outputs.admin_changed }}" = "false" ]; then
             git restore admin-sdk/
@@ -339,14 +378,14 @@ jobs:
           fi
 
       - name: Configure git identity
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.pychanges.outputs.python_changed == 'true')
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.pychanges.outputs.python_changed == 'true' || steps.changes.outputs.rn_changed == 'true')
         working-directory: mediaviz_sdk
         run: |
           git config user.name "mediaviz-pipeline-bot[bot]"
           git config user.email "mediaviz-pipeline-bot[bot]@users.noreply.github.com"
 
       - name: Commit + push regenerated SDKs
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.pychanges.outputs.python_changed == 'true')
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.pychanges.outputs.python_changed == 'true' || steps.changes.outputs.rn_changed == 'true')
         working-directory: mediaviz_sdk
         run: |
           HUB_SHORT_SHA=$(git -C ../mediaviz_intelligence_hub rev-parse --short HEAD)
@@ -390,7 +429,7 @@ jobs:
 
       # ── npm + Packagist publish (gated per-package on content hash) ────────
       - name: Upgrade npm CLI (Trusted Publishing needs ≥ 11.5)
-        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true')
+        if: steps.ctx.outputs.mode == 'propagate' && (steps.changes.outputs.public_changed == 'true' || steps.changes.outputs.admin_changed == 'true' || steps.changes.outputs.rn_changed == 'true')
         # node-version is 22, so npm@latest (12.x, requires node ≥22) installs cleanly
         # and satisfies the ≥11.5 Trusted Publishing floor. If node is ever pinned back
         # below 22, pin npm below 12 here (e.g. npm@^11) to avoid EBADENGINE.
@@ -399,6 +438,11 @@ jobs:
       - name: Publish @mediaviz/sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.public_changed == 'true'
         working-directory: ${{ steps.dirs.outputs.js_dir }}
+        run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
+
+      - name: Publish @mediaviz/react-native-sdk to npm
+        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.rn_changed == 'true'
+        working-directory: ${{ steps.dirs.outputs.rn_dir }}
         run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
 
       - name: Publish @mediaviz/admin-sdk to npm

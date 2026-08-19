@@ -1,0 +1,11 @@
+{
+  "name": "@mediaviz/react-native-module",
+  "description": "React Native runtime adapters bundled into the generated React Native SDK",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

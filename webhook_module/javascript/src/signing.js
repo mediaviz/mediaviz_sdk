@@ -8,12 +8,21 @@
 // constant time. Web Crypto only, so the same code runs in Node >= 18 and
 // browsers.
 
-const _encoder = new TextEncoder();
+// Built on first use, not at import. These functions are a server-side concern
+// (only the endpoint receiving a push verifies a signature), but the module is
+// bundled into every SDK including React Native — and constructing this at
+// module scope made merely importing the SDK crash on any runtime without a
+// TextEncoder global.
+let _encoderInstance = null;
+function _encode(text) {
+  if (!_encoderInstance) _encoderInstance = new TextEncoder();
+  return _encoderInstance.encode(text);
+}
 
 async function signWebhookPayload(secret, timestamp, rawBody) {
   const key = await globalThis.crypto.subtle.importKey(
-    'raw', _encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const payload = _concat(_encoder.encode(`${timestamp}.`), toBytes(rawBody));
+    'raw', _encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const payload = _concat(_encode(`${timestamp}.`), toBytes(rawBody));
   const digest = await globalThis.crypto.subtle.sign('HMAC', key, payload);
   return 'sha256=' + _hex(new Uint8Array(digest));
 }
@@ -37,7 +46,7 @@ async function verifyWebhookSignature(secretCurrent, secretPrevious, headers, ra
 
 // helpers
 function toBytes(rawBody) {
-  if (typeof rawBody === 'string') return _encoder.encode(rawBody);
+  if (typeof rawBody === 'string') return _encode(rawBody);
   if (rawBody instanceof Uint8Array) return rawBody;
   if (rawBody instanceof ArrayBuffer) return new Uint8Array(rawBody);
   throw new TypeError('rawBody must be a string, Uint8Array, or ArrayBuffer');

@@ -92,12 +92,12 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         # Type-check both module interpretations: sdk.d.ts as ESM, sdk.d.cts as CJS.
         self._typecheck_dts(output_dir, dts_path)
         self._typecheck_dts(output_dir, cts_path)
-        print(f"  [javascript] types emitted → {dts_path} (+ sdk.esm.d.ts, sdk.d.cts)")
+        print(f"  [{self.framework_name}] types emitted → {dts_path} (+ sdk.esm.d.ts, sdk.d.cts)")
 
     def _typecheck_dts(self, output_dir: str, dts_path: str) -> None:
         tsc = os.path.join(output_dir, "node_modules", ".bin", "tsc")
         if not os.path.isfile(tsc):
-            print(f"  [javascript] tsc not installed — skipping .d.ts type-check for {output_dir}")
+            print(f"  [{self.framework_name}] tsc not installed — skipping .d.ts type-check for {output_dir}")
             return
         result = subprocess.run(
             [tsc, "--noEmit", "--strict", "--skipLibCheck", dts_path],
@@ -106,18 +106,22 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         if result.returncode != 0:
             raise RuntimeError(f"sdk.d.ts failed type-check:\n{result.stdout}{result.stderr}")
 
+    # Extra `npm install` flags; subclasses append to keep the build install lean.
+    npm_install_args: list[str] = []
+
     def build_dist(self, output_dir: str) -> None:
         npm = shutil.which("npm")
         if not npm:
-            print(f"  [javascript] npm not found on PATH — skipping dist build for {output_dir}")
+            print(f"  [{self.framework_name}] npm not found on PATH — skipping dist build for {output_dir}")
             return
-        for cmd in (["npm", "install", "--no-audit", "--no-fund"], ["npm", "run", "build"]):
+        install = ["npm", "install", "--no-audit", "--no-fund", *self.npm_install_args]
+        for cmd in (install, ["npm", "run", "build"]):
             result = subprocess.run(cmd, cwd=output_dir, capture_output=True, text=True)
             if result.returncode != 0:
-                print(f"  [javascript] {' '.join(cmd)} failed in {output_dir}:")
+                print(f"  [{self.framework_name}] {' '.join(cmd)} failed in {output_dir}:")
                 print(result.stdout + result.stderr)
                 return
-        print(f"  [javascript] dist built → {os.path.join(output_dir, 'dist')}")
+        print(f"  [{self.framework_name}] dist built → {os.path.join(output_dir, 'dist')}")
 
     def copy_module(self, module_name: str, module_root: str, output_dir: str) -> None:
         self._copy_module_files(module_root, "javascript", module_name, output_dir)
