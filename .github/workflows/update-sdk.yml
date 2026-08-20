@@ -440,11 +440,6 @@ jobs:
         working-directory: ${{ steps.dirs.outputs.js_dir }}
         run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
 
-      - name: Publish @mediaviz/react-native-sdk to npm
-        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.rn_changed == 'true'
-        working-directory: ${{ steps.dirs.outputs.rn_dir }}
-        run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
-
       - name: Publish @mediaviz/admin-sdk to npm
         if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.admin_changed == 'true'
         working-directory: ${{ steps.dirs.outputs.admin_js_dir }}
@@ -530,6 +525,18 @@ jobs:
           curl -fsS -XPOST -H 'content-type:application/json' \
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}" \
             -d '{"repository":{"url":"https://github.com/mediaviz/mediaviz-php-sdk"}}'
+
+      # Deliberately last of the publish steps. npm Trusted Publishing (OIDC)
+      # requires a trusted publisher registered against an EXISTING package, so
+      # the very first automated publish of a brand-new package always fails
+      # until it is bootstrapped by hand (one manual publish with a temporary
+      # classic token, register the publisher, revoke the token). Ordering it
+      # after the established packages means that guaranteed first failure
+      # cannot take @mediaviz/admin-sdk, PyPI or Packagist down with it.
+      - name: Publish @mediaviz/react-native-sdk to npm
+        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.rn_changed == 'true'
+        working-directory: ${{ steps.dirs.outputs.rn_dir }}
+        run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
 
       # ── Propagate to the docs site ─────────────────────────────────────────
       # The docs generators read the public JS SDK (sdk/vN/javascript + sdk.d.ts)

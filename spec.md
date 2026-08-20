@@ -780,6 +780,8 @@ The admin package requires its **own** trusted-publisher entry at the npm packag
 ### npm — `@mediaviz/react-native-sdk` (public)
 Built by the same public `generate.py` run (no `--frameworks` argument, so every registered framework generates), from `sdk/v*/react_native/`. Same dist-tag scheme and Trusted Publishing flow as `@mediaviz/sdk`, published with `--access public --provenance`. It needs its own trusted-publisher entry at the npm package level — bootstrap identically: one manual publish with a temporary classic token, register the publisher, revoke the token.
 
+Its publish step is ordered **after** every established package (npm, PyPI, Packagist): Trusted Publishing cannot be registered against a package that does not exist, so a brand-new package's first automated publish always fails until bootstrapped, and that guaranteed failure must not take the working publishes down with it.
+
 Because it ships from the same `sdk/` tree as the public JS package but is a separate npm package, it carries its **own** content-hash gate (`rn_changed`, hashing `sdk/v*/react_native/dist/`): an RN-only adapter change must publish even when the endpoint `dist/` is unchanged, and vice versa. It is public, so the same registry-liveness reconciliation as `@mediaviz/sdk` applies. The `Discard unchanged generator output` step reverts `sdk/` only when the public, Python **and** RN gates are all no-ops.
 
 ### Content-hash gate (skip no-op publishes)
