@@ -12,10 +12,13 @@ High-level operator guide to the CI workflow that regenerates and publishes the 
 |----------|----------|------------|----------|
 | `@mediaviz/sdk` | npm | public | dev, qa, main (dist-tags `dev`/`qa`/`latest`) |
 | `@mediaviz/admin-sdk` | npm | **private** (`--access restricted`) | dev, qa, main |
+| `@mediaviz/react-native-sdk` | npm | public | **not yet automated** — see [`REACT_NATIVE_PROMOTION.md`](./REACT_NATIVE_PROMOTION.md) |
 | `mediaviz-sdk` | PyPI | public | dev, qa, main (PEP 440 pre-releases) |
 | `mediaviz/mediaviz-php-sdk` | Packagist | public | **main only** |
 
 PHP/Packagist publishes only on `main`; the admin package is JavaScript-only.
+
+> **React Native is generated but not published by CI.** The publish step lives on `dev`, and `repository_dispatch` runs the workflow file from `main` — so it never executes. The package on npm was bootstrapped by hand, and its `latest` tag currently points at a dev prerelease. [`REACT_NATIVE_PROMOTION.md`](./REACT_NATIVE_PROMOTION.md) is the runbook; [`REACT_NATIVE_VERIFICATION.md`](./REACT_NATIVE_VERIFICATION.md) tracks what is still unverified on-device.
 
 ### PyPI branching — pre-releases, not dist-tags
 
