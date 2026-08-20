@@ -1,0 +1,5 @@
+{
+  "name": "@mediaviz/webhooks-module",
+  "description": "MediaViz webhook consumer module bundled into the generated JS SDK",
+  "main": "src/index.js"
+}
