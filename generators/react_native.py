@@ -173,6 +173,16 @@ class ReactNativeGenerator(JavaScriptBrowserGenerator):
         super().emit_dts_file(endpoints, composites, utilities, output_dir, admin=admin)
         self.emit_react_dts(output_dir)
 
+    def dts_addendum(self) -> str:
+        """Declarations for the adapters copied in from ``react_native_module/``.
+
+        Hand-written for the same reason as the ``/react`` subpath's: this is the
+        fixed shape of the bundled source, not something the endpoint catalog can
+        vary. Appended to the main ``sdk.d.ts`` because the barrel re-exports
+        these from the package root, so that is where TypeScript looks for them.
+        """
+        return _ADAPTER_DTS
+
     def emit_react_dts(self, output_dir: str) -> None:
         """Declarations for the ``/react`` subpath.
 
@@ -239,4 +249,163 @@ export interface MediaVizContextValue {
 export declare function MediaVizProvider(props: MediaVizProviderProps): unknown;
 export declare function useMediaViz(): MediaVizContextValue;
 export declare const MediaVizContext: unknown;
+"""
+
+
+# Declarations for react_native_module/. Kept beside _REACT_DTS so both
+# hand-written surfaces live together; appended to sdk.d.ts by dts_addendum.
+_ADAPTER_DTS = """
+
+// ── React Native adapters ──────────────────────────────────────────────────
+// Bundled from react_native_module/ and re-exported from the package root.
+
+/** Token shape the stores read back. Both tokens may be absent. */
+export interface TokenPair {
+  accessToken: string | null;
+  refreshToken: string | null;
+}
+
+/**
+ * Persistence contract. `save` accepts either the OAuth client's snake_case
+ * response or the client's camelCase getters; both normalise to TokenPair.
+ */
+export interface TokenStore {
+  load(): Promise<TokenPair>;
+  save(tokens: unknown): Promise<void>;
+  clear(): Promise<void>;
+}
+
+/** Native crypto, as expo-crypto or react-native-quick-crypto expose it. */
+export interface CryptoImpl {
+  /** May fill in place and return void (expo-crypto) or return the array. */
+  getRandomValues(bytes: Uint8Array): Uint8Array | void;
+  /** May resolve a Uint8Array, ArrayBuffer, typed array, or byte array. */
+  digest(bytes: Uint8Array): Promise<Uint8Array | ArrayBuffer | ArrayBufferView | number[]> | Uint8Array | ArrayBuffer | ArrayBufferView | number[];
+}
+
+/** Normalised provider the OAuth SDK's PKCE path consumes. */
+export interface CryptoProvider {
+  getRandomValues(bytes: Uint8Array): Uint8Array;
+  sha256(bytes: Uint8Array): Promise<Uint8Array>;
+}
+
+/** Normalises either native crypto convention into a CryptoProvider. */
+export declare function createCryptoProvider(impl: CryptoImpl): CryptoProvider;
+
+/**
+ * Installs the provider PKCE uses. Must be called before any sign-in:
+ * Hermes ships no SubtleCrypto, so the default WebCrypto path throws.
+ */
+export declare function configureCrypto(provider: CryptoProvider): void;
+
+/** Non-persistent default. Tokens are lost when the app is killed. */
+export declare class MemoryTokenStore implements TokenStore {
+  load(): Promise<TokenPair>;
+  save(tokens: unknown): Promise<void>;
+  clear(): Promise<void>;
+}
+
+/** The subset of expo-secure-store this SDK calls. */
+export interface SecureStoreLike {
+  getItemAsync(key: string, options?: Record<string, unknown>): Promise<string | null>;
+  setItemAsync(key: string, value: string, options?: Record<string, unknown>): Promise<void>;
+  deleteItemAsync(key: string, options?: Record<string, unknown>): Promise<void>;
+}
+
+export interface SecureTokenStoreOptions {
+  accessKey?: string;
+  refreshKey?: string;
+  secureStoreOptions?: Record<string, unknown>;
+}
+
+/**
+ * Backed by expo-secure-store (Keychain on iOS, Keystore on Android). Tokens
+ * are stored under separate keys — a single value is capped at 2048 bytes and
+ * two JWTs in one blob can cross that.
+ */
+export declare function createSecureTokenStore(
+  SecureStore: SecureStoreLike,
+  options?: SecureTokenStoreOptions
+): TokenStore;
+
+/** The subset of react-native-keychain this SDK calls. */
+export interface KeychainLike {
+  getGenericPassword(options?: Record<string, unknown>): Promise<{ password: string } | false>;
+  setGenericPassword(username: string, password: string, options?: Record<string, unknown>): Promise<unknown>;
+  resetGenericPassword(options?: Record<string, unknown>): Promise<unknown>;
+}
+
+export interface KeychainTokenStoreOptions {
+  service?: string;
+  keychainOptions?: Record<string, unknown>;
+}
+
+/** Backed by react-native-keychain, which has no size cap, so one JSON entry. */
+export declare function createKeychainTokenStore(
+  Keychain: KeychainLike,
+  options?: KeychainTokenStoreOptions
+): TokenStore;
+
+/** Contract of expo-web-browser's openAuthSessionAsync. */
+export type OpenAuthSession = (
+  url: string,
+  redirectUri: string,
+  options?: Record<string, unknown>
+) => Promise<{ type: string; url?: string }>;
+
+/** 'cancelled' when the user dismissed the sheet, 'failed' otherwise. */
+export declare class AuthSessionError extends Error {
+  readonly name: 'AuthSessionError';
+  readonly code: string;
+  constructor(code: string, message: string);
+}
+
+export interface AuthSessionOptions {
+  openAuthSession: OpenAuthSession;
+  redirectUri: string;
+  state?: string;
+  sessionOptions?: Record<string, unknown>;
+}
+
+/** Runs the full interactive login and leaves the client authenticated. */
+export declare function startAuthSession(
+  mv: MediaViz,
+  options: AuthSessionOptions
+): Promise<TokenResponse>;
+
+/**
+ * Extracts query and fragment params from a redirect URL. Hand-rolled because
+ * React Native's URL polyfill mis-parses the custom schemes native redirect
+ * URIs use. Returns an empty object for input it cannot parse.
+ */
+export declare function parseRedirectUrl(url: string): Record<string, string>;
+
+export interface SignInOverrides {
+  openAuthSession?: OpenAuthSession;
+  redirectUri?: string;
+  state?: string;
+  sessionOptions?: Record<string, unknown>;
+}
+
+export interface CreateSessionOptions {
+  /** The MediaViz class itself — this module is copied into the package and cannot name its host. */
+  MediaViz: new (config?: MediaVizConfig) => MediaViz;
+  config?: MediaVizConfig;
+  /** Defaults to a MemoryTokenStore. */
+  store?: TokenStore;
+  openAuthSession?: OpenAuthSession;
+  onTokens?: (tokens: unknown | null) => void;
+}
+
+/** The signed-in lifecycle, independent of React. react.js binds over this. */
+export interface Session {
+  readonly client: MediaViz;
+  readonly store: TokenStore;
+  /** Loads persisted tokens into the client. Resolves null when there are none. */
+  restore(): Promise<TokenPair | null>;
+  signIn(overrides?: SignInOverrides): Promise<TokenResponse>;
+  signOut(): Promise<void>;
+}
+
+export declare function createSession(options: CreateSessionOptions): Session;
 """
