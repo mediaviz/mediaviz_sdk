@@ -526,18 +526,6 @@ jobs:
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}" \
             -d '{"repository":{"url":"https://github.com/mediaviz/mediaviz-php-sdk"}}'
 
-      # Deliberately last of the publish steps. npm Trusted Publishing (OIDC)
-      # requires a trusted publisher registered against an EXISTING package, so
-      # the very first automated publish of a brand-new package always fails
-      # until it is bootstrapped by hand (one manual publish with a temporary
-      # classic token, register the publisher, revoke the token). Ordering it
-      # after the established packages means that guaranteed first failure
-      # cannot take @mediaviz/admin-sdk, PyPI or Packagist down with it.
-      - name: Publish @mediaviz/react-native-sdk to npm
-        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.rn_changed == 'true'
-        working-directory: ${{ steps.dirs.outputs.rn_dir }}
-        run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
-
       # ── Propagate to the docs site ─────────────────────────────────────────
       # The docs generators read the public JS SDK (sdk/vN/javascript + sdk.d.ts)
       # off this branch, so rebuild docs whenever the public SDK content changed.
@@ -551,3 +539,16 @@ jobs:
           event-type: sdk-updated
           client-payload: |
             {"branch":"${{ steps.ctx.outputs.branch }}"}
+
+      # Deliberately the LAST step in the job — after every other publish AND
+      # after the docs dispatch. npm Trusted Publishing (OIDC) requires a trusted
+      # publisher registered against an EXISTING package, so the very first
+      # automated publish of a brand-new package always fails until it is
+      # bootstrapped by hand (one manual publish with a temporary classic token,
+      # register the publisher, revoke the token). Nothing may sit behind it: a
+      # failure here must not take @mediaviz/admin-sdk, PyPI, Packagist or the
+      # docs rebuild down with it.
+      - name: Publish @mediaviz/react-native-sdk to npm
+        if: steps.ctx.outputs.mode == 'propagate' && steps.changes.outputs.rn_changed == 'true'
+        working-directory: ${{ steps.dirs.outputs.rn_dir }}
+        run: npm publish --access public --tag ${{ steps.npm-meta.outputs.tag }} --provenance
