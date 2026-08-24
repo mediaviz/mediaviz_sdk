@@ -204,3 +204,48 @@ def test_react_dts_declares_the_provider_surface(gen, out_dir):
         assert name in dts
     # The require condition needs a .d.cts or node16 resolution reads it as ESM.
     assert os.path.isfile(os.path.join(out_dir, "dist", "react.d.cts"))
+
+
+# Every name the barrel re-exports from react_native_module/. These ship as
+# runtime exports regardless; the risk is that they ship *untyped*, which no
+# test caught until a TypeScript consumer hit TS2305 on the published package.
+_ADAPTER_EXPORTS = (
+    "createCryptoProvider", "configureCrypto",
+    "MemoryTokenStore", "createSecureTokenStore", "createKeychainTokenStore",
+    "startAuthSession", "parseRedirectUrl", "AuthSessionError",
+    "createSession",
+)
+
+
+def test_adapter_exports_are_declared(gen):
+    dts = gen.dts_addendum()
+    for name in _ADAPTER_EXPORTS:
+        assert f"export declare function {name}" in dts or f"export declare class {name}" in dts, name
+
+
+def test_adapter_addendum_matches_the_barrel(gen):
+    """The declared surface must not drift from what index.js actually exports."""
+    barrel = os.path.join(RN_MODULE_DIR, "javascript", "src", "index.js")
+    exported = gen.discover_file_exports(barrel)
+    dts = gen.dts_addendum()
+    for name in exported:
+        assert name in dts, f"{name} is exported by the barrel but undeclared"
+
+
+def test_addendum_is_appended_to_every_dts_variant(gen, out_dir):
+    gen._schemas = {}
+    gen.emit_dts_file([_EP], None, None, out_dir)
+    dist = os.path.join(out_dir, "dist")
+    bodies = [open(os.path.join(dist, n)).read()
+              for n in ("sdk.d.ts", "sdk.esm.d.ts", "sdk.d.cts")]
+    # The require/import conditions resolve to different files; a name missing
+    # from one of them is invisible to half of all consumers.
+    for body in bodies:
+        for name in _ADAPTER_EXPORTS:
+            assert name in body, name
+    assert bodies[0] == bodies[1] == bodies[2]
+
+
+def test_addendum_is_react_native_only():
+    """The browser SDK bundles no adapters, so its declarations must not gain them."""
+    assert JavaScriptBrowserGenerator().dts_addendum() == ""

@@ -72,7 +72,7 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         skipped, mirroring build_dist's npm-not-found behaviour.
         """
         from .typescript_dts import build_dts
-        dts = build_dts(self, endpoints, composites, utilities, self._schemas, admin=admin)
+        dts = build_dts(self, endpoints, composites, utilities, self._schemas, admin=admin) + self.dts_addendum()
         dist_dir = os.path.join(output_dir, "dist")
         os.makedirs(dist_dir, exist_ok=True)
         dts_path = os.path.join(dist_dir, "sdk.d.ts")
@@ -93,6 +93,17 @@ class JavaScriptBrowserGenerator(BaseGenerator):
         self._typecheck_dts(output_dir, dts_path)
         self._typecheck_dts(output_dir, cts_path)
         print(f"  [{self.framework_name}] types emitted → {dts_path} (+ sdk.esm.d.ts, sdk.d.cts)")
+
+    def dts_addendum(self) -> str:
+        """Declarations appended to the generated .d.ts, after the catalog-derived surface.
+
+        The endpoint types come from the endpoint spec, but a framework that
+        bundles hand-written adapters (React Native's crypto/storage/auth-session
+        modules) re-exports names the catalog knows nothing about. Without this
+        they ship untyped and TypeScript consumers get TS2305 on the very APIs
+        the framework exists to add.
+        """
+        return ""
 
     def _typecheck_dts(self, output_dir: str, dts_path: str) -> None:
         tsc = os.path.join(output_dir, "node_modules", ".bin", "tsc")
