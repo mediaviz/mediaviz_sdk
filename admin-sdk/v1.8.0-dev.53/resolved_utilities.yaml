@@ -1,0 +1,4 @@
+resolved_at: '2026-11-20T16:23:52Z'
+modules:
+- source_module: oauth
+  utilities: []
